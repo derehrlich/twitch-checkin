@@ -52,14 +52,21 @@
   @keyframes clipout { to { opacity: 0; transform: translate(-50%, 30px) scale(.96); } }
 
   /* Schild-Layout für Alerts und Raids (wie im alten Meld-Alert): Titel, Name, Nachricht, darüber ein großes Bild/GIF */
+  :root { --wood-img: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px), repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px); }
+  /* Soundboard: kleines Holz-Schild unten links, solange ein Kanalpunkte-Sound läuft */
+  #sbtoast { position: fixed; left: 40px; bottom: 40px; display: flex; align-items: center; gap: 14px; padding: 12px 22px 12px 16px; max-width: 520px; box-sizing: border-box;
+    background-color: #724C31; background-image: var(--wood-img); border: 4px solid #4A2F1B; border-radius: 12px; box-shadow: 0 4px 0 0 #4A2F1B, 0 8px 18px rgba(0, 0, 0, .5);
+    color: #fff3da; opacity: 0; transform: translateY(24px) scale(.96); transition: opacity .35s, transform .45s cubic-bezier(.34, 1.56, .64, 1); pointer-events: none; }
+  #sbtoast.show { opacity: 1; transform: none; }
+  #sbtoast i { font-style: normal; font-size: 30px; }
+  #sbtoast span { display: flex; flex-direction: column; min-width: 0; }
+  #sbtoast b { font-size: 22px; text-shadow: 2px 2px 0 rgba(0, 0, 0, .5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sbtoast small { font-size: 17px; color: #ecd9b6; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sign .card { min-width: 440px; max-width: 620px; text-align: center; padding: 30px 44px 26px; }
   /* Holz-Hintergrund wie in der Ziel-Badge: Raster und Streifen, dunkler Rand, Schrauben, wanderndes Glanz-Licht, goldener Glow beim Aufsetzen */
   .wrap .card.panel {
     background-color: #724C31;
-    background-image:
-      linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px),
-      repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px);
+    background-image: var(--wood-img);
     background-size: auto;
     border: 6px solid #4A2F1B; border-radius: 15px;
     box-shadow: 0 6px 0 0 #4A2F1B, 0 12px 24px rgba(0, 0, 0, .5);
@@ -108,6 +115,7 @@
 <canvas id="fx"></canvas>
 <div id="stage"></div>
 <div id="clipstage"></div>
+<div id="sbtoast"></div>
 <script>
 // Lautstärke und Dauer kommen aus dem Admin-Bereich. Optional überschreibbar per URL:
 // ?volume=0.6 (0..1)   ?duration=5000 (ms)   ?poll=3000 (Abfrageintervall in ms)
@@ -356,10 +364,43 @@ async function poll() {
     useImages(data.images ?? {});
     useUploadedSounds(data.sounds ?? {});
     setSoundVolume();
-    for (const ev of data.events) if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) enqueue(ev);
+    for (const ev of data.events) {
+      if (ev.type === 'sound') playBoard(ev);
+      else if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) enqueue(ev);
+    }
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
+}
+
+// ---------- Kanalpunkte-Soundboard ----------
+// Die Töne werden vorab geladen (Liste vom Server), damit sie bei einer Einlösung ohne Verzögerung spielen.
+// Soundboard-Töne laufen sofort und stehen nicht in der Warteschlange der Alerts. Ein Ton endet spätestens nach 20 Sekunden.
+const board = {}; // id -> { url, audio }
+async function loadBoard() {
+  try {
+    const map = await (await fetch('/api/soundboard', { cache: 'no-store' })).json();
+    for (const id of Object.keys(board)) if (!map[id]) delete board[id];
+    for (const [id, url] of Object.entries(map)) {
+      if (board[id]?.url === url) continue;
+      const audio = new Audio(url); audio.preload = 'auto';
+      board[id] = { url, audio };
+    }
+  } catch { /* beim nächsten Durchlauf erneut */ }
+  setTimeout(loadBoard, 60_000);
+}
+let sbTimer = null;
+function playBoard(ev) {
+  const a = new Audio(ev.src);
+  a.volume = Math.max(0, Math.min(1, volume * (Number(ev.volume) || 1)));
+  a.play().catch(() => {});
+  const stop = setTimeout(() => { try { a.pause(); } catch { /* egal */ } }, 20_000);
+  a.addEventListener('ended', () => clearTimeout(stop), { once: true });
+  const el = document.getElementById('sbtoast');
+  el.innerHTML = `<i>🔊</i><span><b>${esc(ev.user)}</b><small>${esc(ev.title)}</small></span>`;
+  el.classList.add('show');
+  clearTimeout(sbTimer);
+  sbTimer = setTimeout(() => el.classList.remove('show'), 4500);
 }
 
 // ---------- Selbst-Update ----------
@@ -399,6 +440,7 @@ if (params.has('demo')) {
   show(); setInterval(show, duration + 1500);
 } else {
   poll();
+  loadBoard();
   checkForUpdate();
 }
 </script>

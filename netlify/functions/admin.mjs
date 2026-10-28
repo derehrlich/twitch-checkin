@@ -5,10 +5,11 @@ import { fill, fmtDuration, pushOverlay, signText, streamDay } from '../lib/chec
 import { raiderPackage, raidVars, raidCard } from '../lib/raid.mjs';
 import { buildAlert } from '../lib/alerts.mjs';
 import { SLOTS, slotKey } from '../lib/sounds.mjs';
+import { MAX_ENTRIES, ID, getBoard, isActive, newId, sanitizeEntry, saveBoard, soundKey } from '../lib/soundboard.mjs';
 import { IMAGE_MAX, IMAGE_SLOTS, imageKey, sniffImage } from '../lib/images.mjs';
 import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
-import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
+import { ensureRewards, listSubscriptions, SCOPES, deleteReward, sendChat, siteUrl, subscribe, syncSoundboardRewards, userByLogin } from '../lib/twitch.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -71,7 +72,7 @@ export default async (req) => {
       if (tokens && process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
         try {
           const subs = await listSubscriptions(webhookUrl);
-          const expected = 1 + (state.checkoutRewardId ? 1 : 0) + (state.streakRewardId ? 1 : 0) + (settings.raidEnabled ? 1 : 0) + (settings.alertsEnabled ? 5 : 0);
+          const expected = 1 + (state.checkoutRewardId ? 1 : 0) + (state.streakRewardId ? 1 : 0) + (await getBoard()).filter((e) => isActive(e) && e.rewardId).length + (settings.raidEnabled ? 1 : 0) + (settings.alertsEnabled ? 5 : 0);
           const notReady = subs.find((x) => x.status !== 'enabled');
           subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
         } catch (e) { subscriptionError = e.message; }
@@ -111,12 +112,16 @@ export default async (req) => {
     if (route[0] === 'setup' && method === 'POST') {
       if (!process.env.EVENTSUB_SECRET) return json({ error: 'EVENTSUB_SECRET ist nicht gesetzt' }, 400);
       const settings = await getSettings();
-      const titles = [settings.rewardTitle, ...(settings.checkoutEnabled ? [settings.checkoutRewardTitle] : []), ...(settings.streakRescueEnabled ? [settings.streakRewardTitle] : [])];
-      if (new Set(titles).size !== titles.length) return json({ error: 'Check-in, Check-out und Streak-Retter brauchen verschiedene Reward-Namen' }, 400);
+      const board = await getBoard();
+      const titles = [settings.rewardTitle, ...(settings.checkoutEnabled ? [settings.checkoutRewardTitle] : []), ...(settings.streakRescueEnabled ? [settings.streakRewardTitle] : []), ...board.map((e) => e.title)];
+      if (new Set(titles).size !== titles.length) return json({ error: 'Alle Rewards (Check-in, Check-out, Streak-Retter und Soundboard-Einträge) brauchen verschiedene Namen' }, 400);
       const { checkin, checkout, streak } = await ensureRewards(settings);
-      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : [])], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
+      const synced = await syncSoundboardRewards(board);
+      await saveBoard(synced);
+      const boardIds = synced.filter((e) => isActive(e) && e.rewardId).map((e) => e.rewardId);
+      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : []), ...boardIds], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
       await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
-      return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null, streak: streak?.title ?? null });
+      return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null, streak: streak?.title ?? null, soundboard: boardIds.length });
     }
 
     // ---- Tests (verändern keine Zähler)
@@ -157,6 +162,10 @@ export default async (req) => {
         const level = Math.max(1, Number(body.count) || 100);
         if (body.target === 'milestone') await pushOverlay({ type: 'checkin', user, count: level, streak: 12, milestone: true });
         else await sendChat(fill(settings.milestoneTemplate, { user, count: level, streak: 12, record: 15 }));
+      } else if (body.target === 'soundboard') {
+        const entry = (await getBoard()).find((e) => e.id === body.id);
+        if (!entry || !entry.soundVersion) return json({ error: 'Eintrag hat noch keinen Ton' }, 400);
+        await pushOverlay({ type: 'sound', id: entry.id, user, title: entry.title, volume: entry.volume, src: `/api/soundboard?id=${entry.id}&v=${entry.soundVersion}` });
       } else if (body.target === 'rescue') {
         await pushOverlay({ type: 'alert', kind: 'rescue', user, streak: 12, days: 2, ...signText(settings, 'rescue', { user, streak: 12, days: 2 }) });
       } else if (body.target === 'checkout-chat') {
@@ -203,6 +212,48 @@ export default async (req) => {
       if (method === 'DELETE') {
         await db.delete(slotKey(slot));
         return json(await setSound(null, slot));
+      }
+    }
+
+    // ---- Kanalpunkte-Soundboard (ein Reward mit Sounddatei je Eintrag)
+    if (route[0] === 'soundboard') {
+      const board = await getBoard();
+      if (route.length === 1 && method === 'GET') return json(board);
+      if (route.length === 1 && method === 'POST') {
+        if (board.length >= MAX_ENTRIES) return json({ error: `Höchstens ${MAX_ENTRIES} Einträge` }, 400);
+        const fields = sanitizeEntry(body);
+        if (!fields.title) return json({ error: 'Bitte einen Namen angeben' }, 400);
+        if (board.some((e) => e.title === fields.title)) return json({ error: 'Es gibt schon einen Eintrag mit diesem Namen' }, 400);
+        const entry = { id: newId(), cost: 100, cooldown: 0, volume: 1, enabled: true, soundName: null, soundVersion: null, rewardId: null, ...fields };
+        await saveBoard([...board, entry]);
+        return json(entry);
+      }
+      const entry = board.find((e) => e.id === route[1]);
+      if (!ID.test(route[1] ?? '') || !entry) return json({ error: 'Eintrag nicht gefunden' }, 404);
+      if (route.length === 2 && method === 'PUT') {
+        const fields = sanitizeEntry(body);
+        if (fields.title && board.some((e) => e.id !== entry.id && e.title === fields.title)) return json({ error: 'Es gibt schon einen Eintrag mit diesem Namen' }, 400);
+        Object.assign(entry, fields);
+        await saveBoard(board);
+        return json(entry);
+      }
+      if (route[2] === 'sound' && method === 'POST') {
+        const buf = Buffer.from(typeof body.data === 'string' ? body.data : '', 'base64');
+        if (!buf.length) return json({ error: 'Keine Datei empfangen' }, 400);
+        if (buf.length > SOUND_MAX) return json({ error: 'Die Datei ist zu groß (maximal 1,5 MB)' }, 413);
+        const type = sniffAudio(buf);
+        if (!type) return json({ error: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' }, 400);
+        await db.set(soundKey(entry.id), { type, data: buf.toString('base64') });
+        entry.soundName = String(body.name || 'Ton').replace(/[<>"]/g, '').slice(0, 80);
+        entry.soundVersion = Date.now();
+        await saveBoard(board);
+        return json(entry);
+      }
+      if (route.length === 2 && method === 'DELETE') {
+        await saveBoard(board.filter((e) => e.id !== entry.id));
+        await db.delete(soundKey(entry.id));
+        if (entry.rewardId) await deleteReward(entry.rewardId);
+        return json({ ok: true });
       }
     }
 

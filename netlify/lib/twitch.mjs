@@ -119,6 +119,41 @@ export async function ensureRewards(settings) {
   return { checkin, checkout, streak };
 }
 
+// Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge
+// ohne Ton oder abgeschaltete aus und merkt sich die Reward-ID im Eintrag.
+export async function syncSoundboardRewards(entries) {
+  const { user_id } = await userToken();
+  const { data: list } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
+  for (const e of entries) {
+    const active = Boolean(e.enabled && e.soundVersion);
+    const fields = {
+      title: e.title, cost: e.cost, is_enabled: active,
+      prompt: `Spielt „${e.title}“ im Stream ab.`, background_color: '#2E8B6E',
+      is_global_cooldown_enabled: e.cooldown > 0, ...(e.cooldown > 0 ? { global_cooldown_seconds: e.cooldown } : {}),
+    };
+    let reward = list.find((r) => r.id === e.rewardId) ?? list.find((r) => r.title === e.title);
+    if (!reward) {
+      if (!active) continue; // nichts anlegen, was ohnehin aus wäre
+      try {
+        reward = (await helix('POST', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id }, body: fields })).data[0];
+      } catch (err) {
+        if (err.message.includes('DUPLICATE_REWARD')) throw new Error(`Auf deinem Kanal gibt es schon einen Reward „${e.title}“, der nicht von dieser App stammt. Benenne oder lösche ihn in Twitch oder wähle für den Soundboard-Eintrag einen anderen Namen.`);
+        throw err;
+      }
+    } else if (reward.title !== e.title || reward.cost !== e.cost || reward.is_enabled !== active || (reward.global_cooldown_setting?.global_cooldown_seconds ?? 0) !== (e.cooldown > 0 ? e.cooldown : 0) || Boolean(reward.global_cooldown_setting?.is_enabled) !== e.cooldown > 0) {
+      reward = (await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: reward.id }, body: fields })).data[0];
+    }
+    e.rewardId = reward.id;
+  }
+  return entries;
+}
+
+// Reward in Twitch löschen (klappt nur bei Rewards dieser App; Fehler sind nicht schlimm)
+export async function deleteReward(rewardId) {
+  const { user_id } = await userToken();
+  await helix('DELETE', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: rewardId } }).catch((e) => console.warn('Reward nicht gelöscht:', e.message));
+}
+
 export const EVENT_TYPE = 'channel.channel_points_custom_reward_redemption.add';
 export const RAID_TYPE = 'channel.raid';
 // Alert-Ereignisse: Typ, Version und Bedingung (Follow braucht zusätzlich den Moderator)

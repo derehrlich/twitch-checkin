@@ -71,6 +71,9 @@ export const DEFAULTS = {
   raidDuration: 11000,
   // Eigene Bilder je Alert (wie die Sounds): { follow: { name, version }, ... }
   images: {},
+  // Soundboard: optionale Chatnachricht bei einer Einlösung (Platzhalter: {user} {title})
+  soundboardChat: false,
+  soundboardTemplate: '🔊 {user} spielt „{title}“',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -95,6 +98,7 @@ function sanitize(input) {
   str('checkoutDuplicateTemplate', 400);
   str('noCheckinTemplate', 400);
   str('raidTemplate', 400);
+  str('soundboardTemplate', 200);
   for (const k of ['follow', 'sub', 'resub', 'gift', 'cheer', 'raid', 'rescue']) {
     str(k + 'Title', 60);
     if (typeof input[k + 'Message'] === 'string') out[k + 'Message'] = input[k + 'Message'].trim().slice(0, 120); // darf leer sein
@@ -120,7 +124,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

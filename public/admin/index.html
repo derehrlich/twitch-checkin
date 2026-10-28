@@ -145,6 +145,21 @@
     </section>
 
     <section class="px-box">
+      <h2>Kanalpunkte-Soundboard</h2>
+      <p>Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit einer Sounddatei. Löst ein Zuschauer ihn ein, spielt das Overlay den Sound und zeigt kurz ein kleines Schild mit Name und Sound. Die Abklingzeit erzwingt Twitch selbst. Ein Eintrag ohne Sounddatei oder ohne Haken bei „Aktiv“ wird in Twitch ausgeschaltet.</p>
+      <div id="boardRows"></div>
+      <div class="row" style="margin-top:16px;align-items:end">
+        <div><label for="newBoardTitle">Neuer Eintrag: Name des Rewards</label><input id="newBoardTitle" maxlength="45" placeholder="z. B. Airhorn"></div>
+        <div style="flex:0 1 140px"><label for="newBoardCost">Preis (Kanalpunkte)</label><input id="newBoardCost" type="number" min="1" value="200"></div>
+        <button id="addBoard">Eintrag anlegen</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="syncBoard">Rewards mit Twitch abgleichen</button>
+      </div>
+      <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ auf „Rewards mit Twitch abgleichen“ klicken (das ist dasselbe wie „Reward &amp; Webhook einrichten“ oben). Höchstens 20 Einträge, Sounds bis 1,5 MB. Ein Ton wird nach spätestens 20 Sekunden beendet.</p>
+    </section>
+
+    <section class="px-box">
       <h2>Einstellungen</h2>
       <form id="settingsForm">
         <label for="chatTemplate">Chatnachricht beim Check-in</label>
@@ -225,6 +240,12 @@
         <label for="giftTemplate">Chat-Text Gift-Sub</label><textarea id="giftTemplate" maxlength="400"></textarea>
         <label for="cheerTemplate">Chat-Text Bits</label><textarea id="cheerTemplate" maxlength="400"></textarea>
         <p class="muted">Platzhalter: <code>{user}</code> <code>{tier}</code> <code>{months}</code> <code>{total}</code> <code>{bits}</code>. Nach dem Ein- oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+
+        <h2 style="margin-top:22px">Soundboard</h2>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="soundboardChat" type="checkbox"> Bei einer Einlösung eine Nachricht im Chat schreiben</label>
+        <label for="soundboardTemplate">Chatnachricht</label>
+        <input id="soundboardTemplate" maxlength="200">
+        <p class="muted">Platzhalter: <code>{user}</code> Name, <code>{title}</code> Name des Eintrags.</p>
 
         <h2 style="margin-top:22px">Alert-Schilder im Overlay</h2>
         <p class="muted">So sehen die Schilder aus: oben ein Bild oder GIF (siehe „Bilder“ unten), darunter Titel, Name und Nachricht. Platzhalter: <code>{user}</code> <code>{tier}</code> (1 bis 3) <code>{months}</code> <code>{total}</code> <code>{bits}</code> <code>{viewers}</code> <code>{raids}</code> <code>{game}</code> <code>{streak}</code> <code>{days}</code>. Die Nachricht darf leer sein.</p>
@@ -460,8 +481,8 @@ $('soundRows').addEventListener('click', run(async (e) => {
   }
 }));
 
-const FIELDS = ['followTitle', 'followMessage', 'subTitle', 'subMessage', 'resubTitle', 'resubMessage', 'giftTitle', 'giftMessage', 'cheerTitle', 'cheerMessage', 'raidTitle', 'raidMessage', 'rescueTitle', 'rescueMessage', 'alertDuration', 'raidDuration', 'chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
-const CHECKS = ['chatEnabled', 'checkoutEnabled', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
+const FIELDS = ['soundboardTemplate', 'followTitle', 'followMessage', 'subTitle', 'subMessage', 'resubTitle', 'resubMessage', 'giftTitle', 'giftMessage', 'cheerTitle', 'cheerMessage', 'raidTitle', 'raidMessage', 'rescueTitle', 'rescueMessage', 'alertDuration', 'raidDuration', 'chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const CHECKS = ['soundboardChat', 'chatEnabled', 'checkoutEnabled', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
   for (const f of FIELDS) $(f).value = settings[f];
@@ -493,7 +514,7 @@ $('settingsForm').addEventListener('submit', run(async (e) => {
 // ---- Aktionen
 $('setup').addEventListener('click', run(async () => {
   $('setup').disabled = true;
-  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? `, „${r.checkout}“` : ''}${r.streak ? `, „${r.streak}“` : ''} und Webhook eingerichtet ✓`); await loadState(); }
+  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? `, „${r.checkout}“` : ''}${r.streak ? `, „${r.streak}“` : ''}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhook eingerichtet ✓`); await loadState(); await loadBoardEntries(); }
   finally { $('setup').disabled = false; }
 }));
 $('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
@@ -561,7 +582,81 @@ $('delUser').addEventListener('click', run(async () => {
   await api('DELETE', `users/${selected}`); selected = null; await loadUsers(); await loadState();
 }));
 
-async function init() { await loadState(); await Promise.all([loadSettings(), loadUsers()]); if (new URLSearchParams(location.search).has('verbunden')) { toast('Mit Twitch verbunden ✓ – jetzt „Reward & Webhook einrichten“ klicken'); history.replaceState(null, '', '/admin/'); } }
+// ---- Soundboard
+let boardEntries = [];
+async function loadBoardEntries() { boardEntries = await api('GET', 'soundboard'); renderBoard(); }
+function renderBoard() {
+  $('boardRows').innerHTML = boardEntries.length ? boardEntries.map((e) => `
+    <div data-id="${esc(e.id)}" style="border-top:3px dotted var(--plaque);padding-top:10px;margin-top:12px">
+      <div class="grid2">
+        <div><label>Name des Rewards</label><input data-f="title" maxlength="45" value="${esc(e.title)}"></div>
+        <div><label>Preis (Kanalpunkte)</label><input data-f="cost" type="number" min="1" value="${e.cost}"></div>
+        <div><label>Abklingzeit (Sekunden, 0 = keine)</label><input data-f="cooldown" type="number" min="0" max="86400" value="${e.cooldown}"></div>
+        <div><label>Lautstärke (0,1 bis 1)</label><input data-f="volume" type="number" min="0.1" max="1" step="0.1" value="${e.volume}"></div>
+      </div>
+      <label class="check" style="font-size:16px;color:var(--ink)"><input data-f="enabled" type="checkbox" ${e.enabled ? 'checked' : ''}> Aktiv (als Reward in Twitch verfügbar)</label>
+      <p class="muted" style="margin:4px 0">Ton: <b>${e.soundVersion ? esc(e.soundName) : 'noch keiner'}</b> · Reward: ${e.rewardId ? 'angelegt' : 'noch nicht angelegt'}</p>
+      <div class="row" style="align-items:end">
+        <div><input data-f="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
+        <button data-act="upload">Ton hochladen</button>
+        <button data-act="save">Speichern</button>
+        <button data-act="play" class="ghost" ${e.soundVersion ? '' : 'disabled'}>▶ Anhören</button>
+        <button data-act="test" class="ghost" ${e.soundVersion ? '' : 'disabled'}>Im Overlay testen</button>
+        <button data-act="del" class="danger">Löschen</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Noch keine Einträge.</p>';
+}
+const boardFields = (row) => ({
+  title: row.querySelector('[data-f=title]').value, cost: row.querySelector('[data-f=cost]').value, cooldown: row.querySelector('[data-f=cooldown]').value,
+  volume: row.querySelector('[data-f=volume]').value, enabled: row.querySelector('[data-f=enabled]').checked,
+});
+$('addBoard').addEventListener('click', run(async () => {
+  await api('POST', 'soundboard', { title: $('newBoardTitle').value, cost: $('newBoardCost').value });
+  $('newBoardTitle').value = '';
+  await loadBoardEntries(); toast('Eintrag angelegt ✓ – jetzt einen Ton hochladen');
+}));
+$('syncBoard').addEventListener('click', () => $('setup').click());
+let boardPreview = null;
+$('boardRows').addEventListener('click', run(async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const row = btn.closest('[data-id]');
+  const id = row.dataset.id;
+  const entry = boardEntries.find((x) => x.id === id);
+  if (btn.dataset.act === 'save') {
+    await api('PUT', `soundboard/${id}`, boardFields(row));
+    await loadBoardEntries(); toast('Gespeichert ✓ – zum Übernehmen in Twitch „Rewards mit Twitch abgleichen“ klicken');
+  } else if (btn.dataset.act === 'upload') {
+    const file = row.querySelector('[data-f=file]').files[0];
+    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
+    if (file.size > 1_500_000) return toast('Die Datei ist zu groß (maximal 1,5 MB)', true);
+    btn.disabled = true;
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1]);
+        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+        r.readAsDataURL(file);
+      });
+      await api('POST', `soundboard/${id}/sound`, { name: file.name, data });
+      await loadBoardEntries(); toast('Ton hochgeladen ✓ – jetzt „Rewards mit Twitch abgleichen“ klicken');
+    } finally { btn.disabled = false; }
+  } else if (btn.dataset.act === 'play') {
+    boardPreview?.pause();
+    boardPreview = new Audio(`/api/soundboard?id=${id}&v=${entry.soundVersion}`);
+    boardPreview.volume = Math.min(1, Math.max(0, Number($('volume').value) || 0)) * (entry.volume || 1);
+    await boardPreview.play();
+  } else if (btn.dataset.act === 'test') {
+    await api('POST', 'test', { target: 'soundboard', id, user: $('testUser').value });
+    toast('Test gesendet (dauert bis ca. 3 s)');
+  } else if (btn.dataset.act === 'del') {
+    if (!confirm(`„${entry.title}“ samt Reward in Twitch löschen?`)) return;
+    await api('DELETE', `soundboard/${id}`);
+    await loadBoardEntries(); toast('Gelöscht ✓');
+  }
+}));
+
+async function init() { await loadState(); await Promise.all([loadSettings(), loadUsers(), loadBoardEntries()]); if (new URLSearchParams(location.search).has('verbunden')) { toast('Mit Twitch verbunden ✓ – jetzt „Reward & Webhook einrichten“ klicken'); history.replaceState(null, '', '/admin/'); } }
 init().catch(() => {});
 </script>
 </body>

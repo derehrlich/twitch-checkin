@@ -15,6 +15,7 @@ Object.assign(process.env, {
 const calls = [];
 const rewards = []; // vom Mock angelegte Rewards
 let shoutoutFails = false;
+let deletedRewards = 0; // damit neue Reward-IDs nie mit gelöschten kollidieren
 let clipsFail = false, channelsFail = false;
 let clips = [
   { id: 'LangClip', title: 'zu lang', duration: 55, creator_name: 'x' },
@@ -38,13 +39,17 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.pathname.endsWith('/helix/clips')) return ok({ data: clips });
   if (u.pathname.endsWith('/chat/messages')) return ok({ data: [{ is_sent: true }] });
   if (u.pathname.endsWith('/custom_rewards') && entry.method === 'GET') return ok({ data: rewards });
+  const cooldown = (r, b) => { if ('is_global_cooldown_enabled' in b) r.global_cooldown_setting = { is_enabled: b.is_global_cooldown_enabled, global_cooldown_seconds: b.global_cooldown_seconds ?? 0 }; return r; };
   if (u.pathname.endsWith('/custom_rewards') && entry.method === 'POST') {
-    const r = { id: 'reward' + (rewards.length + 1), title: entry.body.title, cost: entry.body.cost, is_enabled: true };
+    const r = cooldown({ id: 'reward' + (rewards.length + 1 + deletedRewards), title: entry.body.title, cost: entry.body.cost, is_enabled: entry.body.is_enabled ?? true }, entry.body);
     rewards.push(r);
     return ok({ data: [r] });
   }
   if (u.pathname.endsWith('/custom_rewards') && entry.method === 'PATCH') {
-    const r = rewards.find((x) => x.id === entry.query.id); Object.assign(r, entry.body); return ok({ data: [r] });
+    const r = rewards.find((x) => x.id === entry.query.id); Object.assign(r, entry.body); cooldown(r, entry.body); return ok({ data: [r] });
+  }
+  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'DELETE') {
+    const i = rewards.findIndex((x) => x.id === entry.query.id); if (i >= 0) { rewards.splice(i, 1); deletedRewards++; } return new Response(null, { status: 204 });
   }
   if (u.pathname.endsWith('/redemptions')) return ok({ data: [{}] });
   if (u.pathname.endsWith('/eventsub/subscriptions')) {
@@ -64,6 +69,7 @@ const admin = (await import('../netlify/functions/admin.mjs')).default;
 const auth = (await import('../netlify/functions/auth.mjs')).default;
 const sound = (await import('../netlify/functions/sound.mjs')).default;
 const image = (await import('../netlify/functions/image.mjs')).default;
+const board = (await import('../netlify/functions/soundboard.mjs')).default;
 const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/checkin.mjs');
 const { getSettings } = await import('../netlify/lib/settings.mjs');
 const { computeStreak, findRescue, parseLevels } = await import('../netlify/lib/streak.mjs');
@@ -120,7 +126,7 @@ await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', asy
 await test('Setup legt beide Rewards an und abonniert je einen Webhook mit reward_id', async () => {
   const res = await admin(adminReq('POST', 'setup', {}, cookie));
   assert.equal(res.status, 200, await res.clone().text());
-  assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out', streak: 'Streak-Retter' });
+  assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out', streak: 'Streak-Retter', soundboard: 0 });
   const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
   assert.deepEqual(created.map((c) => c.body.condition.reward_id).filter(Boolean).sort(), ['reward1', 'reward2', 'reward3']);
   const raidSub = created.find((c) => c.body.type === 'channel.raid');
@@ -713,6 +719,102 @@ await test('Alerts: Chat-Dank nur wenn eingeschaltet; Admin-Test erzeugt Karten'
   assert.equal((await admin(adminReq('POST', 'test', { target: 'alert-quatsch' }, cookie))).status, 400);
   const [card] = (await eventsSince(cur)).filter((e) => e.type === 'alert');
   assert.deepEqual([card.kind, card.user, card.bits], ['cheer', 'Tester', 70]);
+});
+
+// ---- Kanalpunkte-Soundboard
+await test('Soundboard: Einträge anlegen, bereinigen und begrenzen, Namen müssen eindeutig sein', async () => {
+  const add = (b) => admin(adminReq('POST', 'soundboard', b, cookie));
+  assert.equal((await add({ cost: 100 })).status, 400, 'ohne Namen');
+  const airhorn = await (await add({ title: '  Airhorn  ', cost: 99_999_999, cooldown: -5, volume: 7 })).json();
+  assert.deepEqual([airhorn.title, airhorn.cost, airhorn.cooldown, airhorn.volume, airhorn.enabled, airhorn.soundVersion], ['Airhorn', 1_000_000, 0, 1, true, null]);
+  assert.equal((await add({ title: 'Airhorn' })).status, 400, 'doppelter Name');
+  const boo = await (await add({ title: 'Buh!', cost: 150, cooldown: 60, volume: 0.5 })).json();
+  assert.deepEqual([boo.cost, boo.cooldown, boo.volume], [150, 60, 0.5]);
+  assert.equal((await admin(adminReq('PUT', `soundboard/${boo.id}`, { title: 'Airhorn' }, cookie))).status, 400, 'Umbenennen auf vergebenen Namen');
+  const ok = await (await admin(adminReq('PUT', `soundboard/${boo.id}`, { cost: 250, volume: 0.01 }, cookie))).json();
+  assert.deepEqual([ok.cost, ok.volume], [250, 0.1], 'Lautstärke wird auf 0,1 angehoben');
+  assert.equal((await admin(adminReq('PUT', 'soundboard/zzzzzzzz', { cost: 1 }, cookie))).status, 404);
+  for (let i = 0; i < 18; i++) assert.equal((await add({ title: 'Füller ' + i })).status, 200);
+  assert.equal((await add({ title: 'Einer zu viel' })).status, 400, 'Obergrenze 20');
+  for (const e of (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).filter((x) => x.title.startsWith('Füller'))) await admin(adminReq('DELETE', `soundboard/${e.id}`, {}, cookie));
+  assert.equal((await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).length, 2);
+});
+
+await test('Soundboard: Upload mit Typprüfung, Auslieferung und Liste nur für aktive Töne', async () => {
+  const list = await (await admin(adminReq('GET', 'soundboard', null, cookie))).json();
+  const [air, boo] = [list.find((e) => e.title === 'Airhorn'), list.find((e) => e.title === 'Buh!')];
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVE'), Buffer.alloc(40)]);
+  const up = (id, buf, name = 'horn.wav') => admin(adminReq('POST', `soundboard/${id}/sound`, { name, data: buf.toString('base64') }, cookie));
+  assert.equal((await up(air.id, Buffer.from('<html>böse</html>'))).status, 400, 'nur Audio');
+  assert.equal((await up(air.id, Buffer.alloc(1_600_000, 1))).status, 413);
+  const r = await (await up(air.id, wav, 'h<o>rn.wav')).json();
+  assert.equal(r.soundName, 'horn.wav');
+  assert.ok(r.soundVersion);
+  assert.deepEqual(await (await board(new Request(BASE + '/api/soundboard'))).json(), { [air.id]: `/api/soundboard?id=${air.id}&v=${r.soundVersion}` }, 'Buh! hat noch keinen Ton');
+  const served = await board(new Request(BASE + `/api/soundboard?id=${air.id}&v=1`));
+  assert.equal(served.headers.get('content-type'), 'audio/wav');
+  assert.equal((await board(new Request(BASE + `/api/soundboard?id=${boo.id}`))).status, 404);
+  assert.equal((await board(new Request(BASE + '/api/soundboard?id=../../x'))).status, 404);
+});
+
+await test('Soundboard: Einrichten legt Rewards mit Abklingzeit an und abonniert nur Einträge mit Ton', async () => {
+  const list = await (await admin(adminReq('GET', 'soundboard', null, cookie))).json();
+  const air = list.find((e) => e.title === 'Airhorn');
+  await admin(adminReq('PUT', `soundboard/${air.id}`, { cost: 300, cooldown: 120 }, cookie));
+  const res = await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal((await res.json()).soundboard, 1);
+  const reward = rewards.find((r) => r.title === 'Airhorn');
+  assert.deepEqual([reward.cost, reward.is_enabled, reward.global_cooldown_setting], [300, true, { is_enabled: true, global_cooldown_seconds: 120 }]);
+  assert.equal(rewards.find((r) => r.title === 'Buh!'), undefined, 'ohne Ton wird nichts angelegt');
+  const saved = (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).find((e) => e.id === air.id);
+  assert.equal(saved.rewardId, reward.id);
+  assert.ok(subs.some((x) => x.condition.reward_id === reward.id), 'Webhook für den Reward');
+  assert.equal(subs.filter((x) => x.condition.reward_id).length, 4, 'Check-in, Check-out, Streak-Retter und Airhorn');
+  const state = await (await admin(adminReq('GET', 'state', null, cookie))).json();
+  assert.ok(state.subscription !== 'unvollständig – bitte neu einrichten', 'Status zählt den Soundboard-Webhook mit');
+  const sameTitle = await (await admin(adminReq('POST', 'soundboard', { title: 'Check-in' }, cookie))).json();
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 400, 'Name wie ein anderer Reward');
+  await admin(adminReq('DELETE', `soundboard/${sameTitle.id}`, {}, cookie));
+});
+
+await test('Soundboard: Einlösung spielt den Sound im Overlay, schließt ab und schreibt nur auf Wunsch in den Chat', async () => {
+  const air = (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).find((e) => e.title === 'Airhorn');
+  const status = () => calls.filter((c) => c.path.endsWith('/redemptions')).at(-1).body.status;
+  const cur = await cursor(); const n = chats().length;
+  assert.equal((await webhook(signed('notification', redemption('sb1', '7', 'Hörer', air.rewardId)))).status, 204);
+  const ev = (await eventsSince(cur)).find((e) => e.type === 'sound');
+  assert.deepEqual([ev.id, ev.user, ev.title, ev.volume], [air.id, 'Hörer', 'Airhorn', 1]);
+  assert.match(ev.src, new RegExp(`^/api/soundboard\\?id=${air.id}&v=\\d+$`));
+  assert.equal(status(), 'FULFILLED');
+  assert.equal(chats().length, n, 'Chat ist aus');
+  await admin(adminReq('PUT', 'settings', { soundboardChat: true, soundboardTemplate: '🔊 {user} spielt „{title}“' }, cookie));
+  await webhook(signed('notification', redemption('sb2', '7', 'Hörer', air.rewardId)));
+  assert.equal(chats().at(-1), '🔊 Hörer spielt „Airhorn“');
+  await admin(adminReq('PUT', 'settings', { soundboardChat: false }, cookie));
+  assert.equal(await db.get('user/7'), null, 'ein Soundboard-Reward zählt nicht als Check-in');
+  await webhook(signed('notification', redemption('sb3', '7', 'Hörer', 'rewardFremd')));
+  assert.equal((await eventsSince(cur)).filter((e) => e.type === 'sound').length, 2, 'fremder Reward wird ignoriert');
+});
+
+await test('Soundboard: ausgeschalteter Eintrag wird in Twitch deaktiviert, Einlösung bekommt Punkte zurück; Test im Admin; Löschen räumt auf', async () => {
+  const air = (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).find((e) => e.title === 'Airhorn');
+  const cur = await cursor();
+  assert.equal((await admin(adminReq('POST', 'test', { target: 'soundboard', id: air.id, user: 'Tester' }, cookie))).status, 200);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'sound').user, 'Tester');
+  await admin(adminReq('PUT', `soundboard/${air.id}`, { enabled: false }, cookie));
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.equal(rewards.find((r) => r.id === air.rewardId).is_enabled, false, 'in Twitch ausgeschaltet');
+  assert.deepEqual(await (await board(new Request(BASE + '/api/soundboard'))).json(), {}, 'nicht mehr in der Overlay-Liste');
+  const n = (await eventsSince(cur)).filter((e) => e.type === 'sound').length;
+  await webhook(signed('notification', redemption('sb4', '7', 'Hörer', air.rewardId)));
+  assert.equal(calls.filter((c) => c.path.endsWith('/redemptions')).at(-1).body.status, 'CANCELED');
+  assert.equal((await eventsSince(cur)).filter((e) => e.type === 'sound').length, n, 'kein Sound');
+  const before = calls.length;
+  assert.equal((await (await admin(adminReq('DELETE', `soundboard/${air.id}`, {}, cookie))).json()).ok, true);
+  assert.ok(calls.slice(before).some((c) => c.method === 'DELETE' && c.path.endsWith('/custom_rewards') && c.query.id === air.rewardId), 'Reward in Twitch gelöscht');
+  assert.equal(await db.get(`soundboard/${air.id}`), null);
+  assert.equal((await board(new Request(BASE + `/api/soundboard?id=${air.id}`))).status, 404);
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

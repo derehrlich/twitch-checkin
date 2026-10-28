@@ -5,6 +5,7 @@ import { getSettings } from '../lib/settings.mjs';
 import { handleCheckout, handleRedemption, handleRescue } from '../lib/checkin.mjs';
 import { handleRaid } from '../lib/raid.mjs';
 import { handleAlert } from '../lib/alerts.mjs';
+import { getBoard, handleSoundboard } from '../lib/soundboard.mjs';
 import { ALERT_TYPES } from '../lib/twitch.mjs';
 import { safeEqual, text } from '../lib/http.mjs';
 
@@ -57,13 +58,16 @@ export default async (req) => {
     const isCheckin = Boolean(state.rewardId) && e.reward.id === state.rewardId;
     const isCheckout = Boolean(state.checkoutRewardId) && e.reward.id === state.checkoutRewardId;
     const isRescue = Boolean(state.streakRewardId) && e.reward.id === state.streakRewardId;
-    if (!isCheckin && !isCheckout && !isRescue) return new Response(null, { status: 204 });
+    const board = isCheckin || isCheckout || isRescue ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
+    if (!isCheckin && !isCheckout && !isRescue && !board) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
     try {
       const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward };
-      await (isRescue ? handleRescue : isCheckout ? handleCheckout : handleRedemption)(redemption, await getSettings());
+      const settings = await getSettings();
+      if (board) await handleSoundboard(redemption, board, settings);
+      else await (isRescue ? handleRescue : isCheckout ? handleCheckout : handleRedemption)(redemption, settings);
     } catch (err) {
       console.error('Check-in fehlgeschlagen:', err);
       await db.delete(`seen/${e.id}`); // Twitch darf es erneut versuchen
