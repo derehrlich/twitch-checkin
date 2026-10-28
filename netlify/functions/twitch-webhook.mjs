@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import { db } from '../lib/store.mjs';
 import { getSettings } from '../lib/settings.mjs';
-import { handleRedemption } from '../lib/checkin.mjs';
+import { handleCheckout, handleRedemption } from '../lib/checkin.mjs';
 import { safeEqual, text } from '../lib/http.mjs';
 
 export const config = { path: '/api/twitch-webhook' };
@@ -36,13 +36,16 @@ export default async (req) => {
   if (type === 'notification') {
     const e = body.event;
     const state = (await db.get('config/state')) ?? {};
-    // Nur der eigene Check-in-Reward zählt; ohne gespeicherte ID (Einrichtung fehlt) wird nichts gezählt
-    if (!state.rewardId || e.reward.id !== state.rewardId) return new Response(null, { status: 204 });
+    // Nur die eigenen Check-in/Check-out-Rewards zählen; ohne gespeicherte IDs (Einrichtung fehlt) passiert nichts
+    const isCheckin = Boolean(state.rewardId) && e.reward.id === state.rewardId;
+    const isCheckout = Boolean(state.checkoutRewardId) && e.reward.id === state.checkoutRewardId;
+    if (!isCheckin && !isCheckout) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
     try {
-      await handleRedemption({ id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward }, await getSettings());
+      const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward };
+      await (isCheckout ? handleCheckout : handleRedemption)(redemption, await getSettings());
     } catch (err) {
       console.error('Check-in fehlgeschlagen:', err);
       await db.delete(`seen/${e.id}`); // Twitch darf es erneut versuchen

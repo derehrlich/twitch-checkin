@@ -9,6 +9,13 @@ export function streamDay(settings, date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(shifted);
 }
 
+// 134 -> "2 Std 14 Min", 120 -> "2 Std", 45 -> "45 Min"
+export function fmtDuration(minutes) {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m} Min`;
+  return m % 60 ? `${Math.floor(m / 60)} Std ${m % 60} Min` : `${Math.floor(m / 60)} Std`;
+}
+
 export const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
 
 // Overlay-Ereignis ablegen; das Overlay holt es beim nächsten Abruf. Alte Einträge werden gleich mit entsorgt.
@@ -36,6 +43,7 @@ export async function recordCheckIn(userId, userName, settings) {
   user.count = user.days.length;
   user.first ??= now;
   user.last = now;
+  user.sessions = { ...(user.sessions ?? {}), [day]: { in: now, out: null, minutes: null } };
   await db.set(`user/${userId}`, user);
   return { isNew: true, count: user.count, day };
 }
@@ -55,4 +63,47 @@ export async function handleRedemption(redemption, settings) {
     await setRedemptionStatus(id, reward.id, 'CANCELED'); // Punkte zurück
   }
   return result;
+}
+
+// Offene Sitzung (eingecheckt, nicht ausgecheckt) der letzten 24 Stunden; die jüngste gewinnt.
+// So klappt das Auschecken auch, wenn der Stream über den Tageswechsel hinausgeht.
+function findOpenSession(user, now) {
+  let best = null;
+  for (const [day, s] of Object.entries(user.sessions ?? {})) {
+    const age = now - Date.parse(s.in);
+    if (s.out == null && age >= 0 && age <= 24 * 3_600_000 && (!best || s.in > best.in)) best = { day, ...s };
+  }
+  return best;
+}
+
+/** Check-out: Dauer = jetzt minus Check-in. Ohne offenen Check-in oder doppelt: Hinweis und Punkte zurück. */
+export async function handleCheckout(redemption, settings, now = new Date()) {
+  const { id, user_id, user_name, reward } = redemption;
+  const user = await db.get(`user/${user_id}`);
+  const open = user ? findOpenSession(user, now) : null;
+
+  const refuse = async (template) => {
+    if (settings.chatEnabled) await sendChat(fill(template, { user: user_name, count: user?.count ?? 0, duration: '' })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+    await setRedemptionStatus(id, reward.id, 'CANCELED'); // Punkte zurück
+    return { ok: false };
+  };
+
+  if (!open) {
+    const alreadyOut = Object.values(user?.sessions ?? {}).some((s) => s.out && now - Date.parse(s.out) <= 24 * 3_600_000);
+    return refuse(alreadyOut ? settings.checkoutDuplicateTemplate : settings.noCheckinTemplate);
+  }
+  // Atomare Sperre gegen gleichzeitige Doppel-Einlösungen
+  if (!(await db.setIfNew(`checkout/${open.day}/${user_id}`, 1))) return refuse(settings.checkoutDuplicateTemplate);
+
+  const minutes = Math.max(0, Math.round((now - Date.parse(open.in)) / 60_000));
+  user.name = user_name;
+  user.sessions[open.day] = { in: open.in, out: now.toISOString(), minutes };
+  await db.set(`user/${user_id}`, user);
+
+  await pushOverlay({ type: 'checkout', user: user_name, minutes, count: user.count });
+  if (settings.chatEnabled) {
+    await sendChat(fill(settings.checkoutTemplate, { user: user_name, count: user.count, duration: fmtDuration(minutes) })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+  }
+  await setRedemptionStatus(id, reward.id, 'FULFILLED');
+  return { ok: true, minutes };
 }

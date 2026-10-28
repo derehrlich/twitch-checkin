@@ -112,6 +112,10 @@
         <button id="testOverlay" class="ghost">Overlay testen</button>
         <button id="testChat" class="ghost">Chat testen</button>
       </div>
+      <div class="row" style="margin-top:12px">
+        <button id="testCheckout" class="ghost">Check-out im Overlay testen</button>
+        <button id="testCheckoutChat" class="ghost">Check-out im Chat testen</button>
+      </div>
       <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
 
       <h2 style="margin-top:26px">Ton</h2>
@@ -137,6 +141,23 @@
         <label for="duplicateTemplate">Nachricht, wenn schon eingecheckt (Punkte werden erstattet)</label>
         <textarea id="duplicateTemplate" maxlength="400"></textarea>
         <p class="muted">Platzhalter: <code>{user}</code> Name, <code>{count}</code> Anzahl der Besuche</p>
+
+        <h2 style="margin-top:22px">Check-out</h2>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="checkoutEnabled" type="checkbox"> Check-out aktivieren (zweiter Reward, speichert die Zeit im Stream)</label>
+        <div class="grid2">
+          <div><label for="checkoutRewardTitle">Reward-Name</label><input id="checkoutRewardTitle" maxlength="45"></div>
+          <div><label for="checkoutRewardCost">Preis (Kanalpunkte)</label><input id="checkoutRewardCost" type="number" min="1"></div>
+        </div>
+        <label for="checkoutTemplate">Chatnachricht beim Check-out</label>
+        <textarea id="checkoutTemplate" maxlength="400"></textarea>
+        <div class="preview" id="preview2"></div>
+        <label for="checkoutDuplicateTemplate">Nachricht, wenn schon ausgecheckt (Punkte werden erstattet)</label>
+        <textarea id="checkoutDuplicateTemplate" maxlength="400"></textarea>
+        <label for="noCheckinTemplate">Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)</label>
+        <textarea id="noCheckinTemplate" maxlength="400"></textarea>
+        <p class="muted">Zusätzlicher Platzhalter: <code>{duration}</code> Dauer, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+
+        <h2 style="margin-top:22px">Allgemein</h2>
         <div class="grid2">
           <div><label for="rewardTitle">Reward-Name</label><input id="rewardTitle" maxlength="45"></div>
           <div><label for="rewardCost">Preis (Kanalpunkte)</label><input id="rewardCost" type="number" min="1"></div>
@@ -155,10 +176,12 @@
       <div class="stats" id="stats"></div>
       <div class="row" style="margin-top:12px">
         <div><label for="search">Suchen</label><input id="search" type="search" placeholder="Name…"></div>
+        <div style="flex:0 1 190px"><label for="sort">Sortieren nach</label>
+          <select id="sort"><option value="count">Besuche</option><option value="total">Gesamtzeit</option><option value="avg">Ø Dauer</option><option value="name">Name</option></select></div>
         <a class="btn ghost" href="/api/admin/export.csv">CSV-Export</a>
       </div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Name</th><th>Besuche</th><th>Zuletzt</th></tr></thead>
+        <thead><tr><th>Name</th><th>Besuche</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
         <tbody id="users"></tbody>
       </table></div>
       <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
@@ -212,16 +235,33 @@ async function loadState() {
   $('checks').innerHTML =
     check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${missing}</b>`) +
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
-    check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Reward angelegt' : 'Reward noch nicht angelegt') +
+    check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Check-in-Reward angelegt' : 'Reward noch nicht angelegt') +
+    (s.checkoutEnabled ? check(s.checkoutRewardId ? 'ok' : 'warn', s.checkoutRewardId ? 'Check-out-Reward angelegt' : 'Check-out-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Check-out ist ausgeschaltet')) +
     check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
       s.revoked ? `Webhook widerrufen (${esc(s.revoked)}), bitte neu einrichten`
       : sub === 'enabled' ? 'Webhook aktiv – Check-ins werden empfangen'
       : sub ? `Webhook-Status: ${esc(sub)}` + (sub.includes('pending') ? ' (Twitch prüft gerade, kurz neu laden)' : '')
       : s.subscriptionError ? `Webhook nicht abfragbar: ${esc(s.subscriptionError)}` : 'Webhook noch nicht eingerichtet');
   $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay;
-  $('stats').innerHTML = [['users', 'Besucher gesamt'], ['today', `Heute (${s.today})`], ['checkins', 'Check-ins gesamt']]
-    .map(([k, l]) => `<div class="stat"><b>${s.totals[k]}</b><span class="muted">${l}</span></div>`).join('');
+  totals = s.totals; today = s.today; renderStats();
 }
+let totals = null, today = '';
+function renderStats() {
+  if (!totals) return;
+  const known = users.flatMap((u) => timed(u).map((x) => x.minutes));
+  const items = [[totals.users, 'Besucher gesamt'], [totals.today, `Heute (${today})`], [totals.checkins, 'Check-ins gesamt'],
+    [known.length ? fmtDuration(known.reduce((a, b) => a + b, 0) / known.length) : '–', 'Ø Dauer'],
+    [`${known.length} von ${totals.checkins}`, 'Besuche mit Check-out']];
+  $('stats').innerHTML = items.map(([v, l]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
+}
+// 134 -> "2 Std 14 Min"
+function fmtDuration(minutes) {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m} Min`;
+  return m % 60 ? `${Math.floor(m / 60)} Std ${m % 60} Min` : `${Math.floor(m / 60)} Std`;
+}
+const timed = (u) => Object.values(u.sessions ?? {}).filter((x) => x.minutes != null);
+const stats = (u) => { const t = timed(u); const total = t.reduce((a, x) => a + x.minutes, 0); return { total, avg: t.length ? total / t.length : 0, n: t.length }; };
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ---- Einstellungen
@@ -263,37 +303,45 @@ $('soundReset').addEventListener('click', run(async () => {
   renderSound(); toast('Eingebauter Ton aktiv ✓');
 }));
 
-const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
   for (const f of FIELDS) $(f).value = settings[f];
   $('chatEnabled').checked = settings.chatEnabled;
+  $('checkoutEnabled').checked = settings.checkoutEnabled;
   updatePreview();
   renderSound();
 }
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
-function updatePreview() { $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 }); }
+function updatePreview() {
+  $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 });
+  $('preview2').textContent = 'Vorschau: ' + fill($('checkoutTemplate').value, { user: 'Max', count: 7, duration: '2 Std 14 Min' });
+}
 $('chatTemplate').addEventListener('input', updatePreview);
+$('checkoutTemplate').addEventListener('input', updatePreview);
 
 $('settingsForm').addEventListener('submit', run(async (e) => {
   e.preventDefault();
-  const body = { chatEnabled: $('chatEnabled').checked };
+  const body = { chatEnabled: $('chatEnabled').checked, checkoutEnabled: $('checkoutEnabled').checked };
   for (const f of FIELDS) body[f] = $(f).value;
   settings = await api('PUT', 'settings', body);
   for (const f of FIELDS) $(f).value = settings[f];
+  updatePreview();
   toast('Gespeichert ✓');
 }));
 
 // ---- Aktionen
 $('setup').addEventListener('click', run(async () => {
   $('setup').disabled = true;
-  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“ und Webhook eingerichtet ✓`); await loadState(); }
+  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? ` und „${r.checkout}“` : ''} und Webhook eingerichtet ✓`); await loadState(); }
   finally { $('setup').disabled = false; }
 }));
 $('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
 const testBody = (target) => ({ target, user: $('testUser').value, count: $('testCount').value });
 $('testOverlay').addEventListener('click', run(async () => { await api('POST', 'test', testBody('overlay')); toast('Overlay-Test gesendet (dauert bis ca. 3 s)'); }));
 $('testChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('chat')); toast('Testnachricht im Chat gesendet ✓'); }));
+$('testCheckout').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout')); toast('Check-out-Test gesendet (dauert bis ca. 3 s)'); }));
+$('testCheckoutChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout-chat')); toast('Check-out-Nachricht im Chat gesendet ✓'); }));
 $('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
 $('loginForm').addEventListener('submit', run(async (e) => {
   e.preventDefault();
@@ -303,13 +351,17 @@ $('loginForm').addEventListener('submit', run(async (e) => {
 
 // ---- Besucher
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE') : '–';
-async function loadUsers() { users = await api('GET', 'users'); renderUsers(); renderDetail(); }
+async function loadUsers() { users = await api('GET', 'users'); renderUsers(); renderDetail(); renderStats(); }
 function renderUsers() {
   const q = $('search').value.trim().toLowerCase();
-  const list = users.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 200);
-  $('users').innerHTML = list.map((u) => `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${fmtDate(u.last)}</td></tr>`).join('')
-    || '<tr><td colspan="3" class="muted">Noch keine Besucher.</td></tr>';
+  const by = $('sort').value;
+  const key = { count: (u) => -u.count, total: (u) => -stats(u).total, avg: (u) => -stats(u).avg, name: (u) => u.name.toLowerCase() }[by];
+  const list = users.filter((u) => u.name.toLowerCase().includes(q)).sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0)).slice(0, 200);
+  $('users').innerHTML = list.map((u) => { const st = stats(u);
+    return `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${st.n ? fmtDuration(st.total) : '–'}</td><td>${st.n ? fmtDuration(st.avg) : '–'}</td><td>${fmtDate(u.last)}</td></tr>`; }).join('')
+    || '<tr><td colspan="5" class="muted">Noch keine Besucher.</td></tr>';
 }
+$('sort').addEventListener('change', renderUsers);
 $('search').addEventListener('input', renderUsers);
 $('users').addEventListener('click', (e) => { const tr = e.target.closest('tr.user'); if (tr) { selected = tr.dataset.id; renderDetail(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } });
 
@@ -317,8 +369,10 @@ function renderDetail() {
   const u = users.find((x) => x.id === selected);
   $('detail').classList.toggle('hidden', !u);
   if (!u) return;
-  $('dName').textContent = `${u.name} – ${u.count} Besuche`;
-  $('dDays').innerHTML = [...u.days].reverse().map((d) => `<span class="chip">${esc(d)}<button data-day="${esc(d)}" title="Besuch entfernen">×</button></span>`).join('');
+  const st = stats(u);
+  $('dName').textContent = `${u.name} – ${u.count} Besuche` + (st.n ? `, ${fmtDuration(st.total)} gesamt (Ø ${fmtDuration(st.avg)})` : '');
+  const label = (d) => { const x = u.sessions?.[d]; return x ? (x.minutes != null ? ` · ${fmtDuration(x.minutes)}` : ' · ohne Check-out') : ''; };
+  $('dDays').innerHTML = [...u.days].reverse().map((d) => `<span class="chip">${esc(d)}${label(d)}<button data-day="${esc(d)}" title="Besuch entfernen">×</button></span>`).join('');
 }
 $('dDays').addEventListener('click', run(async (e) => {
   const day = e.target.dataset.day; if (!day || !confirm(`Besuch am ${day} entfernen?`)) return;

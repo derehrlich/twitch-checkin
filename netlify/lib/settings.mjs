@@ -12,6 +12,14 @@ export const DEFAULTS = {
   dayRolloverHour: 5,
   volume: 0.6,
   duration: 5000,
+  // Check-out: zweiter Reward, aus Check-in und Check-out ergibt sich die Dauer
+  checkoutEnabled: true,
+  checkoutRewardTitle: 'Check-out',
+  checkoutRewardCost: 1,
+  // Platzhalter: {user} {count} {duration}
+  checkoutTemplate: '👋 {user} geht – {duration} dabei gewesen. Bis zum nächsten Mal!',
+  checkoutDuplicateTemplate: '{user}, du bist heute schon ausgecheckt ✅ Deine Punkte bekommst du zurück.',
+  noCheckinTemplate: '{user}, du bist gerade nicht eingecheckt – zum Auschecken musst du zuerst einchecken. Deine Punkte bekommst du zurück.',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -30,11 +38,17 @@ function sanitize(input) {
   str('rewardTitle', 45);
   str('chatTemplate', 400);
   str('duplicateTemplate', 400);
+  str('checkoutRewardTitle', 45);
+  str('checkoutTemplate', 400);
+  str('checkoutDuplicateTemplate', 400);
+  str('noCheckinTemplate', 400);
   num('rewardCost', 1, 1_000_000);
+  num('checkoutRewardCost', 1, 1_000_000);
   num('dayRolloverHour', 0, 23);
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
+  if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }
   }

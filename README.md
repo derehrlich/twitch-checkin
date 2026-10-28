@@ -33,13 +33,24 @@ Ein Check-in zählt **einmal pro Stream-Tag**. Der Tag wechselt um 5 Uhr (einste
 
 Der Reward wird von der App angelegt. Gibt es schon einen Reward gleichen Namens, der nicht von dieser App stammt, bitte vorher umbenennen oder löschen. Twitch erlaubt der App nur bei eigenen Rewards, Einlösungen zu bestätigen oder zu erstatten.
 
+## Check-out und Dauer
+
+Neben dem Check-in-Reward gibt es einen zweiten Reward **„Check-out“** (Name, Preis und Texte im Admin einstellbar, abschaltbar). Wer geht, löst ihn ein. Aus Check-in und Check-out ergibt sich die Dauer, die pro Besuch gespeichert wird.
+
+- Im Chat kommt z. B. `👋 Max geht – 2 Std 14 Min dabei gewesen. Bis zum nächsten Mal!` (Platzhalter `{duration}`), und das Overlay zeigt eine Check-out-Karte mit der Dauer auf der Münze.
+- **Wer nicht auscheckt**, bekommt den Besuch gezählt, aber keine Dauer. Es gibt bewusst keinen automatischen Check-out, damit niemand Zeit geschenkt bekommt.
+- Auschecken geht, solange der Check-in höchstens 24 Stunden her ist, auch über den Tageswechsel hinweg.
+- Ohne Check-in oder bei doppeltem Check-out bekommt der Zuschauer einen Hinweis im Chat und seine Punkte zurück.
+- Im Admin siehst du Gesamtzeit und Ø Dauer pro Besucher, kannst danach sortieren und im CSV-Export stehen Check-in, Check-out und Minuten.
+- **Wichtig nach einem Update:** Einmal im Admin auf „Reward & Webhook einrichten“ klicken, damit der Check-out-Reward angelegt und abonniert wird. Besuche von vor dem Update haben keine Dauer.
+
 ## Admin-Bereich
 
 - **Status** zeigt, ob Variablen, Twitch-Verbindung, Reward und Webhook in Ordnung sind
 - **Einstellungen**: Chattexte (`{user}`, `{count}`), Rewardname und -preis, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel
 - **Tests**: Overlay und Chat testen, ohne Zähler zu verändern
 - **Ton**: eigene Sounddatei hochladen, anhören, zurücksetzen
-- **Besucher**: Suche, Besuchstage ansehen, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export
+- **Besucher**: Suche, Sortierung (Besuche, Gesamtzeit, Ø Dauer), Besuchstage mit Dauer ansehen, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export
 
 ## Look
 

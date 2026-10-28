@@ -27,6 +27,7 @@
 
   .txt { min-width: 0; }
   .tag { display: flex; align-items: center; gap: 8px; font-size: 15px; letter-spacing: 2.4px; text-transform: uppercase; font-weight: 600; color: #e9d3ae; }
+  .tag i.out { background: #f0a83a; box-shadow: 0 0 8px 1px rgba(240, 168, 58, .85); }
   .tag i { width: 10px; height: 10px; border-radius: 50%; background: #62c254; box-shadow: 0 0 8px 1px rgba(98, 194, 84, .8); }
   .name { font-weight: 700; line-height: 1.08; color: #fff3da; overflow-wrap: anywhere; margin: 4px 0 2px; text-shadow: 0 3px 0 rgba(43, 24, 12, .75), 0 6px 10px rgba(0, 0, 0, .35); }
   .sub { font-size: 22px; font-weight: 500; color: #ecd9b6; }
@@ -135,21 +136,29 @@ let busy = false;
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const nameSize = (n) => (n.length > 22 ? 30 : n.length > 16 ? 38 : n.length > 12 ? 46 : 54);
 const coinSize = (c) => (String(c).length > 3 ? 28 : String(c).length > 2 ? 34 : 44);
+// Check-out: Münze zeigt die Dauer, z. B. "45" Minuten oder "2:14" Stunden
+function coinFor(ev) {
+  if (ev.type !== 'checkout') return { small: 'Besuch', big: ev.count };
+  const m = Math.max(0, Number(ev.minutes) || 0);
+  return m < 60 ? { small: 'Minuten', big: m } : { small: 'Stunden', big: `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` };
+}
 
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
   const ev = queue.shift();
+  const out = ev.type === 'checkout';
+  const coin = coinFor(ev);
   stage.innerHTML = `<div class="wrap" style="animation-duration:${duration}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
     <div class="card panel">
       <div class="row">
-        <div class="coin"><small>Besuch</small><b style="font-size:${coinSize(ev.count)}px">${esc(ev.count)}</b></div>
+        <div class="coin"><small>${coin.small}</small><b style="font-size:${coinSize(coin.big)}px">${esc(coin.big)}</b></div>
         <div class="txt">
-          <div class="tag"><i></i>Eingecheckt</div>
+          <div class="tag"><i class="${out ? 'out' : ''}"></i>${out ? 'Ausgecheckt' : 'Eingecheckt'}</div>
           <div class="name" style="font-size:${nameSize(ev.user)}px">${esc(ev.user)}</div>
-          <div class="sub">schön, dass du da bist!</div>
+          <div class="sub">${out ? 'bis zum nächsten Mal!' : 'schön, dass du da bist!'}</div>
         </div>
       </div>
       <div class="bar"><span style="animation-duration:${duration}ms"></span></div>
@@ -175,7 +184,7 @@ async function poll() {
     if (data.duration != null && !params.has('duration')) duration = data.duration;
     useUploadedSound(data.sound ?? null);
     setSoundVolume();
-    for (const ev of data.events) if (ev.type === 'checkin') queue.push(ev);
+    for (const ev of data.events) if (ev.type === 'checkin' || ev.type === 'checkout') queue.push(ev);
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
@@ -184,7 +193,11 @@ async function poll() {
 if (params.has('demo')) {
   const names = ['NovelsByEverly', 'Akinasuka', 'Max', 'EinSehrLangerZuschauerName123'];
   let i = 0;
-  const show = () => { queue.push({ type: 'checkin', user: names[i % names.length], count: [7, 42, 128, 1032][i % 4] }); i++; next(); };
+  const show = () => {
+    const n = i % names.length;
+    queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
+    i++; next();
+  };
   show(); setInterval(show, duration + 1500);
 } else {
   poll();

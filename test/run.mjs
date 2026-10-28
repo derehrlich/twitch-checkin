@@ -13,6 +13,8 @@ Object.assign(process.env, {
 
 // ---- Twitch simulieren
 const calls = [];
+const rewards = []; // vom Mock angelegte Rewards
+let subs = []; // aktive Webhook-Subscriptions
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
   const entry = { method: init.method || 'GET', path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body && !String(init.body).includes('=') ? JSON.parse(init.body) : init.body };
@@ -23,10 +25,23 @@ globalThis.fetch = async (url, init = {}) => {
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
   }
   if (u.pathname.endsWith('/chat/messages')) return ok({ data: [{ is_sent: true }] });
-  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'GET') return ok({ data: [] });
-  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'POST') return ok({ data: [{ id: 'reward1', title: 'Check-in', cost: 1 }] });
+  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'GET') return ok({ data: rewards });
+  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'POST') {
+    const r = { id: 'reward' + (rewards.length + 1), title: entry.body.title, cost: entry.body.cost, is_enabled: true };
+    rewards.push(r);
+    return ok({ data: [r] });
+  }
+  if (u.pathname.endsWith('/custom_rewards') && entry.method === 'PATCH') {
+    const r = rewards.find((x) => x.id === entry.query.id); Object.assign(r, entry.body); return ok({ data: [r] });
+  }
   if (u.pathname.endsWith('/redemptions')) return ok({ data: [{}] });
-  if (u.pathname.endsWith('/eventsub/subscriptions')) return ok({ data: [{ id: 's1', status: 'webhook_callback_verification_pending', transport: { callback: 'https://beispiel.netlify.app/api/twitch-webhook' } }] });
+  if (u.pathname.endsWith('/eventsub/subscriptions')) {
+    if (entry.method === 'GET') return ok({ data: subs });
+    if (entry.method === 'DELETE') { subs = subs.filter((x) => x.id !== entry.query.id); return ok({}); }
+    const sub = { id: 's' + (subs.length + 1) + calls.length, status: 'webhook_callback_verification_pending', condition: entry.body.condition, transport: entry.body.transport };
+    subs.push(sub);
+    return ok({ data: [sub] });
+  }
   return ok({}, 404);
 };
 
@@ -36,7 +51,7 @@ const overlay = (await import('../netlify/functions/overlay.mjs')).default;
 const admin = (await import('../netlify/functions/admin.mjs')).default;
 const auth = (await import('../netlify/functions/auth.mjs')).default;
 const sound = (await import('../netlify/functions/sound.mjs')).default;
-const { streamDay } = await import('../netlify/lib/checkin.mjs');
+const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/checkin.mjs');
 const { getSettings } = await import('../netlify/lib/settings.mjs');
 
 const BASE = 'https://beispiel.netlify.app';
@@ -87,14 +102,26 @@ await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', asy
   assert.equal((await db.get('config/tokens')).login, 'streamerin');
 });
 
-await test('Setup legt Reward an und abonniert den Webhook mit reward_id', async () => {
+await test('Setup legt beide Rewards an und abonniert je einen Webhook mit reward_id', async () => {
   const res = await admin(adminReq('POST', 'setup', {}, cookie));
   assert.equal(res.status, 200, await res.clone().text());
-  const sub = calls.find((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
-  assert.equal(sub.body.transport.method, 'webhook');
-  assert.equal(sub.body.condition.reward_id, 'reward1');
-  assert.equal(sub.body.transport.callback, BASE + '/api/twitch-webhook');
-  assert.equal((await db.get('config/state')).rewardId, 'reward1');
+  assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out' });
+  const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
+  assert.deepEqual(created.map((c) => c.body.condition.reward_id).sort(), ['reward1', 'reward2']);
+  assert.ok(created.every((c) => c.body.transport.method === 'webhook' && c.body.transport.callback === BASE + '/api/twitch-webhook'));
+  const state = await db.get('config/state');
+  assert.equal(state.rewardId, 'reward1');
+  assert.equal(state.checkoutRewardId, 'reward2');
+  // Zweites Einrichten legt nichts doppelt an und ersetzt die Subscriptions
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.equal(rewards.length, 2);
+  assert.equal(subs.length, 2);
+});
+
+await test('Setup lehnt gleiche Namen für Check-in und Check-out ab', async () => {
+  await admin(adminReq('PUT', 'settings', { checkoutRewardTitle: 'Check-in' }, cookie));
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 400);
+  await admin(adminReq('PUT', 'settings', { checkoutRewardTitle: 'Check-out' }, cookie));
 });
 
 // ---- Webhook
@@ -157,6 +184,71 @@ await test('Besuch an späterem Tag erhöht den Zähler (Admin-Nachtrag + neuer 
   assert.match(chats().at(-1), /2x dabei/);
 });
 
+const checkoutNotification = (id, userId, name) => signed('notification', redemption(id, userId, name, 'reward2'));
+await test('Check-out: berechnet Dauer, speichert sie, Chat, Overlay, schließt Einlösung ab', async () => {
+  // Max (Nutzer 1) ist heute eingecheckt; Check-in auf vor 134 Minuten zurückdatieren
+  const u = await db.get('user/1');
+  const day = Object.keys(u.sessions).sort().at(-1);
+  assert.equal(u.sessions[day].out, null, 'Check-in legt eine offene Sitzung an');
+  u.sessions[day].in = new Date(Date.now() - 134 * 60_000).toISOString();
+  await db.set('user/1', u);
+
+  const before = calls.length;
+  assert.equal((await webhook(checkoutNotification('o1', '1', 'Max'))).status, 204);
+  const after = await db.get('user/1');
+  assert.equal(after.sessions[day].minutes, 134);
+  assert.ok(after.sessions[day].out);
+  assert.equal(chats().at(-1), '👋 Max geht – 2 Std 14 Min dabei gewesen. Bis zum nächsten Mal!');
+  assert.equal(calls.slice(before).find((c) => c.method === 'PATCH').body.status, 'FULFILLED');
+  assert.equal(after.count, u.count, 'Check-out verändert den Besuchszähler nicht');
+
+  const ev = await (await overlay(new Request(BASE + '/api/overlay?since=event/000000000000000'))).json();
+  assert.deepEqual(ev.events.at(-1), { type: 'checkout', user: 'Max', minutes: 134, count: after.count });
+});
+
+await test('Zweiter Check-out am selben Tag: Hinweis und Erstattung, Dauer bleibt', async () => {
+  const before = calls.length;
+  await webhook(checkoutNotification('o2', '1', 'Max'));
+  assert.match(chats().at(-1), /schon ausgecheckt/);
+  assert.equal(calls.slice(before).find((c) => c.method === 'PATCH').body.status, 'CANCELED');
+  const day = Object.keys((await db.get('user/1')).sessions).sort().at(-1);
+  assert.equal((await db.get('user/1')).sessions[day].minutes, 134);
+});
+
+await test('Check-out ohne Check-in: Hinweis und Erstattung, kein Nutzer wird angelegt', async () => {
+  const before = calls.length;
+  await webhook(checkoutNotification('o3', '77', 'Neuling'));
+  assert.match(chats().at(-1), /nicht eingecheckt/);
+  assert.equal(calls.slice(before).find((c) => c.method === 'PATCH').body.status, 'CANCELED');
+  assert.equal(await db.get('user/77'), null);
+});
+
+await test('Gleichzeitige Check-outs zählen nur einmal', async () => {
+  await webhook(signed('notification', redemption('c1', '5', 'Eva')));
+  const u = await db.get('user/5'); const day = Object.keys(u.sessions)[0];
+  u.sessions[day].in = new Date(Date.now() - 30 * 60_000).toISOString(); await db.set('user/5', u);
+  const n0 = chats().filter((c) => c.includes('Eva geht')).length;
+  await Promise.all([1, 2, 3].map((i) => webhook(checkoutNotification('co' + i, '5', 'Eva'))));
+  assert.equal(chats().filter((c) => c.includes('Eva geht')).length - n0, 1);
+  assert.equal((await db.get('user/5')).sessions[day].minutes, 30);
+});
+
+await test('Check-out nach Tageswechsel findet die offene Sitzung der letzten 24 Stunden', async () => {
+  await webhook(signed('notification', redemption('d1', '6', 'Nacht')));
+  const u = await db.get('user/6'); const day = Object.keys(u.sessions)[0];
+  u.sessions[day].in = new Date(Date.now() - 7 * 3_600_000).toISOString(); await db.set('user/6', u); // 7 Std her
+  const r = await handleCheckout({ id: 'x', user_id: '6', user_name: 'Nacht', reward: { id: 'reward2' } }, await getSettings());
+  assert.equal(r.minutes, 420);
+  assert.equal(fmtDuration(420), '7 Std');
+  assert.equal(fmtDuration(0), '0 Min');
+  assert.equal(fmtDuration(61), '1 Std 1 Min');
+  // Sitzungen, die älter als 24 Stunden sind, zählen nicht mehr
+  await webhook(signed('notification', redemption('d2', '8', 'Alt')));
+  const old = await db.get('user/8'); const oday = Object.keys(old.sessions)[0];
+  old.sessions[oday].in = new Date(Date.now() - 30 * 3_600_000).toISOString(); await db.set('user/8', old);
+  assert.equal((await handleCheckout({ id: 'y', user_id: '8', user_name: 'Alt', reward: { id: 'reward2' } }, await getSettings())).ok, false);
+});
+
 await test('Overlay: erster Abruf ohne Altlasten, danach nur neue Ereignisse', async () => {
   const first = await (await overlay(new Request(BASE + '/api/overlay'))).json();
   assert.deepEqual(first.events, []);
@@ -176,6 +268,10 @@ await test('Einstellungen werden bereinigt und gespeichert', async () => {
   assert.equal(s.duration, 2000);
   assert.equal(s.timezone, 'Europe/Berlin');
   assert.equal(s.evil, undefined);
+  assert.equal(s.checkoutRewardCost, 1);
+  const co = await (await admin(adminReq('PUT', 'settings', { checkoutEnabled: false, checkoutRewardCost: 5, checkoutTemplate: 'Tschüss {user}, {duration}!' }, cookie))).json();
+  assert.deepEqual([co.checkoutEnabled, co.checkoutRewardCost, co.checkoutTemplate], [false, 5, 'Tschüss {user}, {duration}!']);
+  await admin(adminReq('PUT', 'settings', { checkoutEnabled: true, checkoutRewardCost: 1 }, cookie));
 });
 
 await test('Eigener Ton: Upload, Auslieferung ans Overlay, Zurücksetzen, Schutz vor falschen Dateien', async () => {
@@ -218,8 +314,9 @@ await test('Rangliste, Entfernen eines Besuchs, CSV-Export, Löschen', async () 
   const users = await (await admin(adminReq('GET', 'users', null, cookie))).json();
   assert.equal(users[0].name, 'Max');
   const csv = await (await admin(adminReq('GET', 'export.csv', null, cookie))).text();
-  assert.match(csv, /^datum,user,besuch_nr\n/);
-  assert.match(csv, /2020-01-01,"Max",1/);
+  assert.match(csv, /^datum,user,besuch_nr,checkin,checkout,minuten\n/);
+  assert.match(csv, /2020-01-01,"Max",1,,,/);
+  assert.match(csv, /"Max",2,[^,]+,[^,]+,134/);
   let res = await admin(adminReq('DELETE', 'users/1/days/2020-01-01', null, cookie));
   assert.equal((await res.json()).count, 1);
   res = await admin(adminReq('DELETE', 'users/3', null, cookie));

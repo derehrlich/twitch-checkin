@@ -1,9 +1,9 @@
 // Admin-API (alles außer Login nur mit Session-Cookie)
 import { db } from '../lib/store.mjs';
 import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
-import { fill, pushOverlay, streamDay } from '../lib/checkin.mjs';
+import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
-import { ensureReward, listSubscriptions, sendChat, siteUrl, subscribe } from '../lib/twitch.mjs';
+import { ensureRewards, listSubscriptions, sendChat, siteUrl, subscribe } from '../lib/twitch.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -64,7 +64,12 @@ export default async (req) => {
       let subscription = null;
       let subscriptionError = null;
       if (tokens && process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
-        try { subscription = (await listSubscriptions(webhookUrl))[0]?.status ?? 'keine'; } catch (e) { subscriptionError = e.message; }
+        try {
+          const subs = await listSubscriptions(webhookUrl);
+          const expected = state.checkoutRewardId ? 2 : 1;
+          const notReady = subs.find((x) => x.status !== 'enabled');
+          subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
+        } catch (e) { subscriptionError = e.message; }
       }
       const users = await allUsers();
       const today = streamDay(settings);
@@ -76,6 +81,8 @@ export default async (req) => {
         },
         connectedAs: tokens?.login ?? null,
         rewardId: state.rewardId ?? null,
+        checkoutRewardId: state.checkoutRewardId ?? null,
+        checkoutEnabled: settings.checkoutEnabled,
         revoked: state.revoked ?? null,
         subscription, subscriptionError,
         urls: { site: siteUrl(req), redirect: `${siteUrl(req)}/api/auth/callback`, webhook: webhookUrl, overlay: `${siteUrl(req)}/overlay` },
@@ -90,13 +97,17 @@ export default async (req) => {
       if (method === 'PUT') return json(await saveSettings(body));
     }
 
-    // ---- Reward + Webhook einrichten
+    // ---- Rewards + Webhook einrichten
     if (route[0] === 'setup' && method === 'POST') {
       if (!process.env.EVENTSUB_SECRET) return json({ error: 'EVENTSUB_SECRET ist nicht gesetzt' }, 400);
-      const reward = await ensureReward(await getSettings());
-      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, reward.id);
-      await db.set('config/state', { ...((await db.get('config/state')) ?? {}), rewardId: reward.id, revoked: null });
-      return json({ ok: true, reward: reward.title });
+      const settings = await getSettings();
+      if (settings.checkoutEnabled && settings.rewardTitle === settings.checkoutRewardTitle) {
+        return json({ error: 'Check-in und Check-out brauchen verschiedene Reward-Namen' }, 400);
+      }
+      const { checkin, checkout } = await ensureRewards(settings);
+      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : [])]);
+      await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
+      return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null });
     }
 
     // ---- Tests (verändern keine Zähler)
@@ -106,6 +117,10 @@ export default async (req) => {
       const count = Math.max(1, Number(body.count) || 7);
       if (body.target === 'chat') {
         await sendChat(fill(settings.chatTemplate, { user, count }));
+      } else if (body.target === 'checkout') {
+        await pushOverlay({ type: 'checkout', user, minutes: 134, count });
+      } else if (body.target === 'checkout-chat') {
+        await sendChat(fill(settings.checkoutTemplate, { user, count, duration: fmtDuration(134) }));
       } else {
         await pushOverlay({ type: 'checkin', user, count });
       }
@@ -155,12 +170,14 @@ export default async (req) => {
       if (route[2] === 'days' && route[3] && method === 'DELETE') { // Besuch entfernen
         user.days = user.days.filter((d) => d !== route[3]);
         user.count = user.days.length;
+        if (user.sessions) delete user.sessions[route[3]];
         await db.set(`user/${id}`, user);
         await db.delete(`checked/${route[3]}/${id}`);
+        await db.delete(`checkout/${route[3]}/${id}`);
         return json({ id, ...user });
       }
       if (route.length === 2 && method === 'DELETE') {
-        for (const d of user.days) await db.delete(`checked/${d}/${id}`);
+        for (const d of user.days) { await db.delete(`checked/${d}/${id}`); await db.delete(`checkout/${d}/${id}`); }
         await db.delete(`user/${id}`);
         return json({ ok: true });
       }
@@ -168,8 +185,13 @@ export default async (req) => {
 
     // ---- CSV-Export
     if (route[0] === 'export.csv' && method === 'GET') {
-      const rows = ['datum,user,besuch_nr'];
-      for (const u of await allUsers()) u.days.forEach((d, i) => rows.push(`${d},${csvCell(u.name)},${i + 1}`));
+      const rows = ['datum,user,besuch_nr,checkin,checkout,minuten'];
+      for (const u of await allUsers()) {
+        u.days.forEach((d, i) => {
+          const ses = u.sessions?.[d];
+          rows.push(`${d},${csvCell(u.name)},${i + 1},${ses?.in ?? ''},${ses?.out ?? ''},${ses?.minutes ?? ''}`);
+        });
+      }
       return text(rows.join('\n'), 200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="checkins.csv"' });
     }
 

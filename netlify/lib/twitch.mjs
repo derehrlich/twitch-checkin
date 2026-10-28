@@ -75,32 +75,41 @@ export async function setRedemptionStatus(redemptionId, rewardId, status) {
   }
 }
 
-// Legt den Reward an (oder passt Preis/Namen an) und merkt sich die ID
-export async function ensureReward(settings) {
+// Legt die Rewards an (oder passt Preis/Namen an) und merkt sich die IDs.
+// Check-out nur, wenn aktiviert; ein früher angelegter Check-out-Reward wird dann in Twitch deaktiviert.
+export async function ensureRewards(settings) {
   const { user_id } = await userToken();
   const state = (await db.get('config/state')) ?? {};
-  const { data } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
-  let reward = data.find((r) => r.id === state.rewardId) ?? data.find((r) => r.title === settings.rewardTitle);
-  if (!reward) {
-    try {
-      reward = (await helix('POST', 'channel_points/custom_rewards', {
-        query: { broadcaster_id: user_id },
-        body: { title: settings.rewardTitle, cost: settings.rewardCost, prompt: 'Check-in für diesen Stream – dein Besuch wird mitgezählt!', background_color: '#9146FF' },
-      })).data[0];
-    } catch (e) {
-      if (e.message.includes('DUPLICATE_REWARD')) {
-        throw new Error(`Auf deinem Kanal gibt es schon einen Reward „${settings.rewardTitle}“, der nicht von dieser App stammt. Benenne oder lösche ihn in Twitch, oder wähle in den Einstellungen einen anderen Reward-Namen (und speichere).`);
+  const { data: list } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
+
+  const make = async ({ stateKey, title, cost, prompt, color }) => {
+    let reward = list.find((r) => r.id === state[stateKey]) ?? list.find((r) => r.title === title);
+    if (!reward) {
+      try {
+        reward = (await helix('POST', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id }, body: { title, cost, prompt, background_color: color } })).data[0];
+      } catch (e) {
+        if (e.message.includes('DUPLICATE_REWARD')) {
+          throw new Error(`Auf deinem Kanal gibt es schon einen Reward „${title}“, der nicht von dieser App stammt. Benenne oder lösche ihn in Twitch, oder wähle in den Einstellungen einen anderen Reward-Namen (und speichere).`);
+        }
+        throw e;
       }
-      throw e;
+    } else if (reward.title !== title || reward.cost !== cost || reward.is_enabled === false) {
+      reward = (await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: reward.id }, body: { title, cost, is_enabled: true } })).data[0];
     }
-  } else if (reward.title !== settings.rewardTitle || reward.cost !== settings.rewardCost) {
-    reward = (await helix('PATCH', 'channel_points/custom_rewards', {
-      query: { broadcaster_id: user_id, id: reward.id },
-      body: { title: settings.rewardTitle, cost: settings.rewardCost },
-    })).data[0];
+    state[stateKey] = reward.id;
+    return reward;
+  };
+
+  const checkin = await make({ stateKey: 'rewardId', title: settings.rewardTitle, cost: settings.rewardCost, prompt: 'Check-in für diesen Stream – dein Besuch wird mitgezählt!', color: '#9146FF' });
+  let checkout = null;
+  if (settings.checkoutEnabled) {
+    checkout = await make({ stateKey: 'checkoutRewardId', title: settings.checkoutRewardTitle, cost: settings.checkoutRewardCost, prompt: 'Check-out: deine Zeit im Stream wird gespeichert.', color: '#F08A24' });
+  } else if (state.checkoutRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.checkoutRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.checkoutRewardId;
   }
-  await db.set('config/state', { ...state, rewardId: reward.id });
-  return reward;
+  await db.set('config/state', state);
+  return { checkin, checkout };
 }
 
 export const EVENT_TYPE = 'channel.channel_points_custom_reward_redemption.add';
@@ -111,18 +120,21 @@ export async function listSubscriptions(webhookUrl) {
   return data.filter((s) => s.transport?.callback === webhookUrl);
 }
 
-export async function subscribe(webhookUrl, rewardId) {
+// Eine Subscription pro Reward (so löst nicht jede fremde Einlösung im Kanal einen Aufruf aus)
+export async function subscribe(webhookUrl, rewardIds) {
   const { user_id } = await userToken();
-  for (const s of await listSubscriptions(webhookUrl)) {
-    await helix('DELETE', 'eventsub/subscriptions', { as: 'app', query: { id: s.id } });
+  for (const sub of await listSubscriptions(webhookUrl)) {
+    await helix('DELETE', 'eventsub/subscriptions', { as: 'app', query: { id: sub.id } });
   }
-  return helix('POST', 'eventsub/subscriptions', {
-    as: 'app',
-    body: {
-      type: EVENT_TYPE,
-      version: '1',
-      condition: { broadcaster_user_id: user_id, reward_id: rewardId },
-      transport: { method: 'webhook', callback: webhookUrl, secret: process.env.EVENTSUB_SECRET },
-    },
-  });
+  for (const rewardId of rewardIds) {
+    await helix('POST', 'eventsub/subscriptions', {
+      as: 'app',
+      body: {
+        type: EVENT_TYPE,
+        version: '1',
+        condition: { broadcaster_user_id: user_id, reward_id: rewardId },
+        transport: { method: 'webhook', callback: webhookUrl, secret: process.env.EVENTSUB_SECRET },
+      },
+    });
+  }
 }
