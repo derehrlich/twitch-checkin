@@ -4,6 +4,8 @@ import { db } from '../lib/store.mjs';
 import { getSettings } from '../lib/settings.mjs';
 import { handleCheckout, handleRedemption } from '../lib/checkin.mjs';
 import { handleRaid } from '../lib/raid.mjs';
+import { handleAlert } from '../lib/alerts.mjs';
+import { ALERT_TYPES } from '../lib/twitch.mjs';
 import { safeEqual, text } from '../lib/http.mjs';
 
 export const config = { path: '/api/twitch-webhook' };
@@ -36,13 +38,15 @@ export default async (req) => {
 
   if (type === 'notification') {
     const e = body.event;
-    if (body.subscription?.type === 'channel.raid') {
-      // Raid-Events haben keine eigene ID, daher dient die Nachrichten-ID der Wiederholungserkennung
+    const subType = body.subscription?.type;
+    if (subType === 'channel.raid' || ALERT_TYPES.includes(subType)) {
+      // Diese Events haben keine eigene ID, daher dient die Nachrichten-ID der Wiederholungserkennung
       if (!(await db.setIfNew(`seen/${msgId}`, Date.now()))) return new Response(null, { status: 204 });
       try {
-        await handleRaid(e, await getSettings());
+        const settings = await getSettings();
+        await (subType === 'channel.raid' ? handleRaid(e, settings) : handleAlert(subType, e, settings));
       } catch (err) {
-        console.error('Raid fehlgeschlagen:', err);
+        console.error(`${subType} fehlgeschlagen:`, err);
         await db.delete(`seen/${msgId}`);
         return text('error', 500);
       }

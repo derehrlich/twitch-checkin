@@ -3,8 +3,9 @@ import { db } from '../lib/store.mjs';
 import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
 import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
 import { raiderPackage, raidVars } from '../lib/raid.mjs';
+import { buildAlert } from '../lib/alerts.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
-import { ensureRewards, listSubscriptions, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
+import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -67,7 +68,7 @@ export default async (req) => {
       if (tokens && process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
         try {
           const subs = await listSubscriptions(webhookUrl);
-          const expected = (state.checkoutRewardId ? 2 : 1) + (settings.raidEnabled ? 1 : 0);
+          const expected = (state.checkoutRewardId ? 2 : 1) + (settings.raidEnabled ? 1 : 0) + (settings.alertsEnabled ? 5 : 0);
           const notReady = subs.find((x) => x.status !== 'enabled');
           subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
         } catch (e) { subscriptionError = e.message; }
@@ -81,7 +82,8 @@ export default async (req) => {
           EVENTSUB_SECRET: Boolean(process.env.EVENTSUB_SECRET),
         },
         connectedAs: tokens?.login ?? null,
-        raidScopeMissing: Boolean(tokens) && !(tokens.scopes ?? []).includes('moderator:manage:shoutouts'),
+        missingScopes: tokens ? SCOPES.filter((sc) => !(tokens.scopes ?? []).includes(sc)) : [],
+        alertsEnabled: settings.alertsEnabled,
         raidEnabled: settings.raidEnabled,
         rewardId: state.rewardId ?? null,
         checkoutRewardId: state.checkoutRewardId ?? null,
@@ -108,7 +110,7 @@ export default async (req) => {
         return json({ error: 'Check-in und Check-out brauchen verschiedene Reward-Namen' }, 400);
       }
       const { checkin, checkout } = await ensureRewards(settings);
-      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : [])], { raids: settings.raidEnabled });
+      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : [])], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
       await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
       return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null });
     }
@@ -122,6 +124,20 @@ export default async (req) => {
         await sendChat(fill(settings.chatTemplate, { user, count }));
       } else if (body.target === 'checkout') {
         await pushOverlay({ type: 'checkout', user, minutes: 134, count });
+      } else if (String(body.target).startsWith('alert-')) {
+        // Beispieldaten, unabhängig vom Schalter „Alerts aktiv“, aber mit den Anzeigeregeln der Einstellungen
+        const samples = {
+          follow: ['channel.follow', { user_name: user }],
+          sub: ['channel.subscribe', { user_name: user, tier: '1000', is_gift: false }],
+          resub: ['channel.subscription.message', { user_name: user, tier: '2000', cumulative_months: count, message: { text: 'Immer wieder gerne! 🎉' } }],
+          gift: ['channel.subscription.gift', { user_name: user, tier: '1000', total: Math.min(count, 100) }],
+          cheer: ['channel.cheer', { user_name: user, bits: count * 10, message: 'Cheer100 für dich!' }],
+        };
+        const sample = samples[body.target.slice(6)];
+        if (!sample) return json({ error: 'Unbekannter Alert' }, 400);
+        const alert = buildAlert(sample[0], sample[1], { ...settings, alertFollow: true, alertSub: true, alertGift: true, alertCheer: true, alertCheerMin: 1 });
+        await pushOverlay({ type: 'alert', ...alert.card });
+        if (body.chat) await sendChat(fill(alert.template, alert.vars));
       } else if (body.target === 'raid' || body.target === 'raid-chat') {
         // Echte Daten (Spiel, Clip) vom angegebenen Kanal; Shoutout wird im Test nie ausgelöst
         const login = String(body.raider || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 25) || (await db.get('config/tokens'))?.login;

@@ -195,6 +195,24 @@ async function showRaid(ev) {
   stage.innerHTML = '';
 }
 
+function checkView(ev) {
+  const out = ev.type === 'checkout';
+  const coin = coinFor(ev);
+  return { small: coin.small, big: coin.big, dot: out ? 'out' : '', tag: out ? 'Ausgecheckt' : 'Eingecheckt', sub: out ? 'bis zum nächsten Mal!' : 'schön, dass du da bist!' };
+}
+
+// Follow, Sub, Resub, Gift-Sub, Bits: gleiche Karte, andere Münze und Texte
+function alertView(ev) {
+  switch (ev.kind) {
+    case 'follow': return { small: 'Follow', big: '♥', dot: 'raid', tag: 'Neuer Follower', sub: 'willkommen in der Runde!' };
+    case 'sub': return { small: 'Sub', big: '★', dot: 'raid', tag: 'Neuer Sub', sub: `${ev.tier} – danke für die Unterstützung!` };
+    case 'resub': return { small: 'Monate', big: ev.months, dot: 'raid', tag: 'Sub-Treue', sub: ev.message || `${ev.tier} – danke für die Treue!` };
+    case 'gift': return { small: 'Subs', big: ev.total, dot: 'raid', tag: 'Sub-Geschenk', sub: `verschenkt ${ev.total} Sub${ev.total === 1 ? '' : 's'}!` };
+    case 'cheer': return { small: 'Bits', big: ev.bits, dot: 'raid', tag: 'Bits', sub: ev.message || 'danke für die Bits!' };
+    default: return { small: '', big: '', dot: '', tag: 'Alert', sub: '' };
+  }
+}
+
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
@@ -205,18 +223,17 @@ async function next() {
     next();
     return;
   }
-  const out = ev.type === 'checkout';
-  const coin = coinFor(ev);
+  const v = ev.type === 'alert' ? alertView(ev) : checkView(ev);
   stage.innerHTML = `<div class="wrap" style="animation-duration:${duration}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
     <div class="card panel">
       <div class="row">
-        <div class="coin"><small>${coin.small}</small><b style="font-size:${coinSize(coin.big)}px">${esc(coin.big)}</b></div>
+        <div class="coin"><small>${esc(v.small)}</small><b style="font-size:${coinSize(v.big)}px">${esc(v.big)}</b></div>
         <div class="txt">
-          <div class="tag"><i class="${out ? 'out' : ''}"></i>${out ? 'Ausgecheckt' : 'Eingecheckt'}</div>
+          <div class="tag"><i class="${v.dot}"></i>${esc(v.tag)}</div>
           <div class="name" style="font-size:${nameSize(ev.user)}px">${esc(ev.user)}</div>
-          <div class="sub">${out ? 'bis zum nächsten Mal!' : 'schön, dass du da bist!'}</div>
+          <div class="sub">${esc(v.sub)}</div>
         </div>
       </div>
       <div class="bar"><span style="animation-duration:${duration}ms"></span></div>
@@ -242,7 +259,7 @@ async function poll() {
     if (data.duration != null && !params.has('duration')) duration = data.duration;
     useUploadedSound(data.sound ?? null);
     setSoundVolume();
-    for (const ev of data.events) if (['checkin', 'checkout', 'raid'].includes(ev.type)) queue.push(ev);
+    for (const ev of data.events) if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) queue.push(ev);
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
@@ -253,7 +270,8 @@ if (params.has('demo')) {
   let i = 0;
   const show = () => {
     const n = i % names.length;
-    if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', clip: null });
+    if (i % 5 === 2) queue.push([{ type: 'alert', kind: 'follow', user: names[n] }, { type: 'alert', kind: 'gift', user: names[n], total: 5 }, { type: 'alert', kind: 'cheer', user: names[n], bits: 500, message: 'Cheer500 für dich!' }][i % 3]);
+    else if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', clip: null });
     else queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
     i++; next();
   };

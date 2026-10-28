@@ -28,6 +28,20 @@ export const DEFAULTS = {
   raidShoutout: true,
   raidClip: true,
   raidClipMaxSeconds: 30,
+  // Alerts: Follow, Sub/Resub/Prime, Gift-Subs, Bits. Standardmäßig aus, damit nichts doppelt läuft,
+  // solange ein anderes Alert-Tool noch aktiv ist.
+  alertsEnabled: false,
+  alertFollow: true,
+  alertSub: true,
+  alertGift: true,
+  alertCheer: true,
+  alertCheerMin: 1,
+  alertChat: false, // zusätzlich zur Overlay-Karte eine Dankes-Nachricht im Chat
+  // Platzhalter: {user} {tier} {months} {total} {bits}
+  followTemplate: '💜 Danke für den Follow, {user}! Schön, dass du da bist.',
+  subTemplate: '⭐ {user} hat abonniert ({tier}, {months} Monate) – vielen Dank!',
+  giftTemplate: '🎁 {user} verschenkt {total} Sub(s) – du bist großartig!',
+  cheerTemplate: '💎 {user} schickt {bits} Bits – danke!',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -53,13 +67,15 @@ function sanitize(input) {
   str('raidTemplate', 400);
   num('raidMinViewers', 0, 100_000);
   num('raidClipMaxSeconds', 5, 60);
+  for (const k of ['followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate']) str(k, 400);
+  num('alertCheerMin', 1, 1_000_000);
   num('rewardCost', 1, 1_000_000);
   num('checkoutRewardCost', 1, 1_000_000);
   num('dayRolloverHour', 0, 23);
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['raidEnabled', 'raidShoutout', 'raidClip']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

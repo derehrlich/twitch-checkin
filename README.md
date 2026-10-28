@@ -57,6 +57,15 @@ Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu e
 
 Hinweise: Der Clip läuft über den offiziellen Twitch-Embed-Player. Clips sind Inhalte des Raiders und seiner Community; wer das nicht möchte, schaltet die Clip-Option aus.
 
+## Alerts: Follow, Sub, Gift-Sub, Bits
+
+Im Holz-Look des Overlays, mit eigener Münze je Alert: **Follow**, **Sub/Resub** (mit Monaten und Nachricht), **Gift-Subs** (ein Alert pro Paket, die einzelnen geschenkten Subs werden unterdrückt) und **Bits** (mit Mindestwert und Nachricht). Optional kommt zusätzlich ein Dank im Chat, alle Texte sind anpassbar.
+
+- Alerts sind **standardmäßig aus**. Erst einschalten, wenn ein altes Alert-Tool aus ist, sonst läuft alles doppelt.
+- **Prime-Subs** meldet Twitch als normalen Stufe-1-Sub, sie lassen sich nicht getrennt darstellen.
+- **Nach dem Update:** **Mit Twitch verbinden** (neue Berechtigungen `moderator:read:followers`, `channel:read:subscriptions`, `bits:read`), Alerts im Admin einschalten, dann **Reward & Webhook einrichten**.
+- Tests: Unter *OBS-Overlay* gibt es je einen Test-Button pro Alert; sie ändern nichts und laufen auch bei ausgeschalteten Alerts.
+
 ## Admin-Bereich
 
 - **Status** zeigt, ob Variablen, Twitch-Verbindung, Reward und Webhook in Ordnung sind

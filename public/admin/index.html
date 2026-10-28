@@ -117,6 +117,13 @@
         <button id="testCheckoutChat" class="ghost">Check-out im Chat testen</button>
       </div>
       <div class="row" style="margin-top:12px">
+        <button id="testAlertFollow" class="ghost">Follow testen</button>
+        <button id="testAlertSub" class="ghost">Sub testen</button>
+        <button id="testAlertResub" class="ghost">Resub testen</button>
+        <button id="testAlertGift" class="ghost">Gift-Subs testen</button>
+        <button id="testAlertCheer" class="ghost">Bits testen</button>
+      </div>
+      <div class="row" style="margin-top:12px">
         <div><label for="testRaider">Raid-Test: Kanalname des Raiders</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
         <button id="testRaid" class="ghost">Raid im Overlay testen</button>
         <button id="testRaidChat" class="ghost">Raid im Chat testen</button>
@@ -174,6 +181,20 @@
         <textarea id="raidTemplate" maxlength="400"></textarea>
         <div class="preview" id="preview3"></div>
         <p class="muted">Platzhalter: <code>{raider}</code> Name, <code>{viewers}</code> Zuschauer, <code>{game}</code> zuletzt gespieltes Spiel, <code>{url}</code> Kanallink. Nach dem Aktivieren oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken. Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleibt dann nur der Chattext und die Overlay-Karte.</p>
+
+        <h2 style="margin-top:22px">Alerts</h2>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertsEnabled" type="checkbox"> Alerts aktiv (Follow, Sub, Gift-Sub, Bits) – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertFollow" type="checkbox"> Follow</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertSub" type="checkbox"> Sub, Resub und Prime (Prime meldet Twitch als Stufe 1)</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertGift" type="checkbox"> Gift-Subs (ein Alert pro Paket)</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertCheer" type="checkbox"> Bits</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertChat" type="checkbox"> Zusätzlich Dankes-Nachricht im Chat</label>
+        <div class="grid2"><div><label for="alertCheerMin">Bits-Alert ab (Bits)</label><input id="alertCheerMin" type="number" min="1"></div></div>
+        <label for="followTemplate">Chat-Text Follow</label><textarea id="followTemplate" maxlength="400"></textarea>
+        <label for="subTemplate">Chat-Text Sub/Resub</label><textarea id="subTemplate" maxlength="400"></textarea>
+        <label for="giftTemplate">Chat-Text Gift-Sub</label><textarea id="giftTemplate" maxlength="400"></textarea>
+        <label for="cheerTemplate">Chat-Text Bits</label><textarea id="cheerTemplate" maxlength="400"></textarea>
+        <p class="muted">Platzhalter: <code>{user}</code> <code>{tier}</code> <code>{months}</code> <code>{total}</code> <code>{bits}</code>. Nach dem Ein- oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
 
         <h2 style="margin-top:22px">Allgemein</h2>
         <div class="grid2">
@@ -253,7 +274,7 @@ async function loadState() {
   $('checks').innerHTML =
     check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${missing}</b>`) +
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
-    (s.raidScopeMissing ? check('warn', 'Für Shoutouts fehlt eine Berechtigung – bitte „Mit Twitch verbinden“ erneut klicken') : '') +
+    (s.missingScopes.length ? check('warn', `Es fehlen Twitch-Berechtigungen (${esc(s.missingScopes.join(', '))}) – bitte „Mit Twitch verbinden“ erneut klicken`) : '') +
     check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Check-in-Reward angelegt' : 'Reward noch nicht angelegt') +
     (s.checkoutEnabled ? check(s.checkoutRewardId ? 'ok' : 'warn', s.checkoutRewardId ? 'Check-out-Reward angelegt' : 'Check-out-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Check-out ist ausgeschaltet')) +
     check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
@@ -322,8 +343,8 @@ $('soundReset').addEventListener('click', run(async () => {
   renderSound(); toast('Eingebauter Ton aktiv ✓');
 }));
 
-const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'raidTemplate', 'raidMinViewers', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
-const CHECKS = ['chatEnabled', 'checkoutEnabled', 'raidEnabled', 'raidShoutout', 'raidClip'];
+const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const CHECKS = ['chatEnabled', 'checkoutEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
   for (const f of FIELDS) $(f).value = settings[f];
@@ -363,6 +384,9 @@ $('testOverlay').addEventListener('click', run(async () => { await api('POST', '
 $('testChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('chat')); toast('Testnachricht im Chat gesendet ✓'); }));
 $('testCheckout').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout')); toast('Check-out-Test gesendet (dauert bis ca. 3 s)'); }));
 $('testCheckoutChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout-chat')); toast('Check-out-Nachricht im Chat gesendet ✓'); }));
+for (const k of ['Follow', 'Sub', 'Resub', 'Gift', 'Cheer']) {
+  $('testAlert' + k).addEventListener('click', run(async () => { await api('POST', 'test', testBody('alert-' + k.toLowerCase())); toast('Alert-Test gesendet (dauert bis ca. 3 s)'); }));
+}
 const raidBody = (target) => ({ target, raider: $('testRaider').value, count: $('testCount').value });
 $('testRaid').addEventListener('click', run(async () => { const r = await api('POST', 'test', raidBody('raid')); toast(r.clip ? `Raid-Test gesendet mit Clip „${r.clip}“ (dauert bis ca. 3 s)` : 'Raid-Test gesendet – es wurde kein passender Clip gefunden'); }));
 $('testRaidChat').addEventListener('click', run(async () => { await api('POST', 'test', raidBody('raid-chat')); toast('Raid-Nachricht im Chat gesendet ✓'); }));

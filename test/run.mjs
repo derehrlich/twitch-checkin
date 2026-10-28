@@ -131,9 +131,9 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
 });
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
-  assert.equal((await (await admin(adminReq('GET', 'state', null, cookie))).json()).raidScopeMissing, true, 'Tokens ohne scopes');
-  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['moderator:manage:shoutouts'] });
-  assert.equal((await (await admin(adminReq('GET', 'state', null, cookie))).json()).raidScopeMissing, false);
+  assert.ok((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes.includes('moderator:manage:shoutouts'), 'Tokens ohne scopes');
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read'] });
+  assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
 await test('Setup lehnt gleiche Namen für Check-in und Check-out ab', async () => {
@@ -430,6 +430,75 @@ await test('Raid-Test im Admin nutzt echte Kanaldaten, löst aber keinen Shoutou
   assert.equal((await res.json()).clip, 'Krasser Moment');
   assert.ok(!calls.slice(before).some((c) => c.path.endsWith('/chat/shoutouts')));
   assert.equal((await admin(adminReq('POST', 'test', { target: 'raid-chat', raider: 'RaiderIn' }, cookie))).status, 200);
+});
+
+// ---- Alerts
+const alertEvent = (type, event) => ({ subscription: { type }, event: { user_name: 'Fan', ...event } });
+const eventsSince = async (cur) => (await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json()).events;
+const cursor = async () => (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
+let alertN = 0;
+const sendAlert = async (type, event) => {
+  const cur = await cursor();
+  assert.equal((await webhook(signed('notification', alertEvent(type, event), { id: 'alert-' + alertN++ }))).status, 204);
+  return (await eventsSince(cur)).filter((e) => e.type === 'alert');
+};
+
+await test('Alerts: standardmäßig aus, nichts im Overlay', async () => {
+  assert.equal((await getSettings()).alertsEnabled, false);
+  assert.deepEqual(await sendAlert('channel.follow', {}), []);
+});
+
+await test('Setup abonniert Alert-Events mit richtiger Version und Bedingung', async () => {
+  await admin(adminReq('PUT', 'settings', { alertsEnabled: true }, cookie));
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 200);
+  const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions')).slice(-6);
+  const follow = created.find((c) => c.body.type === 'channel.follow');
+  assert.equal(follow.body.version, '2');
+  assert.deepEqual(follow.body.condition, { broadcaster_user_id: '999', moderator_user_id: '999' });
+  for (const t of ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift', 'channel.cheer']) {
+    assert.deepEqual(created.find((c) => c.body.type === t).body.condition, { broadcaster_user_id: '999' }, t);
+  }
+  assert.equal(subs.length, 8);
+});
+
+await test('Alerts: Follow, Sub, Resub, Gift und Bits erzeugen die richtigen Karten', async () => {
+  assert.deepEqual(await sendAlert('channel.follow', {}), [{ type: 'alert', kind: 'follow', user: 'Fan' }]);
+  const [sub] = await sendAlert('channel.subscribe', { tier: '1000', is_gift: false });
+  assert.equal(sub.kind, 'sub'); assert.equal(sub.tier, 'Stufe 1');
+  const [resub] = await sendAlert('channel.subscription.message', { tier: '2000', cumulative_months: 9, message: { text: 'Weiter so!' } });
+  assert.deepEqual([resub.kind, resub.months, resub.tier, resub.message], ['resub', 9, 'Stufe 2', 'Weiter so!']);
+  const [gift] = await sendAlert('channel.subscription.gift', { tier: '1000', total: 5, is_anonymous: true, user_name: null });
+  assert.deepEqual([gift.kind, gift.total, gift.user], ['gift', 5, 'Anonym']);
+  const [cheer] = await sendAlert('channel.cheer', { bits: 250, message: 'Cheer250 hi' });
+  assert.deepEqual([cheer.kind, cheer.bits, cheer.message], ['cheer', 250, 'Cheer250 hi']);
+});
+
+await test('Alerts: geschenkter Sub zählt nicht doppelt, Schalter und Mindest-Bits wirken, Wiederholung nur einmal', async () => {
+  assert.deepEqual(await sendAlert('channel.subscribe', { tier: '1000', is_gift: true }), []);
+  await admin(adminReq('PUT', 'settings', { alertCheerMin: 100, alertGift: false }, cookie));
+  assert.deepEqual(await sendAlert('channel.cheer', { bits: 50 }), [], 'unter Mindestwert');
+  assert.deepEqual(await sendAlert('channel.subscription.gift', { total: 2 }), [], 'Gift ausgeschaltet');
+  const cur = await cursor();
+  const dup = signed('notification', alertEvent('channel.follow', {}), { id: 'dup-1' });
+  const dup2 = signed('notification', alertEvent('channel.follow', {}), { id: 'dup-1' });
+  await webhook(dup); await webhook(dup2);
+  assert.equal((await eventsSince(cur)).filter((e) => e.type === 'alert').length, 1);
+  await admin(adminReq('PUT', 'settings', { alertCheerMin: 1, alertGift: true }, cookie));
+});
+
+await test('Alerts: Chat-Dank nur wenn eingeschaltet; Admin-Test erzeugt Karten', async () => {
+  const n = chats().length;
+  await sendAlert('channel.follow', {});
+  assert.equal(chats().length, n);
+  await admin(adminReq('PUT', 'settings', { alertChat: true }, cookie));
+  await sendAlert('channel.subscription.gift', { total: 3, user_name: 'Gönner' });
+  assert.match(chats().at(-1), /Gönner verschenkt 3 Sub/);
+  await admin(adminReq('PUT', 'settings', { alertChat: false, alertsEnabled: false }, cookie));
+  const cur = await cursor();
+  assert.equal((await admin(adminReq('POST', 'test', { target: 'alert-cheer', user: 'Tester', count: 7 }, cookie))).status, 200);
+  assert.equal((await admin(adminReq('POST', 'test', { target: 'alert-quatsch' }, cookie))).status, 400);
+  const [card] = (await eventsSince(cur)).filter((e) => e.type === 'alert');
+  assert.deepEqual([card.kind, card.user, card.bits], ['cheer', 'Tester', 70]);
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
