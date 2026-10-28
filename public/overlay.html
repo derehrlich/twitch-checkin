@@ -32,10 +32,12 @@
 <canvas id="fx"></canvas>
 <div id="stage"></div>
 <script>
-// Optionen per URL: ?volume=0.6  (0..1)   ?duration=5000 (ms)
+// Lautstärke und Dauer kommen aus dem Admin-Bereich. Optional überschreibbar per URL:
+// ?volume=0.6 (0..1)   ?duration=5000 (ms)   ?poll=3000 (Abfrageintervall in ms)
 const params = new URLSearchParams(location.search);
-const volume = Number(params.get('volume') ?? 0.6);
-const duration = Number(params.get('duration') ?? 5000);
+let volume = Number(params.get('volume') ?? 0.6);
+let duration = Number(params.get('duration') ?? 5000);
+const pollMs = Math.max(1000, Number(params.get('poll') ?? 3000));
 
 // ---------- Ton ----------
 let audioCtx;
@@ -116,12 +118,23 @@ async function next() {
   next();
 }
 
-// ---------- Verbindung zum Server ----------
-const es = new EventSource('/events');
-es.onmessage = (e) => {
-  const ev = JSON.parse(e.data);
-  if (ev.type === 'checkin') { queue.push(ev); next(); }
-};
+// ---------- Server fragen, ob neue Check-ins da sind ----------
+// Netlify kann keine dauerhaften Verbindungen halten, daher wird regelmäßig nachgefragt.
+let cursor = null;
+async function poll() {
+  try {
+    const res = await fetch('/api/overlay' + (cursor ? '?since=' + encodeURIComponent(cursor) : ''), { cache: 'no-store' });
+    const data = await res.json();
+    cursor = data.cursor;
+    if (data.volume != null && !params.has('volume')) volume = data.volume;
+    if (data.duration != null && !params.has('duration')) duration = data.duration;
+    if (customSound) customSound.volume = volume;
+    for (const ev of data.events) if (ev.type === 'checkin') queue.push(ev);
+    next();
+  } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
+  setTimeout(poll, pollMs);
+}
+poll();
 </script>
 </body>
 </html>

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Check-in Admin</title>
+<style>
+  :root { --bg:#0e0e10; --card:#18181b; --line:#2f2f35; --text:#efeff1; --muted:#adadb8; --accent:#9146ff; --ok:#00c853; --warn:#ffb300; --bad:#ff5252; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, 'Segoe UI', sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  h1 { font-size: 22px; margin: 0; } h2 { font-size: 17px; margin: 0 0 12px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  label { display:block; font-size:13px; color:var(--muted); margin: 10px 0 4px; }
+  input, textarea, select { width:100%; background:#0e0e10; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button, .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+  button.ghost, .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button.danger { background:var(--bad); }
+  button:disabled { opacity:.5; cursor: default; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; } .row > * { flex:1 1 160px; } .row > button, .row > .btn { flex:0 0 auto; }
+  .grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
+  .check { display:flex; gap:10px; align-items:center; padding:6px 0; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--muted); flex:none; } .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
+  .muted { color:var(--muted); font-size:13px; } code { background:#0e0e10; padding:2px 6px; border-radius:5px; word-break:break-all; }
+  .stats { display:flex; gap:24px; flex-wrap:wrap; } .stat b { font-size:26px; display:block; line-height:1.1; }
+  table { width:100%; border-collapse: collapse; } th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:500; font-size:13px; }
+  tr.user { cursor:pointer; } tr.user:hover { background:#202024; }
+  .days { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .chip { background:#26262c; border-radius:999px; padding:3px 6px 3px 12px; font-size:13px; display:inline-flex; gap:6px; align-items:center; }
+  .chip button { background:none; padding:0 6px; color:var(--muted); font-size:16px; line-height:1; }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#26262c; border:1px solid var(--line); padding:10px 16px; border-radius:10px; opacity:0; pointer-events:none; transition:opacity .2s; max-width: 90vw; }
+  #toast.show { opacity:1; } #toast.err { border-color: var(--bad); }
+  .hidden { display:none !important; }
+  .preview { background:#0e0e10; border:1px dashed var(--line); border-radius:8px; padding:8px 10px; margin-top:6px; font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>✅ Check-in Admin</h1>
+    <button id="logout" class="ghost hidden">Abmelden</button>
+  </header>
+
+  <!-- Login -->
+  <section id="login" class="hidden">
+    <h2>Anmelden</h2>
+    <form id="loginForm" class="row">
+      <div><label for="pw">Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      <button>Anmelden</button>
+    </form>
+    <p class="muted" id="loginHint"></p>
+  </section>
+
+  <div id="app" class="hidden" style="display:grid; gap:16px;">
+    <section>
+      <h2>Status</h2>
+      <div id="checks"></div>
+      <div class="row" style="margin-top:12px">
+        <a class="btn ghost" href="/api/auth/login">Mit Twitch verbinden</a>
+        <button id="setup">Reward &amp; Webhook einrichten</button>
+      </div>
+      <p class="muted">Nach Änderung von Rewardname oder -preis in den Einstellungen: erneut „einrichten“ klicken.</p>
+      <details><summary class="muted">Technische Angaben</summary>
+        <p class="muted">Twitch OAuth Redirect URL: <code id="uRedirect"></code></p>
+        <p class="muted">Webhook: <code id="uWebhook"></code></p>
+      </details>
+    </section>
+
+    <section>
+      <h2>OBS-Overlay</h2>
+      <p>Browser-Quelle in OBS mit dieser URL (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
+      <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
+      <div class="row" style="margin-top:12px">
+        <div><label for="testUser">Name für den Test</label><input id="testUser" value="TestUser"></div>
+        <div><label for="testCount">Besuch Nr.</label><input id="testCount" type="number" min="1" value="7"></div>
+        <button id="testOverlay" class="ghost">Overlay testen</button>
+        <button id="testChat" class="ghost">Chat testen</button>
+      </div>
+      <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
+    </section>
+
+    <section>
+      <h2>Einstellungen</h2>
+      <form id="settingsForm">
+        <label for="chatTemplate">Chatnachricht beim Check-in</label>
+        <textarea id="chatTemplate" maxlength="400"></textarea>
+        <div class="preview" id="preview1"></div>
+        <label for="duplicateTemplate">Nachricht, wenn schon eingecheckt (Punkte werden erstattet)</label>
+        <textarea id="duplicateTemplate" maxlength="400"></textarea>
+        <p class="muted">Platzhalter: <code>{user}</code> Name, <code>{count}</code> Anzahl der Besuche</p>
+        <div class="grid2">
+          <div><label for="rewardTitle">Reward-Name</label><input id="rewardTitle" maxlength="45"></div>
+          <div><label for="rewardCost">Preis (Kanalpunkte)</label><input id="rewardCost" type="number" min="1"></div>
+          <div><label for="volume">Lautstärke (0 bis 1)</label><input id="volume" type="number" min="0" max="1" step="0.1"></div>
+          <div><label for="duration">Anzeigedauer (ms)</label><input id="duration" type="number" min="2000" max="30000" step="500"></div>
+          <div><label for="timezone">Zeitzone</label><input id="timezone"></div>
+          <div><label for="dayRolloverHour">Neuer Stream-Tag ab (Uhr)</label><input id="dayRolloverHour" type="number" min="0" max="23"></div>
+        </div>
+        <label class="check" style="font-size:15px;color:var(--text)"><input id="chatEnabled" type="checkbox" style="width:auto"> Chatnachrichten senden</label>
+        <button style="margin-top:8px">Speichern</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Besucher</h2>
+      <div class="stats" id="stats"></div>
+      <div class="row" style="margin-top:12px">
+        <div><label for="search">Suchen</label><input id="search" type="search" placeholder="Name…"></div>
+        <a class="btn ghost" href="/api/admin/export.csv">CSV-Export</a>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Name</th><th>Besuche</th><th>Zuletzt</th></tr></thead>
+        <tbody id="users"></tbody>
+      </table></div>
+      <div id="detail" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:12px">
+        <h2 id="dName"></h2>
+        <div class="days" id="dDays"></div>
+        <div class="row">
+          <div><label for="addDay">Besuch nachtragen</label><input id="addDay" type="date"></div>
+          <button id="addDayBtn" class="ghost">Hinzufügen</button>
+          <button id="delUser" class="danger">Nutzer löschen</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let users = [], selected = null, settings = {};
+
+function toast(msg, err = false) {
+  const t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), 3500);
+}
+
+async function api(method, path, body) {
+  const res = await fetch('/api/admin/' + path, {
+    method, headers: body !== undefined ? { 'content-type': 'application/json' } : (method === 'GET' ? {} : { 'content-type': 'application/json' }),
+    body: body !== undefined ? JSON.stringify(body) : (method === 'GET' ? undefined : '{}'),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== 'login') { showLogin(data.adminEnabled === false); throw new Error('Nicht angemeldet'); }
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const run = (fn) => async (...a) => { try { await fn(...a); } catch (e) { if (e.message !== 'Nicht angemeldet') toast(e.message, true); } };
+
+function showLogin(disabled) {
+  $('login').classList.remove('hidden'); $('app').classList.add('hidden'); $('logout').classList.add('hidden');
+  $('loginHint').textContent = disabled ? 'Die Umgebungsvariable ADMIN_PASSWORD ist in Netlify noch nicht gesetzt.' : '';
+}
+
+// ---- Status
+function check(cls, text) { return `<div class="check"><span class="dot ${cls}"></span><span>${text}</span></div>`; }
+async function loadState() {
+  const s = await api('GET', 'state');
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
+  const envOk = s.env.TWITCH_CLIENT_ID && s.env.TWITCH_CLIENT_SECRET && s.env.EVENTSUB_SECRET;
+  const missing = Object.entries(s.env).filter(([, v]) => !v).map(([k]) => k).join(', ');
+  const sub = s.subscription;
+  $('checks').innerHTML =
+    check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${missing}</b>`) +
+    check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
+    check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Reward angelegt' : 'Reward noch nicht angelegt') +
+    check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
+      s.revoked ? `Webhook widerrufen (${esc(s.revoked)}), bitte neu einrichten`
+      : sub === 'enabled' ? 'Webhook aktiv – Check-ins werden empfangen'
+      : sub ? `Webhook-Status: ${esc(sub)}` + (sub.includes('pending') ? ' (Twitch prüft gerade, kurz neu laden)' : '')
+      : s.subscriptionError ? `Webhook nicht abfragbar: ${esc(s.subscriptionError)}` : 'Webhook noch nicht eingerichtet');
+  $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay;
+  $('stats').innerHTML = [['users', 'Besucher gesamt'], ['today', `Heute (${s.today})`], ['checkins', 'Check-ins gesamt']]
+    .map(([k, l]) => `<div class="stat"><b>${s.totals[k]}</b><span class="muted">${l}</span></div>`).join('');
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ---- Einstellungen
+const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+async function loadSettings() {
+  settings = await api('GET', 'settings');
+  for (const f of FIELDS) $(f).value = settings[f];
+  $('chatEnabled').checked = settings.chatEnabled;
+  updatePreview();
+}
+const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
+function updatePreview() { $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 }); }
+$('chatTemplate').addEventListener('input', updatePreview);
+
+$('settingsForm').addEventListener('submit', run(async (e) => {
+  e.preventDefault();
+  const body = { chatEnabled: $('chatEnabled').checked };
+  for (const f of FIELDS) body[f] = $(f).value;
+  settings = await api('PUT', 'settings', body);
+  for (const f of FIELDS) $(f).value = settings[f];
+  toast('Gespeichert ✓');
+}));
+
+// ---- Aktionen
+$('setup').addEventListener('click', run(async () => {
+  $('setup').disabled = true;
+  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“ und Webhook eingerichtet ✓`); await loadState(); }
+  finally { $('setup').disabled = false; }
+}));
+$('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
+const testBody = (target) => ({ target, user: $('testUser').value, count: $('testCount').value });
+$('testOverlay').addEventListener('click', run(async () => { await api('POST', 'test', testBody('overlay')); toast('Overlay-Test gesendet (dauert bis ca. 3 s)'); }));
+$('testChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('chat')); toast('Testnachricht im Chat gesendet ✓'); }));
+$('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
+$('loginForm').addEventListener('submit', run(async (e) => {
+  e.preventDefault();
+  await api('POST', 'login', { password: $('pw').value }); $('pw').value = '';
+  await init();
+}));
+
+// ---- Besucher
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE') : '–';
+async function loadUsers() { users = await api('GET', 'users'); renderUsers(); renderDetail(); }
+function renderUsers() {
+  const q = $('search').value.trim().toLowerCase();
+  const list = users.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 200);
+  $('users').innerHTML = list.map((u) => `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${fmtDate(u.last)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">Noch keine Besucher.</td></tr>';
+}
+$('search').addEventListener('input', renderUsers);
+$('users').addEventListener('click', (e) => { const tr = e.target.closest('tr.user'); if (tr) { selected = tr.dataset.id; renderDetail(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } });
+
+function renderDetail() {
+  const u = users.find((x) => x.id === selected);
+  $('detail').classList.toggle('hidden', !u);
+  if (!u) return;
+  $('dName').textContent = `${u.name} – ${u.count} Besuche`;
+  $('dDays').innerHTML = [...u.days].reverse().map((d) => `<span class="chip">${esc(d)}<button data-day="${esc(d)}" title="Besuch entfernen">×</button></span>`).join('');
+}
+$('dDays').addEventListener('click', run(async (e) => {
+  const day = e.target.dataset.day; if (!day || !confirm(`Besuch am ${day} entfernen?`)) return;
+  await api('DELETE', `users/${selected}/days/${day}`); await loadUsers(); await loadState();
+}));
+$('addDayBtn').addEventListener('click', run(async () => {
+  if (!$('addDay').value) return toast('Bitte ein Datum wählen', true);
+  await api('POST', `users/${selected}/days`, { day: $('addDay').value }); await loadUsers(); await loadState(); toast('Besuch nachgetragen ✓');
+}));
+$('delUser').addEventListener('click', run(async () => {
+  const u = users.find((x) => x.id === selected);
+  if (!confirm(`${u.name} mit allen ${u.count} Besuchen endgültig löschen?`)) return;
+  await api('DELETE', `users/${selected}`); selected = null; await loadUsers(); await loadState();
+}));
+
+async function init() { await loadState(); await Promise.all([loadSettings(), loadUsers()]); if (new URLSearchParams(location.search).has('verbunden')) { toast('Mit Twitch verbunden ✓ – jetzt „Reward & Webhook einrichten“ klicken'); history.replaceState(null, '', '/admin/'); } }
+init().catch(() => {});
+</script>
+</body>
+</html>

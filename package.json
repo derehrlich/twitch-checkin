@@ -4,8 +4,14 @@
   "description": "Twitch Kanalpunkte Check-in mit Besuchszähler, Chatnachricht und OBS-Overlay",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.js"
+    "dev": "netlify dev",
+    "test": "node test/run.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.7"
   }
 }
