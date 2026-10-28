@@ -1,66 +1,98 @@
-/* EhrlichVerwirrt-Look: Holz, Pixel-Schrift, cremefarbene Karten, gelber Akzent.
-   Gemeinsam für Admin und Overlay. Farben hier ändern, dann passt sich alles an. */
-@font-face { font-family: 'Pixelify Sans'; font-weight: 400; font-display: swap; src: url('/fonts/pixelify-sans-latin-400-normal.woff2') format('woff2'); }
+/* EhrlichVerwirrt-Look (gemütlich, Stardew-nah): Holz mit Maserung, Pergament, Messing, Grubenlampen.
+   Gemeinsam für Admin und Overlay. Farben unten in :root anpassen. */
+@font-face { font-family: 'Fredoka'; font-weight: 400; font-display: swap; src: url('/fonts/fredoka-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fredoka'; font-weight: 500; font-display: swap; src: url('/fonts/fredoka-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fredoka'; font-weight: 600; font-display: swap; src: url('/fonts/fredoka-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fredoka'; font-weight: 700; font-display: swap; src: url('/fonts/fredoka-latin-700-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Pixelify Sans'; font-weight: 700; font-display: swap; src: url('/fonts/pixelify-sans-latin-700-normal.woff2') format('woff2'); }
 
 :root {
-  --wood: #7b4b2c;
-  --wood-dark: #5d3820;
-  --wood-line: rgba(0, 0, 0, .16);
-  --ink: #3a2112;          /* dunkler Rahmen und Text */
-  --ink-soft: #6b4a33;
+  --ink: #3a2112;          /* dunkelbrauner Text und Rahmen */
+  --ink-soft: #7a5a40;
+  --frame: #2b180c;        /* Außenkante der Holzrahmen */
   --cream: #f7e8cc;
-  --cream-deep: #efd9b0;
-  --plaque: #d9a066;       /* Holzschild */
-  --plaque-deep: #c48a52;
-  --yellow: #f6b82e;       /* Hauptknopf */
+  --cream-deep: #ead3a6;
+  --gold: #d6a85a;
+  --yellow: #f6b82e;
   --orange: #f08a24;
-  --navy: #2a2140;         /* dunkles Panel wie im Streamplan */
-  --teal: #3aa7b5;
-  --ok: #4aa84a;
+  --navy: #2a2140;
+  --teal: #4fb8c4;
+  --ok: #58a84a;
   --warn: #f08a24;
   --bad: #d64533;
-  --pixel-font: 'Pixelify Sans', 'Courier New', monospace;
+  --font: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  --wordmark: 'Pixelify Sans', 'Fredoka', monospace;
+
+  /* Texturen aus SVG-Rauschen: Holzfasern längs, feine Fasern, Pergamentkorn */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='420' height='260'><filter id='f' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='0.006 0.15' numOctaves='3' seed='7'/><feColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.08  0 0 0 0 0.03  0 0 0 1.7 -0.72'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+  --grain-fine: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200'><filter id='f' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='0.02 0.7' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.85  0 0 0 0 0.65  0 0 0 1.0 -0.5'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+  --paper: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='f' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='0.85' numOctaves='2' seed='11'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.3  0 0 0 0 0.12  0 0 0 0.55 -0.12'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
 }
 
-/* Holzbretter: horizontale Planken mit dunkler Fuge */
+/* Holz: Planken, Maserung, leichter Verlauf */
 .wood {
-  background-color: var(--wood);
+  background-color: #6a4126;
   background-image:
-    repeating-linear-gradient(to bottom, transparent 0 94px, var(--wood-line) 94px 98px),
-    repeating-linear-gradient(to bottom, rgba(255,255,255,.04) 0 47px, transparent 47px 94px);
+    repeating-linear-gradient(to bottom, transparent 0 118px, rgba(20, 10, 4, .6) 118px 120px, rgba(255, 214, 160, .16) 120px 122px, transparent 122px 124px),
+    var(--grain-fine), var(--grain),
+    linear-gradient(to bottom, #7d5232, #603a21);
+  background-size: auto, 300px 200px, 420px 260px, auto;
 }
 
-/* Karten-Look: dicker Rahmen, harter Schatten (kein Weichzeichner) */
+/* Holzpaneel wie im Stream-Rahmen: abgerundet, Lichtkante innen, weicher Schatten */
+.panel {
+  border: 2px solid var(--frame);
+  border-radius: 14px;
+  background-color: #6a4126;
+  background-image: var(--grain-fine), var(--grain), linear-gradient(to bottom, #75492b, #583620);
+  background-size: 300px 200px, 420px 260px, auto;
+  box-shadow: inset 0 0 0 2px rgba(255, 214, 160, .2), inset 0 -8px 14px rgba(20, 10, 4, .3), 0 8px 18px rgba(10, 5, 2, .5);
+  color: var(--cream);
+}
+
+/* Pergamentkarte im Holzrahmen */
 .px-box {
-  background: var(--cream);
+  --rv: radial-gradient(circle at 36% 30%, #fff3bd 0 1.3px, #e2b04a 2.6px, #8a5a14 4.6px, transparent 5.2px);
   color: var(--ink);
-  border: 4px solid var(--ink);
-  box-shadow: 0 6px 0 0 var(--ink);
+  border: 3px solid #4a2c17;
+  border-radius: 14px;
+  background-color: var(--cream);
+  background-image:
+    var(--rv), var(--rv), var(--rv), var(--rv),
+    var(--paper),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, .5), transparent 60%),
+    linear-gradient(to bottom, #fbefd6, #f0daae);
+  background-position: left 9px top 9px, right 9px top 9px, left 9px bottom 9px, right 9px bottom 9px, 0 0, 0 0, 0 0;
+  background-size: 12px 12px, 12px 12px, 12px 12px, 12px 12px, 220px 220px, auto, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, no-repeat, no-repeat;
+  box-shadow: inset 0 0 0 2px rgba(214, 168, 90, .85), inset 0 0 26px rgba(139, 94, 40, .3), 0 8px 18px rgba(10, 5, 2, .45);
 }
 
-/* Holzschild mit vier Nägeln */
+/* Helles Holzschild (Kopfbereich) */
 .plaque {
   position: relative;
-  background: linear-gradient(to bottom, var(--plaque) 0 52%, var(--plaque-deep) 52% 100%);
-  border: 4px solid var(--ink);
-  box-shadow: 0 6px 0 0 var(--ink);
+  border: 3px solid #4a2c17;
+  border-radius: 14px;
+  background-color: #d9a56c;
+  background-image: var(--grain-fine), var(--grain), linear-gradient(to bottom, #e6b87e, #c98f55);
+  background-size: 300px 200px, 420px 260px, auto;
+  box-shadow: inset 0 0 0 2px rgba(255, 233, 190, .45), inset 0 -8px 14px rgba(94, 52, 20, .25), 0 8px 18px rgba(10, 5, 2, .5);
   color: var(--ink);
 }
-.plaque::before, .plaque::after, .plaque > .nail-b::before, .plaque > .nail-b::after {
-  content: ''; position: absolute; width: 8px; height: 8px; background: var(--ink);
+.nail-b { display: none; }
+
+/* Grubenlampe: deine Laterne aus /img/lantern.png, oben weich ausgeblendet (Aufhängung), Glühen und Schwingen per CSS */
+.lantern { position: relative; width: 54px; height: 106px; flex: none; transform-origin: 50% 0; animation: sway 3.6s ease-in-out infinite; }
+.lantern::before {
+  content: ''; position: absolute; inset: 0; background: url('/img/lantern.png') center top / contain no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px); mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+  filter: drop-shadow(0 4px 3px rgba(10, 5, 2, .55));
 }
-.plaque::before { top: 8px; left: 8px; } .plaque::after { top: 8px; right: 8px; }
-.plaque > .nail-b::before { bottom: 8px; left: 8px; } .plaque > .nail-b::after { bottom: 8px; right: 8px; }
-
-/* Laterne: wird per CSS gezeichnet, ein eigenes Bild kann sie ersetzen */
-.lantern { position: relative; width: 26px; height: 34px; transform-origin: 50% -30px; animation: sway 3.2s ease-in-out infinite; }
-.lantern::before { content: ''; position: absolute; left: 11px; top: -30px; width: 4px; height: 30px; background: var(--ink); }
-.lantern > i { position: absolute; inset: 0; background: var(--orange); border: 4px solid var(--ink);
-  box-shadow: inset 0 0 0 3px #ffd36b, 0 0 14px 4px rgba(246, 184, 46, .55); animation: flicker 2.4s steps(2, end) infinite; }
-.lantern > i::before, .lantern > i::after { content: ''; position: absolute; left: -4px; right: -4px; height: 6px; background: var(--ink); }
-.lantern > i::before { top: -8px; } .lantern > i::after { bottom: -8px; }
-@keyframes sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
-@keyframes flicker { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
-
+.lantern > i {
+  position: absolute; left: 50%; top: 66%; width: 190px; height: 190px; margin: -95px 0 0 -95px; pointer-events: none; z-index: -1;
+  background: radial-gradient(circle, rgba(255, 190, 80, .5) 0, rgba(255, 160, 50, .2) 38%, transparent 68%);
+  animation: glow 2.6s ease-in-out infinite;
+}
+@keyframes sway { 0%, 100% { transform: rotate(-3.5deg); } 50% { transform: rotate(3.5deg); } }
+@keyframes glow { 0%, 100% { opacity: .85; transform: scale(1); } 40% { opacity: 1; transform: scale(1.06); } 70% { opacity: .9; transform: scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .lantern, .lantern > i { animation: none; } }

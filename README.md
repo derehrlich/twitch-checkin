@@ -42,10 +42,10 @@ Der Reward wird von der App angelegt. Gibt es schon einen Reward gleichen Namens
 
 ## Look
 
-Overlay und Admin teilen sich den Holz-und-Pixel-Look aus `public/theme.css` (Farben als Variablen ganz oben, Schrift: Pixelify Sans, lizenzfrei, liegt in `public/fonts/`).
+Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`: Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
 
-- **Maskottchen**: Eine Bilddatei als `public/img/lama.png` (transparentes PNG) erscheint am Overlay-Schild und im Admin-Kopf. Ohne Datei bleibt der Platz leer.
-- **Eigener Sound**: Datei als `public/checkin.mp3` ablegen, sonst gibt es eine eingebaute 8-Bit-Fanfare.
+- **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
+- **Eigener Sound**: Datei als `public/checkin.mp3` ablegen, sonst gibt es ein eingebautes Glockenspiel.
 - **Look ansehen**: `/overlay?demo` zeigt alle paar Sekunden eine Beispielkarte, ohne dass ein Check-in nötig ist.
 
 ## Hinweise
