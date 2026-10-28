@@ -15,6 +15,7 @@ Object.assign(process.env, {
 const calls = [];
 const rewards = []; // vom Mock angelegte Rewards
 let shoutoutFails = false;
+let clipsFail = false, channelsFail = false;
 let clips = [
   { id: 'LangClip', title: 'zu lang', duration: 55, creator_name: 'x' },
   { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
@@ -31,6 +32,8 @@ globalThis.fetch = async (url, init = {}) => {
   }
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
+  if (u.pathname.endsWith('/helix/channels') && channelsFail) return ok({ error: 'boom' }, 500);
+  if (u.pathname.endsWith('/helix/clips') && clipsFail) return ok({ error: 'boom' }, 500);
   if (u.pathname.endsWith('/helix/channels')) return ok({ data: [{ broadcaster_name: 'RaiderIn', broadcaster_login: 'raiderin', game_name: 'Hades' }] });
   if (u.pathname.endsWith('/helix/clips')) return ok({ data: clips });
   if (u.pathname.endsWith('/chat/messages')) return ok({ data: [{ is_sent: true }] });
@@ -424,6 +427,29 @@ await test('Raid: Chat, Shoutout und Overlay-Karte mit passendem Clip', async ()
   assert.equal(raid.clip.duration, 15);
 });
 
+await test('Raid ohne Clip: leere Liste, nur zu lange Clips, Fehler bei Clips oder Kanal-Abfrage – Karte, Chat und Shoutout kommen trotzdem', async () => {
+  const saveClips = clips;
+  const cases = [
+    ['keine Clips', () => { clips = []; }],
+    ['nur zu lange Clips', () => { clips = [{ id: 'a', title: 'x', duration: 59, creator_name: 'y' }]; }],
+    ['Clip-Abfrage schlägt fehl', () => { clips = saveClips; clipsFail = true; }],
+    ['Kanal-Abfrage schlägt fehl', () => { clips = []; clipsFail = false; channelsFail = true; }],
+  ];
+  let i = 0;
+  for (const [label, setup] of cases) {
+    clipsFail = false; channelsFail = false; setup();
+    const cur = await cursor(); const n = chats().length; const before = calls.length;
+    assert.equal((await webhook(signed('notification', raidEvent(30), { id: 'noclip-' + i++ }))).status, 204, label);
+    const raid = (await eventsSince(cur)).find((e) => e.type === 'raid');
+    assert.ok(raid, label + ': Overlay-Karte fehlt');
+    assert.equal(raid.clip, null, label);
+    assert.equal(raid.viewers, 30, label);
+    assert.equal(chats().length, n + 1, label + ': Chatnachricht fehlt');
+    assert.ok(calls.slice(before).some((c) => c.path.endsWith('/chat/shoutouts')), label + ': Shoutout fehlt');
+  }
+  clipsFail = false; channelsFail = false; clips = saveClips;
+});
+
 await test('Raid: Wiederholte Zustellung wird nur einmal verarbeitet', async () => {
   const n = chats().length;
   await webhook(signed('notification', raidEvent(42), { id: 'raid-msg-1' }));
@@ -466,12 +492,12 @@ await test('Raid-Test im Admin nutzt echte Kanaldaten, löst aber keinen Shoutou
 });
 
 await test('Raid: zählt, wie oft der Kanal schon geraidet hat, im Chat und im Overlay', async () => {
-  assert.equal((await db.get('raid/777')).count, 5, 'alle fünf eingegangenen Raids zählen, auch zu kleine und bei ausgeschalteter Reaktion');
+  assert.equal((await db.get('raid/777')).count, 9, 'alle neun eingegangenen Raids zählen, auch zu kleine und bei ausgeschalteter Reaktion');
   const cur = await cursor();
   await webhook(signed('notification', raidEvent(20), { id: 'raid-count-1' }));
-  assert.equal((await db.get('raid/777')).count, 6);
-  assert.match(chats().at(-1), /schon zum 6\. Mal bei uns/);
-  assert.equal((await eventsSince(cur)).find((e) => e.type === 'raid').raids, 6);
+  assert.equal((await db.get('raid/777')).count, 10);
+  assert.match(chats().at(-1), /schon zum 10\. Mal bei uns/);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'raid').raids, 10);
 });
 
 await test('Raid: Erster Raid heißt „zum ersten Mal“, Nachtragen im Admin und Test ändern keine Zähler', async () => {

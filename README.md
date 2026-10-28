@@ -66,6 +66,10 @@ Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu e
 
 Hinweise: Der Clip läuft über den offiziellen Twitch-Embed-Player. Clips sind Inhalte des Raiders und seiner Community; wer das nicht möchte, schaltet die Clip-Option aus.
 
+## Overlay aktualisiert sich selbst
+
+OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).
+
 ## Alert-Schilder im Meld-Stil
 
 Alerts (Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) und Raids erscheinen als Holz-Schild: oben ein großes **Bild oder GIF** (Admin → *OBS-Overlay → Bilder & GIFs*, je Alert eins; ohne Bild sitzt das Lama auf dem Schild), darunter **Titel, Name und Nachricht**. Titel und Nachricht stellst du unter *Einstellungen → Alert-Schilder im Overlay* ein, die Standardtexte entsprechen deinem früheren Meld-Alert („Neuer Follower!“, „Neues Abo! – Tier 1 (6 Monate)“, „Raid-Alarm! – Bringt 42 Leute mit!“, „Neuer Cheer! – 500 Bits“).

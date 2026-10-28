@@ -337,6 +337,7 @@ async function next() {
   }
   await sleep(800); // kurze Ruhe zwischen zwei Ereignissen
   busy = false;
+  if (!queue.length) maybeReload();
   next();
 }
 
@@ -361,6 +362,26 @@ async function poll() {
   setTimeout(poll, pollMs);
 }
 
+// ---------- Selbst-Update ----------
+// OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version.
+// Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu,
+// sobald gerade nichts angezeigt wird. (?updatecheck=<ms> ändert den Abstand, mindestens 5000.)
+const updateMs = Math.max(5000, Number(params.get('updatecheck') ?? 120_000));
+let loadedSignature = null, stale = false;
+const hashText = (t) => { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return `${h}:${t.length}`; };
+function maybeReload() { if (stale && !busy && !queue.length) location.reload(); }
+async function checkForUpdate() {
+  try {
+    const res = await fetch('/overlay.html', { cache: 'no-store' });
+    if (res.ok) {
+      const sig = hashText(await res.text());
+      if (loadedSignature === null) loadedSignature = sig; else if (sig !== loadedSignature) stale = true;
+    }
+  } catch { /* offline: später erneut */ }
+  maybeReload();
+  setTimeout(checkForUpdate, updateMs);
+}
+
 if (params.has('demo')) {
   const names = ['NovelsByEverly', 'Akinasuka', 'Max', 'EinSehrLangerZuschauerName123'];
   const demos = [
@@ -378,6 +399,7 @@ if (params.has('demo')) {
   show(); setInterval(show, duration + 1500);
 } else {
   poll();
+  checkForUpdate();
 }
 </script>
 </body>
