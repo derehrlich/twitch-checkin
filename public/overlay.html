@@ -53,6 +53,37 @@
 
   /* Schild-Layout für Alerts und Raids (wie im alten Meld-Alert): Titel, Name, Nachricht, darüber ein großes Bild/GIF */
   .sign .card { min-width: 440px; max-width: 620px; text-align: center; padding: 30px 44px 26px; }
+  /* Holz-Hintergrund wie in der Ziel-Badge: Raster und Streifen, dunkler Rand, Schrauben, wanderndes Glanz-Licht, goldener Glow beim Aufsetzen */
+  .sign .card.panel {
+    background-color: #724C31;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px),
+      repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px);
+    background-size: auto;
+    border: 6px solid #4A2F1B; border-radius: 15px;
+    box-shadow: 0 6px 0 0 #4A2F1B, 0 12px 24px rgba(0, 0, 0, .5);
+    overflow: hidden;
+  }
+  .sign .card > * { position: relative; z-index: 2; }
+  .sign .card::before { /* Glanz-Lichtspiel */
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, .08) 45%, rgba(255, 255, 255, .15) 50%, rgba(255, 255, 255, .05) 55%, transparent 75%);
+    background-size: 250% 100%; animation: sheen 7s ease-in-out infinite;
+  }
+  .sign .card::after { /* vier Schrauben in den Ecken */
+    content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+      radial-gradient(circle at 14px 14px, #a8a8a8 0 3px, #555 3.5px 5px, transparent 5.5px),
+      radial-gradient(circle at calc(100% - 14px) 14px, #a8a8a8 0 3px, #555 3.5px 5px, transparent 5.5px),
+      radial-gradient(circle at 14px calc(100% - 14px), #a8a8a8 0 3px, #555 3.5px 5px, transparent 5.5px),
+      radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), #a8a8a8 0 3px, #555 3.5px 5px, transparent 5.5px);
+  }
+  @keyframes sheen { 0% { background-position: 180% 0; } 100% { background-position: -80% 0; } }
+  @keyframes woodglow { /* goldener Glow wie beim Aktualisieren der Ziel-Badge */
+    0% { box-shadow: 0 0 34px 10px rgba(246, 196, 83, .9), 0 6px 0 0 #4A2F1B, 0 12px 24px rgba(0, 0, 0, .5); }
+    100% { box-shadow: 0 0 0 0 rgba(246, 196, 83, 0), 0 6px 0 0 #4A2F1B, 0 12px 24px rgba(0, 0, 0, .5); }
+  }
   .sign.gif .card { padding-top: 138px; }
   .gifbox { position: absolute; left: 50%; top: -190px; transform: translateX(-50%); width: 320px; height: 320px; z-index: 4; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 15px 20px rgba(0, 0, 0, .6)); pointer-events: none; }
   .gifbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -230,7 +261,7 @@ async function showSign(ev) {
   stage.innerHTML = `<div class="wrap sign${img ? ' gif' : ''}" style="animation-duration:${cardMs}ms">
     ${img ? `<div class="gifbox"><img src="${esc(img)}" alt=""></div>` : '<img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">'}
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
-    <div class="card panel">
+    <div class="card panel" style="animation: woodglow 1.6s ease-out ${Math.round(cardMs * 0.2)}ms">
       <div class="title">${esc(ev.title ?? '')}</div>
       <div class="name" style="font-size:${Math.round(nameSize(name) * 0.9)}px">${esc(name)}</div>
       ${ev.message ? `<div class="msg">${esc(ev.message)}</div>` : ''}

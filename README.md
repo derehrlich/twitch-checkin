@@ -72,6 +72,7 @@ Alerts (Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) und Raids erscheine
 
 - **Anzeigedauer:** 8 s für Alerts, 11 s für Raids (einstellbar). Ist ein hochgeladener Ton länger, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 s), der Ton wird nie abgeschnitten.
 - **Reihenfolge**, wenn mehrere warten: Raid, Sub (auch Resub und Gift), Cheer, Follow, danach Meilenstein, Check-in und Check-out. Zwischen zwei Ereignissen liegt eine kurze Pause von 0,8 s.
+- **Look:** Die Schilder haben den Holz-Hintergrund aus deiner Ziel-Badge: Raster und Streifen, dunkler Rand, Schrauben in den Ecken, ein wanderndes Glanz-Lichtspiel und einen goldenen Glow, der aufleuchtet, wenn das Schild aufsetzt. Das steht in `public/overlay.html` unter `.sign .card.panel`.
 - **Feuerwerk:** Beim Raid gibt es zusätzliche Salven nach 2,5 s und 5 s.
 - **Bilder:** GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch (etwa 320 × 320) mit transparentem Hintergrund. Resub nimmt ohne eigenes Bild das Sub-Bild.
 
