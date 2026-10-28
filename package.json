@@ -1,0 +1,11 @@
+{
+  "name": "twitch-checkin",
+  "version": "1.0.0",
+  "description": "Twitch Kanalpunkte Check-in mit Besuchszähler, Chatnachricht und OBS-Overlay",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js"
+  }
+}
