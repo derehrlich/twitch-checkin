@@ -82,10 +82,17 @@ export async function ensureReward(settings) {
   const { data } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
   let reward = data.find((r) => r.id === state.rewardId) ?? data.find((r) => r.title === settings.rewardTitle);
   if (!reward) {
-    reward = (await helix('POST', 'channel_points/custom_rewards', {
-      query: { broadcaster_id: user_id },
-      body: { title: settings.rewardTitle, cost: settings.rewardCost, prompt: 'Check-in für diesen Stream – dein Besuch wird mitgezählt!', background_color: '#9146FF' },
-    })).data[0];
+    try {
+      reward = (await helix('POST', 'channel_points/custom_rewards', {
+        query: { broadcaster_id: user_id },
+        body: { title: settings.rewardTitle, cost: settings.rewardCost, prompt: 'Check-in für diesen Stream – dein Besuch wird mitgezählt!', background_color: '#9146FF' },
+      })).data[0];
+    } catch (e) {
+      if (e.message.includes('DUPLICATE_REWARD')) {
+        throw new Error(`Auf deinem Kanal gibt es schon einen Reward „${settings.rewardTitle}“, der nicht von dieser App stammt. Benenne oder lösche ihn in Twitch, oder wähle in den Einstellungen einen anderen Reward-Namen (und speichere).`);
+      }
+      throw e;
+    }
   } else if (reward.title !== settings.rewardTitle || reward.cost !== settings.rewardCost) {
     reward = (await helix('PATCH', 'channel_points/custom_rewards', {
       query: { broadcaster_id: user_id, id: reward.id },
