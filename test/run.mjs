@@ -249,6 +249,31 @@ await test('Check-out nach Tageswechsel findet die offene Sitzung der letzten 24
   assert.equal((await handleCheckout({ id: 'y', user_id: '8', user_name: 'Alt', reward: { id: 'reward2' } }, await getSettings())).ok, false);
 });
 
+await test('Check-out für einen Check-in von vor dem Update (ohne Sitzung): Zeit kommt aus "zuletzt"', async () => {
+  const settings = await getSettings();
+  const day = streamDay(settings);
+  // Alter Datensatz: Besuchstag und "zuletzt" vorhanden, aber keine sessions
+  const ninety = new Date(Date.now() - 90 * 60_000).toISOString();
+  await db.set('user/90', { name: 'Altbestand', count: 1, first: ninety, last: ninety, days: [day] });
+  await db.set(`checked/${day}/90`, 1);
+  const before = calls.length;
+  await webhook(checkoutNotification('l1', '90', 'Altbestand'));
+  const u = await db.get('user/90');
+  assert.equal(u.sessions[day].minutes, 90);
+  assert.equal(chats().at(-1), '👋 Altbestand geht – 1 Std 30 Min dabei gewesen. Bis zum nächsten Mal!');
+  assert.equal(calls.slice(before).find((c) => c.method === 'PATCH').body.status, 'FULFILLED');
+  // Zweiter Check-out: schon ausgecheckt
+  await webhook(checkoutNotification('l2', '90', 'Altbestand'));
+  assert.match(chats().at(-1), /schon ausgecheckt/);
+
+  // Letzter Check-in länger als 24 Stunden her: gilt nicht als eingecheckt
+  const old = new Date(Date.now() - 30 * 3_600_000).toISOString();
+  await db.set('user/91', { name: 'Gestern', count: 1, first: old, last: old, days: [streamDay(settings, new Date(old))] });
+  await webhook(checkoutNotification('l3', '91', 'Gestern'));
+  assert.match(chats().at(-1), /nicht eingecheckt/);
+  assert.equal((await db.get('user/91')).sessions, undefined);
+});
+
 await test('Overlay: erster Abruf ohne Altlasten, danach nur neue Ereignisse', async () => {
   const first = await (await overlay(new Request(BASE + '/api/overlay'))).json();
   assert.deepEqual(first.events, []);

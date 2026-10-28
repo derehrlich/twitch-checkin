@@ -76,11 +76,22 @@ function findOpenSession(user, now) {
   return best;
 }
 
+// Check-ins aus der Zeit vor dem Check-out haben keine Sitzung, der Zeitpunkt steht aber in user.last.
+// Daraus wird die offene Sitzung rekonstruiert, wenn der letzte Check-in höchstens 24 Stunden her ist.
+function legacySession(user, settings, now) {
+  if (!user.last) return null;
+  const last = new Date(user.last);
+  const age = now - last;
+  const day = streamDay(settings, last);
+  if (age < 0 || age > 24 * 3_600_000 || !user.days.includes(day) || user.sessions?.[day]) return null;
+  return { day, in: user.last, out: null };
+}
+
 /** Check-out: Dauer = jetzt minus Check-in. Ohne offenen Check-in oder doppelt: Hinweis und Punkte zurück. */
 export async function handleCheckout(redemption, settings, now = new Date()) {
   const { id, user_id, user_name, reward } = redemption;
   const user = await db.get(`user/${user_id}`);
-  const open = user ? findOpenSession(user, now) : null;
+  const open = user ? (findOpenSession(user, now) ?? legacySession(user, settings, now)) : null;
 
   const refuse = async (template) => {
     if (settings.chatEnabled) await sendChat(fill(template, { user: user_name, count: user?.count ?? 0, duration: '' })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
@@ -97,7 +108,7 @@ export async function handleCheckout(redemption, settings, now = new Date()) {
 
   const minutes = Math.max(0, Math.round((now - Date.parse(open.in)) / 60_000));
   user.name = user_name;
-  user.sessions[open.day] = { in: open.in, out: now.toISOString(), minutes };
+  user.sessions = { ...(user.sessions ?? {}), [open.day]: { in: open.in, out: now.toISOString(), minutes } };
   await db.set(`user/${user_id}`, user);
 
   await pushOverlay({ type: 'checkout', user: user_name, minutes, count: user.count });
