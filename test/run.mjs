@@ -14,6 +14,11 @@ Object.assign(process.env, {
 // ---- Twitch simulieren
 const calls = [];
 const rewards = []; // vom Mock angelegte Rewards
+let shoutoutFails = false;
+let clips = [
+  { id: 'LangClip', title: 'zu lang', duration: 55, creator_name: 'x' },
+  { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
+];
 let subs = []; // aktive Webhook-Subscriptions
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
@@ -24,6 +29,10 @@ globalThis.fetch = async (url, init = {}) => {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
   }
+  if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
+  if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
+  if (u.pathname.endsWith('/helix/channels')) return ok({ data: [{ broadcaster_name: 'RaiderIn', broadcaster_login: 'raiderin', game_name: 'Hades' }] });
+  if (u.pathname.endsWith('/helix/clips')) return ok({ data: clips });
   if (u.pathname.endsWith('/chat/messages')) return ok({ data: [{ is_sent: true }] });
   if (u.pathname.endsWith('/custom_rewards') && entry.method === 'GET') return ok({ data: rewards });
   if (u.pathname.endsWith('/custom_rewards') && entry.method === 'POST') {
@@ -92,6 +101,7 @@ await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', asy
   const location = new URL(login.headers.get('location'));
   assert.equal(location.searchParams.get('redirect_uri'), BASE + '/api/auth/callback');
   assert.match(location.searchParams.get('scope'), /user:write:chat/);
+  assert.match(location.searchParams.get('scope'), /moderator:manage:shoutouts/);
   const stateCookie = login.headers.get('set-cookie').split(';')[0];
   const state = location.searchParams.get('state');
 
@@ -107,7 +117,9 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
   assert.equal(res.status, 200, await res.clone().text());
   assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out' });
   const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
-  assert.deepEqual(created.map((c) => c.body.condition.reward_id).sort(), ['reward1', 'reward2']);
+  assert.deepEqual(created.map((c) => c.body.condition.reward_id).filter(Boolean).sort(), ['reward1', 'reward2']);
+  const raidSub = created.find((c) => c.body.type === 'channel.raid');
+  assert.deepEqual(raidSub.body.condition, { to_broadcaster_user_id: '999' }, 'Raid-Subscription für den eigenen Kanal');
   assert.ok(created.every((c) => c.body.transport.method === 'webhook' && c.body.transport.callback === BASE + '/api/twitch-webhook'));
   const state = await db.get('config/state');
   assert.equal(state.rewardId, 'reward1');
@@ -115,7 +127,13 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
   // Zweites Einrichten legt nichts doppelt an und ersetzt die Subscriptions
   await admin(adminReq('POST', 'setup', {}, cookie));
   assert.equal(rewards.length, 2);
-  assert.equal(subs.length, 2);
+  assert.equal(subs.length, 3);
+});
+
+await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
+  assert.equal((await (await admin(adminReq('GET', 'state', null, cookie))).json()).raidScopeMissing, true, 'Tokens ohne scopes');
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['moderator:manage:shoutouts'] });
+  assert.equal((await (await admin(adminReq('GET', 'state', null, cookie))).json()).raidScopeMissing, false);
 });
 
 await test('Setup lehnt gleiche Namen für Check-in und Check-out ab', async () => {
@@ -352,6 +370,66 @@ await test('Rangliste, Entfernen eines Besuchs, CSV-Export, Löschen', async () 
 await test('Schreibende Admin-Aufrufe ohne JSON werden abgelehnt', async () => {
   const res = await admin(new Request(BASE + '/api/admin/settings', { method: 'PUT', headers: { cookie }, body: 'volume=0' }));
   assert.equal(res.status, 415);
+});
+
+// ---- Raids
+const raidEvent = (viewers = 42) => ({ subscription: { type: 'channel.raid' }, event: { from_broadcaster_user_id: '777', from_broadcaster_user_name: 'raiderin', to_broadcaster_user_id: '999', viewers } });
+await test('Raid: Chat, Shoutout und Overlay-Karte mit passendem Clip', async () => {
+  const cur = (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
+  const before = calls.length;
+  const res = await webhook(signed('notification', raidEvent(42), { id: 'raid-msg-1' }));
+  assert.equal(res.status, 204);
+  const mine = calls.slice(before);
+  assert.ok(mine.some((c) => c.path.endsWith('/chat/shoutouts') && c.query.to_broadcaster_id === '777' && c.query.from_broadcaster_id === '999' && c.query.moderator_id === '999'), 'Shoutout');
+  assert.ok(chats().at(-1).includes('RaiderIn') && chats().at(-1).includes('42') && chats().at(-1).includes('Hades') && chats().at(-1).includes('twitch.tv/raiderin'), chats().at(-1));
+  const { events } = await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json();
+  const raid = events.find((e) => e.type === 'raid');
+  assert.equal(raid.raider, 'RaiderIn');
+  assert.equal(raid.viewers, 42);
+  assert.equal(raid.game, 'Hades');
+  assert.equal(raid.clip.id, 'GutClip', 'zu langer Clip wird ausgelassen');
+  assert.equal(raid.clip.duration, 15);
+});
+
+await test('Raid: Wiederholte Zustellung wird nur einmal verarbeitet', async () => {
+  const n = chats().length;
+  await webhook(signed('notification', raidEvent(42), { id: 'raid-msg-1' }));
+  assert.equal(chats().length, n);
+});
+
+await test('Raid: Shoutout-Fehler (Cooldown) stoppt den Rest nicht', async () => {
+  shoutoutFails = true;
+  const n = chats().length;
+  assert.equal((await webhook(signed('notification', raidEvent(5), { id: 'raid-msg-2' }))).status, 204);
+  assert.equal(chats().length, n + 1);
+  shoutoutFails = false;
+});
+
+await test('Raid: unter Mindestzahl, ausgeschaltet oder ohne Clip', async () => {
+  await admin(adminReq('PUT', 'settings', { raidMinViewers: 10 }, cookie));
+  const n = chats().length;
+  await webhook(signed('notification', raidEvent(3), { id: 'raid-msg-3' }));
+  assert.equal(chats().length, n, 'zu klein');
+  await admin(adminReq('PUT', 'settings', { raidMinViewers: 1, raidEnabled: false }, cookie));
+  await webhook(signed('notification', raidEvent(50), { id: 'raid-msg-4' }));
+  assert.equal(chats().length, n, 'ausgeschaltet');
+  await admin(adminReq('PUT', 'settings', { raidEnabled: true, raidClip: false, raidShoutout: false }, cookie));
+  const cur = (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
+  const before = calls.length;
+  await webhook(signed('notification', raidEvent(50), { id: 'raid-msg-5' }));
+  assert.ok(!calls.slice(before).some((c) => c.path.endsWith('/clips') || c.path.endsWith('/chat/shoutouts')));
+  const { events } = await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json();
+  assert.equal(events.find((e) => e.type === 'raid').clip, null);
+  await admin(adminReq('PUT', 'settings', { raidClip: true, raidShoutout: true }, cookie));
+});
+
+await test('Raid-Test im Admin nutzt echte Kanaldaten, löst aber keinen Shoutout aus', async () => {
+  const before = calls.length;
+  const res = await admin(adminReq('POST', 'test', { target: 'raid', raider: 'RaiderIn', count: 9 }, cookie));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).clip, 'Krasser Moment');
+  assert.ok(!calls.slice(before).some((c) => c.path.endsWith('/chat/shoutouts')));
+  assert.equal((await admin(adminReq('POST', 'test', { target: 'raid-chat', raider: 'RaiderIn' }, cookie))).status, 200);
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

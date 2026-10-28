@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { db } from '../lib/store.mjs';
 import { getSettings } from '../lib/settings.mjs';
 import { handleCheckout, handleRedemption } from '../lib/checkin.mjs';
+import { handleRaid } from '../lib/raid.mjs';
 import { safeEqual, text } from '../lib/http.mjs';
 
 export const config = { path: '/api/twitch-webhook' };
@@ -35,6 +36,18 @@ export default async (req) => {
 
   if (type === 'notification') {
     const e = body.event;
+    if (body.subscription?.type === 'channel.raid') {
+      // Raid-Events haben keine eigene ID, daher dient die Nachrichten-ID der Wiederholungserkennung
+      if (!(await db.setIfNew(`seen/${msgId}`, Date.now()))) return new Response(null, { status: 204 });
+      try {
+        await handleRaid(e, await getSettings());
+      } catch (err) {
+        console.error('Raid fehlgeschlagen:', err);
+        await db.delete(`seen/${msgId}`);
+        return text('error', 500);
+      }
+      return new Response(null, { status: 204 });
+    }
     const state = (await db.get('config/state')) ?? {};
     // Nur die eigenen Check-in/Check-out-Rewards zählen; ohne gespeicherte IDs (Einrichtung fehlt) passiert nichts
     const isCheckin = Boolean(state.rewardId) && e.reward.id === state.rewardId;

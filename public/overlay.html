@@ -38,6 +38,17 @@
   /* Maskottchen: sitzt auf dem Schild, die untere Kante verschwindet hinter der Karte (Datei: public/img/lama.png) */
   .mascot { position: absolute; left: 96px; bottom: calc(100% - 30px); width: 118px; filter: drop-shadow(0 4px 4px rgba(10, 5, 2, .5)); }
 
+  /* Raid: Karte oben, darunter der Clip des Raiders im selben Rahmen */
+  .tag i.raid { background: #b98cff; box-shadow: 0 0 8px 1px rgba(185, 140, 255, .85); }
+  .coin.raid b { font-size: 40px; }
+  #clip { position: fixed; left: 50%; top: 470px; width: 720px; transform: translateX(-50%); padding: 14px; box-sizing: border-box; animation: clipin .6s cubic-bezier(.2, .9, .3, 1) both; }
+  #clip.out { animation: clipout .5s ease-in forwards; }
+  #clip .frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
+  #clip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #clip .cap { margin-top: 8px; font-size: 18px; font-weight: 600; color: #ecd9b6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes clipin { from { opacity: 0; transform: translate(-50%, 40px) scale(.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+  @keyframes clipout { to { opacity: 0; transform: translate(-50%, 30px) scale(.96); } }
+
   @keyframes drop {
     0%   { transform: translateY(-320px); opacity: 0; animation-timing-function: cubic-bezier(.2, .9, .3, 1); }
     13%  { transform: translateY(12px); opacity: 1; animation-timing-function: ease-in-out; }
@@ -52,6 +63,7 @@
 <body>
 <canvas id="fx"></canvas>
 <div id="stage"></div>
+<div id="clipstage"></div>
 <script>
 // Lautstärke und Dauer kommen aus dem Admin-Bereich. Optional überschreibbar per URL:
 // ?volume=0.6 (0..1)   ?duration=5000 (ms)   ?poll=3000 (Abfrageintervall in ms)
@@ -143,10 +155,56 @@ function coinFor(ev) {
   return m < 60 ? { small: 'Minuten', big: m } : { small: 'Stunden', big: `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` };
 }
 
+const clipStage = document.getElementById('clipstage');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Raid: Karte mit Name, Zuschauerzahl und Spiel, danach läuft ein Clip des Raiders
+async function showRaid(ev) {
+  const clipMs = ev.clip ? (Number(ev.clip.duration) || 15) * 1000 : 0;
+  const cardMs = Math.max(duration, 6000);
+  stage.innerHTML = `<div class="wrap" style="animation-duration:${cardMs}ms">
+    <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
+    <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
+    <div class="card panel">
+      <div class="row">
+        <div class="coin raid"><small>Raid</small><b style="font-size:${coinSize(ev.viewers)}px">${esc(ev.viewers)}</b></div>
+        <div class="txt">
+          <div class="tag"><i class="raid"></i>Raid eingetroffen</div>
+          <div class="name" style="font-size:${nameSize(ev.raider)}px">${esc(ev.raider)}</div>
+          <div class="sub">${ev.game ? `zuletzt: ${esc(ev.game)}` : 'willkommen im Stream!'}</div>
+        </div>
+      </div>
+      <div class="bar"><span style="animation-duration:${cardMs}ms"></span></div>
+    </div>
+  </div>`;
+  playSound();
+  setTimeout(burst, cardMs * 0.14);
+  let total = cardMs;
+  if (clipMs) {
+    await sleep(1500);
+    const src = `https://clips.twitch.tv/embed?clip=${encodeURIComponent(ev.clip.id)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true&muted=false`;
+    clipStage.innerHTML = `<div id="clip" class="panel"><div class="frame"><iframe src="${src}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
+      <div class="cap">🎬 ${esc(ev.clip.title || 'Clip')}${ev.clip.creator ? ` · von ${esc(ev.clip.creator)}` : ''}</div></div>`;
+    await sleep(clipMs + 1500); // Puffer für den Ladevorgang des Players
+    document.getElementById('clip')?.classList.add('out');
+    await sleep(500);
+    clipStage.innerHTML = '';
+    total = 1500 + clipMs + 2000;
+  }
+  await sleep(Math.max(0, cardMs - total) + 300);
+  stage.innerHTML = '';
+}
+
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
   const ev = queue.shift();
+  if (ev.type === 'raid') {
+    await showRaid(ev);
+    busy = false;
+    next();
+    return;
+  }
   const out = ev.type === 'checkout';
   const coin = coinFor(ev);
   stage.innerHTML = `<div class="wrap" style="animation-duration:${duration}ms">
@@ -184,7 +242,7 @@ async function poll() {
     if (data.duration != null && !params.has('duration')) duration = data.duration;
     useUploadedSound(data.sound ?? null);
     setSoundVolume();
-    for (const ev of data.events) if (ev.type === 'checkin' || ev.type === 'checkout') queue.push(ev);
+    for (const ev of data.events) if (['checkin', 'checkout', 'raid'].includes(ev.type)) queue.push(ev);
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
@@ -195,7 +253,8 @@ if (params.has('demo')) {
   let i = 0;
   const show = () => {
     const n = i % names.length;
-    queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
+    if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', clip: null });
+    else queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
     i++; next();
   };
   show(); setInterval(show, duration + 1500);

@@ -116,6 +116,11 @@
         <button id="testCheckout" class="ghost">Check-out im Overlay testen</button>
         <button id="testCheckoutChat" class="ghost">Check-out im Chat testen</button>
       </div>
+      <div class="row" style="margin-top:12px">
+        <div><label for="testRaider">Raid-Test: Kanalname des Raiders</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
+        <button id="testRaid" class="ghost">Raid im Overlay testen</button>
+        <button id="testRaidChat" class="ghost">Raid im Chat testen</button>
+      </div>
       <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
 
       <h2 style="margin-top:26px">Ton</h2>
@@ -156,6 +161,19 @@
         <label for="noCheckinTemplate">Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)</label>
         <textarea id="noCheckinTemplate" maxlength="400"></textarea>
         <p class="muted">Zusätzlicher Platzhalter: <code>{duration}</code> Dauer, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+
+        <h2 style="margin-top:22px">Raids</h2>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidEnabled" type="checkbox"> Auf eingehende Raids reagieren</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidShoutout" type="checkbox"> Offiziellen Twitch-Shoutout auslösen</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidClip" type="checkbox"> Zufälligen Clip des Raiders im Overlay abspielen</label>
+        <div class="grid2">
+          <div><label for="raidMinViewers">Ab wie vielen Raidern reagieren</label><input id="raidMinViewers" type="number" min="0"></div>
+          <div><label for="raidClipMaxSeconds">Clip höchstens (Sekunden)</label><input id="raidClipMaxSeconds" type="number" min="5" max="60"></div>
+        </div>
+        <label for="raidTemplate">Chatnachricht beim Raid</label>
+        <textarea id="raidTemplate" maxlength="400"></textarea>
+        <div class="preview" id="preview3"></div>
+        <p class="muted">Platzhalter: <code>{raider}</code> Name, <code>{viewers}</code> Zuschauer, <code>{game}</code> zuletzt gespieltes Spiel, <code>{url}</code> Kanallink. Nach dem Aktivieren oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken. Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleibt dann nur der Chattext und die Overlay-Karte.</p>
 
         <h2 style="margin-top:22px">Allgemein</h2>
         <div class="grid2">
@@ -235,6 +253,7 @@ async function loadState() {
   $('checks').innerHTML =
     check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${missing}</b>`) +
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
+    (s.raidScopeMissing ? check('warn', 'Für Shoutouts fehlt eine Berechtigung – bitte „Mit Twitch verbinden“ erneut klicken') : '') +
     check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Check-in-Reward angelegt' : 'Reward noch nicht angelegt') +
     (s.checkoutEnabled ? check(s.checkoutRewardId ? 'ok' : 'warn', s.checkoutRewardId ? 'Check-out-Reward angelegt' : 'Check-out-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Check-out ist ausgeschaltet')) +
     check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
@@ -303,26 +322,28 @@ $('soundReset').addEventListener('click', run(async () => {
   renderSound(); toast('Eingebauter Ton aktiv ✓');
 }));
 
-const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'raidTemplate', 'raidMinViewers', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const CHECKS = ['chatEnabled', 'checkoutEnabled', 'raidEnabled', 'raidShoutout', 'raidClip'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
   for (const f of FIELDS) $(f).value = settings[f];
-  $('chatEnabled').checked = settings.chatEnabled;
-  $('checkoutEnabled').checked = settings.checkoutEnabled;
+  for (const c of CHECKS) $(c).checked = settings[c];
   updatePreview();
   renderSound();
 }
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
 function updatePreview() {
   $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 });
+  $('preview3').textContent = 'Vorschau: ' + fill($('raidTemplate').value, { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka' });
   $('preview2').textContent = 'Vorschau: ' + fill($('checkoutTemplate').value, { user: 'Max', count: 7, duration: '2 Std 14 Min' });
 }
+$('raidTemplate').addEventListener('input', updatePreview);
 $('chatTemplate').addEventListener('input', updatePreview);
 $('checkoutTemplate').addEventListener('input', updatePreview);
 
 $('settingsForm').addEventListener('submit', run(async (e) => {
   e.preventDefault();
-  const body = { chatEnabled: $('chatEnabled').checked, checkoutEnabled: $('checkoutEnabled').checked };
+  const body = Object.fromEntries(CHECKS.map((c) => [c, $(c).checked]));
   for (const f of FIELDS) body[f] = $(f).value;
   settings = await api('PUT', 'settings', body);
   for (const f of FIELDS) $(f).value = settings[f];
@@ -342,6 +363,9 @@ $('testOverlay').addEventListener('click', run(async () => { await api('POST', '
 $('testChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('chat')); toast('Testnachricht im Chat gesendet ✓'); }));
 $('testCheckout').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout')); toast('Check-out-Test gesendet (dauert bis ca. 3 s)'); }));
 $('testCheckoutChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout-chat')); toast('Check-out-Nachricht im Chat gesendet ✓'); }));
+const raidBody = (target) => ({ target, raider: $('testRaider').value, count: $('testCount').value });
+$('testRaid').addEventListener('click', run(async () => { const r = await api('POST', 'test', raidBody('raid')); toast(r.clip ? `Raid-Test gesendet mit Clip „${r.clip}“ (dauert bis ca. 3 s)` : 'Raid-Test gesendet – es wurde kein passender Clip gefunden'); }));
+$('testRaidChat').addEventListener('click', run(async () => { await api('POST', 'test', raidBody('raid-chat')); toast('Raid-Nachricht im Chat gesendet ✓'); }));
 $('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
 $('loginForm').addEventListener('submit', run(async (e) => {
   e.preventDefault();

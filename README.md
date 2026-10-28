@@ -44,6 +44,19 @@ Neben dem Check-in-Reward gibt es einen zweiten Reward **„Check-out“** (Name
 - Im Admin siehst du Gesamtzeit und Ø Dauer pro Besucher, kannst danach sortieren und im CSV-Export stehen Check-in, Check-out und Minuten.
 - **Wichtig nach einem Update:** Einmal im Admin auf „Reward & Webhook einrichten“ klicken, damit der Check-out-Reward angelegt und abonniert wird. Besuche von vor dem Update haben keine Dauer.
 
+## Raids: Chat, Shoutout und Clip
+
+Wenn jemand in deinen Kanal raidet, passiert automatisch:
+- **Chatnachricht** mit Raider, Zuschauerzahl, zuletzt gespieltem Spiel und Kanallink (Platzhalter `{raider}` `{viewers}` `{game}` `{url}`)
+- **Offizieller Twitch-Shoutout** (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten; klappt er nicht, läuft der Rest trotzdem
+- **Overlay-Karte** mit Name und Zuschauerzahl, danach spielt ein **zufälliger Clip aus den beliebtesten Clips des Raiders** (einstellbare Höchstlänge, Standard 30 s)
+
+Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu eine Mindestzahl an Raidern. Unter *OBS-Overlay* gibt es Raid-Tests mit echten Kanaldaten (Shoutouts werden im Test nie ausgelöst).
+
+**Wichtig nach dem Update:** Einmal auf **Mit Twitch verbinden** klicken (neue Berechtigung `moderator:manage:shoutouts`) und danach auf **Reward & Webhook einrichten**, damit der Raid-Webhook (`channel.raid`) angelegt wird. Der Status oben zeigt, falls die Berechtigung noch fehlt.
+
+Hinweise: Der Clip läuft über den offiziellen Twitch-Embed-Player. Clips sind Inhalte des Raiders und seiner Community; wer das nicht möchte, schaltet die Clip-Option aus.
+
 ## Admin-Bereich
 
 - **Status** zeigt, ob Variablen, Twitch-Verbindung, Reward und Webhook in Ordnung sind

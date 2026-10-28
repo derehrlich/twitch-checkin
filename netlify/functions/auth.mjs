@@ -30,7 +30,7 @@ export default async (req) => {
 
     const t = await tokenRequest({ grant_type: 'authorization_code', code: url.searchParams.get('code'), redirect_uri: redirectUri });
     const who = await fetch('https://id.twitch.tv/oauth2/validate', { headers: { Authorization: `OAuth ${t.access_token}` } }).then((r) => r.json());
-    await db.set('config/tokens', toStored(t, { user_id: who.user_id, login: who.login }));
+    await db.set('config/tokens', toStored(t, { user_id: who.user_id, login: who.login, scopes: who.scopes ?? [] }));
     return new Response(null, { status: 302, headers: { Location: '/admin/?verbunden=1', 'Set-Cookie': cookie(req, 'oauth_state', '', 0) } });
   } catch (e) {
     return text('Login fehlgeschlagen: ' + e.message, 400);

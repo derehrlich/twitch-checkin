@@ -20,6 +20,14 @@ export const DEFAULTS = {
   checkoutTemplate: '👋 {user} geht – {duration} dabei gewesen. Bis zum nächsten Mal!',
   checkoutDuplicateTemplate: '{user}, du bist heute schon ausgecheckt ✅ Deine Punkte bekommst du zurück.',
   noCheckinTemplate: '{user}, du bist gerade nicht eingecheckt – zum Auschecken musst du zuerst einchecken. Deine Punkte bekommst du zurück.',
+  // Raids: Chatnachricht, Shoutout und Clip, wenn jemand rein raidet
+  raidEnabled: true,
+  raidMinViewers: 1,
+  // Platzhalter: {raider} {viewers} {game} {url}
+  raidTemplate: '💜 RAID! {raider} ist mit {viewers} Leuten da – willkommen! Zuletzt gespielt: {game}. Schaut bei {url} vorbei!',
+  raidShoutout: true,
+  raidClip: true,
+  raidClipMaxSeconds: 30,
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -42,12 +50,16 @@ function sanitize(input) {
   str('checkoutTemplate', 400);
   str('checkoutDuplicateTemplate', 400);
   str('noCheckinTemplate', 400);
+  str('raidTemplate', 400);
+  num('raidMinViewers', 0, 100_000);
+  num('raidClipMaxSeconds', 5, 60);
   num('rewardCost', 1, 1_000_000);
   num('checkoutRewardCost', 1, 1_000_000);
   num('dayRolloverHour', 0, 23);
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
+  for (const k of ['raidEnabled', 'raidShoutout', 'raidClip']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

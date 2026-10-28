@@ -1,6 +1,6 @@
 import { db } from './store.mjs';
 
-export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat'];
+export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts'];
 
 export const siteUrl = (req) =>
   (process.env.SITE_URL || process.env.URL || (req ? new URL(req.url).origin : '')).replace(/\/$/, '');
@@ -113,28 +113,58 @@ export async function ensureRewards(settings) {
 }
 
 export const EVENT_TYPE = 'channel.channel_points_custom_reward_redemption.add';
+export const RAID_TYPE = 'channel.raid';
 
-// Meine Webhook-Subscriptions (alle Stati)
+// Meine Webhook-Subscriptions (alle Typen und Stati)
 export async function listSubscriptions(webhookUrl) {
-  const { data } = await helix('GET', 'eventsub/subscriptions', { as: 'app', query: { type: EVENT_TYPE } });
+  const { data } = await helix('GET', 'eventsub/subscriptions', { as: 'app' });
   return data.filter((s) => s.transport?.callback === webhookUrl);
 }
 
-// Eine Subscription pro Reward (so löst nicht jede fremde Einlösung im Kanal einen Aufruf aus)
-export async function subscribe(webhookUrl, rewardIds) {
+// Eine Subscription pro Reward (so löst nicht jede fremde Einlösung im Kanal einen Aufruf aus),
+// dazu optional eine für eingehende Raids.
+export async function subscribe(webhookUrl, rewardIds, { raids = false } = {}) {
   const { user_id } = await userToken();
   for (const sub of await listSubscriptions(webhookUrl)) {
     await helix('DELETE', 'eventsub/subscriptions', { as: 'app', query: { id: sub.id } });
   }
-  for (const rewardId of rewardIds) {
-    await helix('POST', 'eventsub/subscriptions', {
-      as: 'app',
-      body: {
-        type: EVENT_TYPE,
-        version: '1',
-        condition: { broadcaster_user_id: user_id, reward_id: rewardId },
-        transport: { method: 'webhook', callback: webhookUrl, secret: process.env.EVENTSUB_SECRET },
-      },
-    });
-  }
+  const create = (type, condition) => helix('POST', 'eventsub/subscriptions', {
+    as: 'app',
+    body: { type, version: '1', condition, transport: { method: 'webhook', callback: webhookUrl, secret: process.env.EVENTSUB_SECRET } },
+  });
+  for (const rewardId of rewardIds) await create(EVENT_TYPE, { broadcaster_user_id: user_id, reward_id: rewardId });
+  if (raids) await create(RAID_TYPE, { to_broadcaster_user_id: user_id });
+}
+
+// ---- Raid-Helfer (öffentliche Daten, brauchen nur den App-Token)
+
+// Anzeigename, Profilbild und zuletzt gespieltes Spiel eines Kanals
+export async function channelInfo(broadcasterId) {
+  const [ch, us] = await Promise.all([
+    helix('GET', 'channels', { as: 'app', query: { broadcaster_id: broadcasterId } }),
+    helix('GET', 'users', { as: 'app', query: { id: broadcasterId } }),
+  ]);
+  const c = ch.data?.[0] ?? {};
+  const u = us.data?.[0] ?? {};
+  return { id: broadcasterId, login: u.login ?? c.broadcaster_login, name: c.broadcaster_name ?? u.display_name, game: c.game_name || '', avatar: u.profile_image_url ?? null };
+}
+
+export async function userByLogin(login) {
+  const { data } = await helix('GET', 'users', { as: 'app', query: { login } });
+  return data?.[0] ?? null;
+}
+
+// Zufälliger Clip aus den beliebtesten Clips des Kanals, höchstens maxSeconds lang
+export async function pickClip(broadcasterId, maxSeconds) {
+  const { data } = await helix('GET', 'clips', { as: 'app', query: { broadcaster_id: broadcasterId, first: '50' } });
+  const fits = (data ?? []).filter((c) => c.duration > 0 && c.duration <= maxSeconds).slice(0, 10); // Liste ist nach Aufrufen sortiert
+  if (!fits.length) return null;
+  const c = fits[Math.floor(Math.random() * fits.length)];
+  return { id: c.id, title: c.title, duration: Math.ceil(c.duration), creator: c.creator_name };
+}
+
+// Offizieller Twitch-Shoutout (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten.
+export async function shoutout(toBroadcasterId) {
+  const { user_id } = await userToken();
+  await helix('POST', 'chat/shoutouts', { query: { from_broadcaster_id: user_id, to_broadcaster_id: toBroadcasterId, moderator_id: user_id } });
 }
