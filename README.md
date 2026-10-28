@@ -40,7 +40,13 @@ Der Reward wird von der App angelegt. Gibt es schon einen Reward gleichen Namens
 - **Tests**: Overlay und Chat testen, ohne Zähler zu verändern
 - **Besucher**: Suche, Besuchstage ansehen, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export
 
-Einen eigenen Sound legst du als `public/checkin.mp3` ab. Der Look steht im CSS von `public/overlay.html`.
+## Look
+
+Overlay und Admin teilen sich den Holz-und-Pixel-Look aus `public/theme.css` (Farben als Variablen ganz oben, Schrift: Pixelify Sans, lizenzfrei, liegt in `public/fonts/`).
+
+- **Maskottchen**: Eine Bilddatei als `public/img/lama.png` (transparentes PNG) erscheint am Overlay-Schild und im Admin-Kopf. Ohne Datei bleibt der Platz leer.
+- **Eigener Sound**: Datei als `public/checkin.mp3` ablegen, sonst gibt es eine eingebaute 8-Bit-Fanfare.
+- **Look ansehen**: `/overlay?demo` zeigt alle paar Sekunden eine Beispielkarte, ohne dass ein Check-in nötig ist.
 
 ## Hinweise
 

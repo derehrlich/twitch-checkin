@@ -5,48 +5,74 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Check-in Admin</title>
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root { --bg:#0e0e10; --card:#18181b; --line:#2f2f35; --text:#efeff1; --muted:#adadb8; --accent:#9146ff; --ok:#00c853; --warn:#ffb300; --bad:#ff5252; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, 'Segoe UI', sans-serif; }
-  main { max-width: 920px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
-  header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-  h1 { font-size: 22px; margin: 0; } h2 { font-size: 17px; margin: 0 0 12px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  label { display:block; font-size:13px; color:var(--muted); margin: 10px 0 4px; }
-  input, textarea, select { width:100%; background:#0e0e10; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; }
-  textarea { min-height: 64px; resize: vertical; }
-  input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
-  button, .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
-  button.ghost, .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
-  button.danger { background:var(--bad); }
-  button:disabled { opacity:.5; cursor: default; }
-  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; } .row > * { flex:1 1 160px; } .row > button, .row > .btn { flex:0 0 auto; }
-  .grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
-  .check { display:flex; gap:10px; align-items:center; padding:6px 0; }
-  .dot { width:12px; height:12px; border-radius:50%; background:var(--muted); flex:none; } .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
-  .muted { color:var(--muted); font-size:13px; } code { background:#0e0e10; padding:2px 6px; border-radius:5px; word-break:break-all; }
-  .stats { display:flex; gap:24px; flex-wrap:wrap; } .stat b { font-size:26px; display:block; line-height:1.1; }
-  table { width:100%; border-collapse: collapse; } th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:500; font-size:13px; }
-  tr.user { cursor:pointer; } tr.user:hover { background:#202024; }
-  .days { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
-  .chip { background:#26262c; border-radius:999px; padding:3px 6px 3px 12px; font-size:13px; display:inline-flex; gap:6px; align-items:center; }
-  .chip button { background:none; padding:0 6px; color:var(--muted); font-size:16px; line-height:1; }
-  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#26262c; border:1px solid var(--line); padding:10px 16px; border-radius:10px; opacity:0; pointer-events:none; transition:opacity .2s; max-width: 90vw; }
-  #toast.show { opacity:1; } #toast.err { border-color: var(--bad); }
+  body { margin:0; color:var(--ink); font:16px/1.45 var(--pixel-font); }
+  main { max-width: 940px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 22px; }
+
+  header.plaque { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 28px 22px; margin-top: 18px; }
+  header .titles small { display:block; font-size:14px; letter-spacing:3px; text-transform:uppercase; color:var(--ink-soft); }
+  header h1 { margin:0; font-size:32px; line-height:1.1; }
+  header .lantern { position:absolute; top:-8px; zoom:1.4; } header .lantern.l { left:-10px; } header .lantern.r { right:-10px; animation-delay:-1.4s; }
+  header .mascot { height: 72px; image-rendering: pixelated; margin: -8px 0; }
+
+  section { padding: 18px 20px 22px; }
+  h2 { font-size: 22px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 4px dotted var(--plaque); }
+  label { display:block; font-size:14px; color:var(--ink-soft); margin: 12px 0 4px; letter-spacing:.5px; }
+  input, textarea, select { width:100%; background:#fffaf0; color:var(--ink); border:3px solid var(--ink); border-radius:0; padding:8px 10px; font:inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  input:focus, textarea:focus, button:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  input[type=checkbox] { width:22px; height:22px; accent-color: var(--ink); }
+
+  button, .btn { background:var(--yellow); color:var(--ink); border:4px solid var(--ink); border-radius:0; padding:7px 16px; font:inherit; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; box-shadow:0 4px 0 0 var(--ink); transition:none; }
+  button:hover, .btn:hover { background:#ffc94f; }
+  button:active, .btn:active { transform: translateY(4px); box-shadow:0 0 0 0 var(--ink); }
+  button.ghost, .btn.ghost { background:var(--cream); }
+  button.ghost:hover, .btn.ghost:hover { background:#fff3d9; }
+  button.danger { background:var(--bad); color:#fff6e6; }
+  button:disabled { opacity:.55; cursor: default; transform:none; box-shadow:0 4px 0 0 var(--ink); }
+
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; } .row > * { flex:1 1 160px; } .row > button, .row > .btn { flex:0 0 auto; margin-bottom:4px; }
+  .grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px; }
+  .check { display:flex; gap:12px; align-items:center; padding:6px 0; }
+  .dot { width:16px; height:16px; background:var(--ink-soft); border:3px solid var(--ink); flex:none; } .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
+  .muted { color:var(--ink-soft); font-size:14px; } code { background:rgba(58,33,18,.12); padding:1px 6px; word-break:break-all; font-family: ui-monospace, Consolas, monospace; font-size:13px; }
+  .stats { display:flex; gap:28px; flex-wrap:wrap; } .stat b { font-size:34px; display:block; line-height:1.1; }
+  table { width:100%; border-collapse: collapse; } th, td { text-align:left; padding:9px 6px; border-bottom:3px dotted var(--cream-deep); } th { color:var(--ink-soft); font-weight:400; font-size:14px; }
+  tr.user { cursor:pointer; } tr.user:hover { background:var(--cream-deep); }
+  .days { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+  .chip { background:var(--cream-deep); border:3px solid var(--ink); padding:1px 4px 1px 10px; font-size:14px; display:inline-flex; gap:6px; align-items:center; }
+  .chip button { background:none; border:0; box-shadow:none; padding:0 6px; color:var(--ink-soft); font-size:20px; line-height:1; }
+  .chip button:hover { color:var(--bad); background:none; } .chip button:active { transform:none; }
+  .preview { background:#fffaf0; border:3px dashed var(--ink-soft); padding:8px 10px; margin-top:8px; font-size:15px; }
+  details summary { cursor:pointer; }
+
+  /* Dunkles Panel wie im Streamplan: Overlay-Bereich */
+  section.navy { background:var(--navy); color:var(--cream); }
+  section.navy h2 { color:var(--teal); border-bottom-color:#4a3d6e; }
+  section.navy label, section.navy .muted { color:#c3b9e0; }
+  section.navy code { background:rgba(255,255,255,.12); }
+
+  #toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--cream); border:4px solid var(--ink); box-shadow:0 5px 0 0 var(--ink); padding:10px 18px; opacity:0; pointer-events:none; max-width: 90vw; z-index:10; }
+  #toast.show { opacity:1; } #toast.err { background:#ffd9cf; border-color:var(--bad); }
+  @media (max-width: 640px) { header .lantern.l { left: 8px; } header .lantern.r { right: 8px; } header h1 { font-size: 26px; } }
   .hidden { display:none !important; }
-  .preview { background:#0e0e10; border:1px dashed var(--line); border-radius:8px; padding:8px 10px; margin-top:6px; font-size:14px; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 </head>
-<body>
+<body class="wood">
 <main>
-  <header>
-    <h1>✅ Check-in Admin</h1>
+  <header class="plaque">
+    <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
+    <div class="titles"><small>EhrlichVerwirrt</small><h1>Check-in Admin</h1></div>
+    <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <button id="logout" class="ghost hidden">Abmelden</button>
+    <i class="nail-b"></i>
   </header>
 
   <!-- Login -->
-  <section id="login" class="hidden">
+  <section id="login" class="px-box hidden">
     <h2>Anmelden</h2>
     <form id="loginForm" class="row">
       <div><label for="pw">Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password" required></div>
@@ -55,8 +81,8 @@
     <p class="muted" id="loginHint"></p>
   </section>
 
-  <div id="app" class="hidden" style="display:grid; gap:16px;">
-    <section>
+  <div id="app" class="hidden" style="display:grid; gap:22px;">
+    <section class="px-box">
       <h2>Status</h2>
       <div id="checks"></div>
       <div class="row" style="margin-top:12px">
@@ -70,7 +96,7 @@
       </details>
     </section>
 
-    <section>
+    <section class="navy" style="border:4px solid var(--ink); box-shadow:0 6px 0 0 var(--ink);">
       <h2>OBS-Overlay</h2>
       <p>Browser-Quelle in OBS mit dieser URL (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
       <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
@@ -83,7 +109,7 @@
       <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
     </section>
 
-    <section>
+    <section class="px-box">
       <h2>Einstellungen</h2>
       <form id="settingsForm">
         <label for="chatTemplate">Chatnachricht beim Check-in</label>
@@ -100,12 +126,12 @@
           <div><label for="timezone">Zeitzone</label><input id="timezone"></div>
           <div><label for="dayRolloverHour">Neuer Stream-Tag ab (Uhr)</label><input id="dayRolloverHour" type="number" min="0" max="23"></div>
         </div>
-        <label class="check" style="font-size:15px;color:var(--text)"><input id="chatEnabled" type="checkbox" style="width:auto"> Chatnachrichten senden</label>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="chatEnabled" type="checkbox"> Chatnachrichten senden</label>
         <button style="margin-top:8px">Speichern</button>
       </form>
     </section>
 
-    <section>
+    <section class="px-box">
       <h2>Besucher</h2>
       <div class="stats" id="stats"></div>
       <div class="row" style="margin-top:12px">
@@ -116,7 +142,7 @@
         <thead><tr><th>Name</th><th>Besuche</th><th>Zuletzt</th></tr></thead>
         <tbody id="users"></tbody>
       </table></div>
-      <div id="detail" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:12px">
+      <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
         <h2 id="dName"></h2>
         <div class="days" id="dDays"></div>
         <div class="row">
