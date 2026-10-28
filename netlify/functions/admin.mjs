@@ -1,6 +1,6 @@
 // Admin-API (alles außer Login nur mit Session-Cookie)
 import { db } from '../lib/store.mjs';
-import { getSettings, saveSettings } from '../lib/settings.mjs';
+import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
 import { fill, pushOverlay, streamDay } from '../lib/checkin.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
 import { ensureReward, listSubscriptions, sendChat, siteUrl, subscribe } from '../lib/twitch.mjs';
@@ -8,6 +8,16 @@ import { ensureReward, listSubscriptions, sendChat, siteUrl, subscribe } from '.
 export const config = { path: '/api/admin/*' };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+const SOUND_MAX = 1_500_000; // Bytes
+// Dateityp an den ersten Bytes erkennen, statt dem Browser zu glauben
+function sniffAudio(buf) {
+  const head = buf.subarray(0, 12).toString('latin1');
+  if (head.startsWith('RIFF') && head.slice(8, 12) === 'WAVE') return 'audio/wav';
+  if (head.startsWith('OggS')) return 'audio/ogg';
+  if (head.startsWith('ID3') || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)) return 'audio/mpeg';
+  return null;
+}
 
 async function allUsers() {
   const keys = await db.list('user/');
@@ -100,6 +110,24 @@ export default async (req) => {
         await pushOverlay({ type: 'checkin', user, count });
       }
       return json({ ok: true });
+    }
+
+    // ---- Eigener Ton
+    if (route[0] === 'sound') {
+      if (method === 'POST') {
+        const buf = Buffer.from(typeof body.data === 'string' ? body.data : '', 'base64');
+        if (!buf.length) return json({ error: 'Keine Datei empfangen' }, 400);
+        if (buf.length > SOUND_MAX) return json({ error: 'Die Datei ist zu groß (maximal 1,5 MB)' }, 413);
+        const type = sniffAudio(buf);
+        if (!type) return json({ error: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' }, 400);
+        await db.set('sound/data', { type, data: buf.toString('base64') });
+        const name = String(body.name || 'Eigener Ton').replace(/[<>"]/g, '').slice(0, 80);
+        return json(await setSound({ name, version: Date.now() }));
+      }
+      if (method === 'DELETE') {
+        await db.delete('sound/data');
+        return json(await setSound(null));
+      }
     }
 
     // ---- Nutzer

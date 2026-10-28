@@ -12,6 +12,9 @@ export const DEFAULTS = {
   dayRolloverHour: 5,
   volume: 0.6,
   duration: 5000,
+  // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
+  soundName: null,
+  soundVersion: null,
 };
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -44,6 +47,13 @@ export async function getSettings() {
 
 export async function saveSettings(input) {
   const next = { ...(await getSettings()), ...sanitize(input) };
+  await db.set('config/settings', next);
+  return next;
+}
+
+// Ton-Metadaten setzen, ohne die Eingabe-Bereinigung der normalen Einstellungen
+export async function setSound(meta) {
+  const next = { ...(await getSettings()), soundName: meta?.name ?? null, soundVersion: meta?.version ?? null };
   await db.set('config/settings', next);
   return next;
 }

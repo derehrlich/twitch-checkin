@@ -11,7 +11,11 @@ export default async (req) => {
   const settings = await getSettings();
   const keys = await db.list('event/');
   const cursor = keys.at(-1) ?? `event/${String(Date.now()).padStart(15, '0')}`;
-  const view = { volume: settings.volume, duration: settings.duration };
+  const view = {
+    volume: settings.volume,
+    duration: settings.duration,
+    sound: settings.soundVersion ? `/api/sound?v=${settings.soundVersion}` : null,
+  };
 
   if (!since) return json({ cursor, events: [], ...view });
 

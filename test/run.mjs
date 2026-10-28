@@ -35,6 +35,7 @@ const webhook = (await import('../netlify/functions/twitch-webhook.mjs')).defaul
 const overlay = (await import('../netlify/functions/overlay.mjs')).default;
 const admin = (await import('../netlify/functions/admin.mjs')).default;
 const auth = (await import('../netlify/functions/auth.mjs')).default;
+const sound = (await import('../netlify/functions/sound.mjs')).default;
 const { streamDay } = await import('../netlify/lib/checkin.mjs');
 const { getSettings } = await import('../netlify/lib/settings.mjs');
 
@@ -175,6 +176,42 @@ await test('Einstellungen werden bereinigt und gespeichert', async () => {
   assert.equal(s.duration, 2000);
   assert.equal(s.timezone, 'Europe/Berlin');
   assert.equal(s.evil, undefined);
+});
+
+await test('Eigener Ton: Upload, Auslieferung ans Overlay, Zurücksetzen, Schutz vor falschen Dateien', async () => {
+  const mp3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(2000, 7)]);
+  const upload = (cookieHeader, data, name = 'ding.mp3') => admin(adminReq('POST', 'sound', { name, data: data.toString('base64') }, cookieHeader));
+
+  assert.equal((await upload(undefined, mp3)).status, 401, 'ohne Login gesperrt');
+  assert.equal((await upload(cookie, Buffer.from('<html>kein Audio</html>'))).status, 400, 'Nicht-Audio abgelehnt');
+  assert.equal((await upload(cookie, Buffer.alloc(0))).status, 400, 'leere Datei abgelehnt');
+  assert.equal((await upload(cookie, Buffer.concat([Buffer.from('ID3'), Buffer.alloc(1_600_000)]))).status, 413, 'zu große Datei abgelehnt');
+  assert.equal((await db.get('sound/data')), null, 'abgelehnte Dateien werden nicht gespeichert');
+
+  const ok = await upload(cookie, mp3, '<b>ding</b>.mp3');
+  assert.equal(ok.status, 200);
+  const settings = await ok.json();
+  assert.equal(settings.soundName, 'bding/b.mp3', 'spitze Klammern im Namen entfernt');
+  assert.ok(settings.soundVersion);
+
+  const poll = await (await overlay(new Request(BASE + '/api/overlay'))).json();
+  assert.equal(poll.sound, `/api/sound?v=${settings.soundVersion}`);
+  const served = await sound(new Request(BASE + poll.sound));
+  assert.equal(served.headers.get('content-type'), 'audio/mpeg');
+  assert.match(served.headers.get('cache-control'), /immutable/);
+  assert.deepEqual(Buffer.from(await served.arrayBuffer()), mp3);
+
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(100)]);
+  assert.equal((await (await upload(cookie, wav, 'x.wav')).json()).soundName, 'x.wav', 'zweiter Upload ersetzt den ersten');
+  assert.equal((await sound(new Request(BASE + '/api/sound'))).headers.get('content-type'), 'audio/wav');
+
+  const afterSave = await (await admin(adminReq('PUT', 'settings', { volume: 0.3 }, cookie))).json();
+  assert.equal(afterSave.soundName, 'x.wav', 'Einstellungen speichern lässt den Ton unberührt');
+
+  const reset = await (await admin(adminReq('DELETE', 'sound', null, cookie))).json();
+  assert.equal(reset.soundName, null);
+  assert.equal((await (await overlay(new Request(BASE + '/api/overlay'))).json()).sound, null);
+  assert.equal((await sound(new Request(BASE + '/api/sound'))).status, 404);
 });
 
 await test('Rangliste, Entfernen eines Besuchs, CSV-Export, Löschen', async () => {

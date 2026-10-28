@@ -38,6 +38,7 @@ Der Reward wird von der App angelegt. Gibt es schon einen Reward gleichen Namens
 - **Status** zeigt, ob Variablen, Twitch-Verbindung, Reward und Webhook in Ordnung sind
 - **Einstellungen**: Chattexte (`{user}`, `{count}`), Rewardname und -preis, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel
 - **Tests**: Overlay und Chat testen, ohne Zähler zu verändern
+- **Ton**: eigene Sounddatei hochladen, anhören, zurücksetzen
 - **Besucher**: Suche, Besuchstage ansehen, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export
 
 ## Look
@@ -45,7 +46,7 @@ Der Reward wird von der App angelegt. Gibt es schon einen Reward gleichen Namens
 Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`: Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
 
 - **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
-- **Eigener Sound**: Datei als `public/checkin.mp3` ablegen, sonst gibt es ein eingebautes Glockenspiel.
+- **Eigener Sound**: Im Admin unter *OBS-Overlay → Ton* hochladen (MP3, WAV oder OGG, höchstens 1,5 MB). Er gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Mit „Eingebauten Ton verwenden“ kommt wieder das Glockenspiel. Reihenfolge: hochgeladener Ton, dann `public/checkin.mp3` (falls vorhanden), dann das Glockenspiel.
 - **Look ansehen**: `/overlay?demo` zeigt alle paar Sekunden eine Beispielkarte, ohne dass ein Check-in nötig ist.
 
 ## Hinweise
