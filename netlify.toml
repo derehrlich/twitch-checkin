@@ -6,6 +6,11 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/"
+  to = "/admin/"
+  status = 302
+
+[[redirects]]
   from = "/overlay"
   to = "/overlay.html"
   status = 200
