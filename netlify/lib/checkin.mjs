@@ -1,5 +1,6 @@
 import { db } from './store.mjs';
 import { sendChat, setRedemptionStatus } from './twitch.mjs';
+import { findRescue, getStreamDays, parseLevels, streakFor } from './streak.mjs';
 
 const pad = (n) => String(n).padStart(15, '0');
 
@@ -31,6 +32,7 @@ export async function pushOverlay(event) {
 export async function recordCheckIn(userId, userName, settings) {
   const day = streamDay(settings);
   const fresh = await db.setIfNew(`checked/${day}/${userId}`, 1);
+  if (fresh) await db.setIfNew(`streamday/${day}`, 1); // Stream-Tag für die Streak-Berechnung
   const user = (await db.get(`user/${userId}`)) ?? { name: userName, count: 0, first: null, last: null, days: [] };
   if (!fresh) {
     // Nicht schreiben: ein gleichzeitiger Gewinner würde sonst mit altem Stand überschrieben.
@@ -52,17 +54,49 @@ export async function recordCheckIn(userId, userName, settings) {
 export async function handleRedemption(redemption, settings) {
   const { id, user_id, user_name, reward } = redemption;
   const result = await recordCheckIn(user_id, user_name, settings);
-  const vars = { user: user_name, count: result.count };
+  const streak = await streakFor(user_id, result.day, settings);
+  const vars = { user: user_name, count: result.count, streak: streak.current, record: streak.record };
 
   if (result.isNew) {
-    await pushOverlay({ type: 'checkin', user: user_name, count: result.count });
-    if (settings.chatEnabled) await sendChat(fill(settings.chatTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+    const milestone = settings.milestoneEnabled && parseLevels(settings.milestoneLevels).includes(result.count);
+    await pushOverlay({ type: 'checkin', user: user_name, count: result.count, streak: streak.current, milestone });
+    if (settings.chatEnabled) await sendChat(fill(milestone ? settings.milestoneTemplate : settings.chatTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     await setRedemptionStatus(id, reward.id, 'FULFILLED');
   } else {
     if (settings.chatEnabled) await sendChat(fill(settings.duplicateTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     await setRedemptionStatus(id, reward.id, 'CANCELED'); // Punkte zurück
   }
   return result;
+}
+
+/** Streak-Retter: schließt die jüngste Lücke aus verpassten Streams. Nicht nötig oder zu lang: Hinweis und Punkte zurück. */
+export async function handleRescue(redemption, settings, now = new Date()) {
+  const { id, user_id, user_name, reward } = redemption;
+  const user = await db.get(`user/${user_id}`);
+  const today = streamDay(settings, now);
+  const streamDays = await getStreamDays();
+
+  const refuse = async (template) => {
+    if (settings.chatEnabled) await sendChat(fill(template, { user: user_name, streak: '', days: '' })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+    await setRedemptionStatus(id, reward.id, 'CANCELED'); // Punkte zurück
+    return { ok: false };
+  };
+
+  const rescue = user ? findRescue(user, streamDays, today, settings.streakGrace, settings.rescueMaxDays) : { status: 'none' };
+  if (rescue.status === 'none') return refuse(settings.rescueNotNeededTemplate);
+  if (rescue.status === 'toolong') return refuse(settings.rescueTooLongTemplate);
+  // Atomare Sperre: dieselbe Lücke nur einmal retten, auch bei gleichzeitigen Einlösungen
+  if (!(await db.setIfNew(`rescue/${user_id}/${rescue.days.at(-1)}`, 1))) return refuse(settings.rescueNotNeededTemplate);
+
+  user.name = user_name;
+  user.saved = [...new Set([...(user.saved ?? []), ...rescue.days])].sort();
+  await db.set(`user/${user_id}`, user);
+  const { current } = await streakFor(user_id, today, settings);
+
+  await pushOverlay({ type: 'alert', kind: 'rescue', user: user_name, streak: current, days: rescue.days.length });
+  if (settings.chatEnabled) await sendChat(fill(settings.rescueTemplate, { user: user_name, streak: current, days: rescue.days.length })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+  await setRedemptionStatus(id, reward.id, 'FULFILLED');
+  return { ok: true, saved: rescue.days.length, streak: current };
 }
 
 // Offene Sitzung (eingecheckt, nicht ausgecheckt) der letzten 24 Stunden; die jüngste gewinnt.

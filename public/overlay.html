@@ -40,6 +40,8 @@
 
   /* Raid: Karte oben, darunter der Clip des Raiders im selben Rahmen */
   .tag i.raid { background: #b98cff; box-shadow: 0 0 8px 1px rgba(185, 140, 255, .85); }
+  .tag i.gold { background: #ffd45e; box-shadow: 0 0 10px 2px rgba(255, 212, 94, .9); }
+  .wrap.milestone .card { box-shadow: 0 0 0 3px rgba(255, 212, 94, .7), 0 0 38px 8px rgba(255, 190, 70, .55); }
   .coin.raid b { font-size: 40px; }
   #clip { position: fixed; left: 50%; top: 470px; width: 720px; transform: translateX(-50%); padding: 14px; box-sizing: border-box; animation: clipin .6s cubic-bezier(.2, .9, .3, 1) both; }
   #clip.out { animation: clipout .5s ease-in forwards; }
@@ -110,12 +112,12 @@ function star(x, y, r, rot) {
   ctx.closePath();
 }
 
-function burst() {
+function burst(n = 80) {
   const colors = ['#ffd45e', '#ffb347', '#fff1b8', '#ffe08a', '#ff9f4a', '#fffaf0'];
   const card = document.querySelector('.card');
   const rect = card ? card.getBoundingClientRect() : { left: innerWidth / 2 - 300, width: 600, top: 110, height: 150 };
   const wasEmpty = particles.length === 0;
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, s = 2 + Math.random() * 7;
     particles.push({
       x: rect.left + rect.width * (0.15 + Math.random() * 0.7), y: rect.top + rect.height * 0.5,
@@ -197,6 +199,8 @@ async function showRaid(ev) {
 
 function checkView(ev) {
   const out = ev.type === 'checkout';
+  if (ev.milestone) return { small: 'Besuch', big: ev.count, dot: 'gold', tag: 'Meilenstein erreicht', sub: `${ev.count}. Besuch – danke für deine Treue!` };
+  if (!out && ev.streak >= 2) return { ...coinFor(ev), dot: '', tag: 'Eingecheckt', sub: `🔥 ${ev.streak} Streams in Folge` };
   const coin = coinFor(ev);
   return { small: coin.small, big: coin.big, dot: out ? 'out' : '', tag: out ? 'Ausgecheckt' : 'Eingecheckt', sub: out ? 'bis zum nächsten Mal!' : 'schön, dass du da bist!' };
 }
@@ -208,6 +212,7 @@ function alertView(ev) {
     case 'sub': return { small: 'Sub', big: '★', dot: 'raid', tag: 'Neuer Sub', sub: `${ev.tier} – danke für die Unterstützung!` };
     case 'resub': return { small: 'Monate', big: ev.months, dot: 'raid', tag: 'Sub-Treue', sub: ev.message || `${ev.tier} – danke für die Treue!` };
     case 'gift': return { small: 'Subs', big: ev.total, dot: 'raid', tag: 'Sub-Geschenk', sub: `verschenkt ${ev.total} Sub${ev.total === 1 ? '' : 's'}!` };
+    case 'rescue': return { small: 'Streak', big: ev.streak, dot: 'gold', tag: 'Streak gerettet', sub: `🔥 ${ev.days} verpasste(r) Stream(s) überbrückt` };
     case 'cheer': return { small: 'Bits', big: ev.bits, dot: 'raid', tag: 'Bits', sub: ev.message || 'danke für die Bits!' };
     default: return { small: '', big: '', dot: '', tag: 'Alert', sub: '' };
   }
@@ -224,7 +229,8 @@ async function next() {
     return;
   }
   const v = ev.type === 'alert' ? alertView(ev) : checkView(ev);
-  stage.innerHTML = `<div class="wrap" style="animation-duration:${duration}ms">
+  const dur = ev.milestone ? Math.round(duration * 1.7) : duration; // Meilensteine bleiben länger stehen
+  stage.innerHTML = `<div class="wrap${ev.milestone ? ' milestone' : ''}" style="animation-duration:${dur}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
     <div class="card panel">
@@ -236,12 +242,14 @@ async function next() {
           <div class="sub">${esc(v.sub)}</div>
         </div>
       </div>
-      <div class="bar"><span style="animation-duration:${duration}ms"></span></div>
+      <div class="bar"><span style="animation-duration:${dur}ms"></span></div>
     </div>
   </div>`;
   playSound();
-  setTimeout(burst, duration * 0.14); // Funken, wenn die Karte aufsetzt
-  await new Promise((r) => setTimeout(r, duration + 300));
+  if (ev.milestone) { // Sonder-Feuerwerk: drei große Salven
+    [0.14, 0.14 + 700 / dur, 0.14 + 1500 / dur].forEach((f) => setTimeout(() => burst(180), dur * f));
+  } else setTimeout(burst, dur * 0.14); // Funken, wenn die Karte aufsetzt
+  await new Promise((r) => setTimeout(r, dur + 300));
   stage.innerHTML = '';
   busy = false;
   next();
@@ -270,7 +278,8 @@ if (params.has('demo')) {
   let i = 0;
   const show = () => {
     const n = i % names.length;
-    if (i % 5 === 2) queue.push([{ type: 'alert', kind: 'follow', user: names[n] }, { type: 'alert', kind: 'gift', user: names[n], total: 5 }, { type: 'alert', kind: 'cheer', user: names[n], bits: 500, message: 'Cheer500 für dich!' }][i % 3]);
+    if (i % 7 === 6) queue.push({ type: 'checkin', user: names[n], count: 100, streak: 12, milestone: true });
+    else if (i % 5 === 2) queue.push([{ type: 'alert', kind: 'follow', user: names[n] }, { type: 'alert', kind: 'gift', user: names[n], total: 5 }, { type: 'alert', kind: 'cheer', user: names[n], bits: 500, message: 'Cheer500 für dich!' }][i % 3]);
     else if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', raids: [1, 3, 12, 2][n], clip: null });
     else queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
     i++; next();

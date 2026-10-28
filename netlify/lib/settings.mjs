@@ -1,4 +1,5 @@
 import { db } from './store.mjs';
+import { parseLevels } from './streak.mjs';
 
 export const DEFAULTS = {
   rewardTitle: 'Check-in',
@@ -20,6 +21,21 @@ export const DEFAULTS = {
   checkoutTemplate: '👋 {user} geht – {duration} dabei gewesen. Bis zum nächsten Mal!',
   checkoutDuplicateTemplate: '{user}, du bist heute schon ausgecheckt ✅ Deine Punkte bekommst du zurück.',
   noCheckinTemplate: '{user}, du bist gerade nicht eingecheckt – zum Auschecken musst du zuerst einchecken. Deine Punkte bekommst du zurück.',
+  // Meilensteine: bei diesen Gesamtbesuchen gibt es ein Sonder-Feuerwerk und einen eigenen Chattext
+  milestoneEnabled: true,
+  milestoneLevels: '10,25,50,100,250,500,1000',
+  // Platzhalter: {user} {count} {streak} {record}
+  milestoneTemplate: '🏆 {user} ist zum {count}. Mal dabei – Meilenstein! Danke für deine Treue ❤️',
+  // Streak: Tage in Folge, an denen du gestreamt hast und die Person da war. Eine Schonfrist verzeiht verpasste Streams.
+  streakGrace: 1,
+  // Streak-Retter: dritter Reward, schließt eine gerissene Lücke (Platzhalter: {user} {streak} {days})
+  streakRescueEnabled: true,
+  streakRewardTitle: 'Streak-Retter',
+  streakRewardCost: 500,
+  rescueMaxDays: 3,
+  rescueTemplate: '🛟 {user} rettet die Streak! {days} verpasste(r) Stream(s) überbrückt – Streak: {streak} 🔥',
+  rescueNotNeededTemplate: '{user}, deine Streak ist nicht in Gefahr ✅ Deine Punkte bekommst du zurück.',
+  rescueTooLongTemplate: '{user}, die Lücke ist zu lang oder zu lange her, da kann ich nichts mehr retten. Deine Punkte bekommst du zurück.',
   // Raids: Chatnachricht, Shoutout und Clip, wenn jemand rein raidet
   raidEnabled: true,
   raidMinViewers: 1,
@@ -65,6 +81,15 @@ function sanitize(input) {
   str('checkoutDuplicateTemplate', 400);
   str('noCheckinTemplate', 400);
   str('raidTemplate', 400);
+  for (const k of ['milestoneTemplate', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate']) str(k, 400);
+  str('streakRewardTitle', 45);
+  num('streakRewardCost', 1, 1_000_000);
+  num('streakGrace', 0, 5);
+  num('rescueMaxDays', 1, 14);
+  if (typeof input.milestoneLevels === 'string') {
+    const levels = parseLevels(input.milestoneLevels).filter((n) => n <= 100_000).slice(0, 20);
+    if (levels.length) out.milestoneLevels = levels.join(',');
+  }
   num('raidMinViewers', 0, 100_000);
   num('raidClipMaxSeconds', 5, 60);
   for (const k of ['followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate']) str(k, 400);
@@ -75,7 +100,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

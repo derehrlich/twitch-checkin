@@ -44,6 +44,13 @@ Neben dem Check-in-Reward gibt es einen zweiten Reward **„Check-out“** (Name
 - Im Admin siehst du Gesamtzeit und Ø Dauer pro Besucher, kannst danach sortieren und im CSV-Export stehen Check-in, Check-out und Minuten.
 - **Wichtig nach einem Update:** Einmal im Admin auf „Reward & Webhook einrichten“ klicken, damit der Check-out-Reward angelegt und abonniert wird. Besuche von vor dem Update haben keine Dauer.
 
+## Meilensteine, Streak und Streak-Retter
+
+- **Meilensteine** zählen die **Gesamtbesuche** und gehen nie verloren. Bei den eingestellten Zahlen (Standard 10, 25, 50, 100, 250, 500, 1000) gibt es statt der normalen Karte eine goldene Meilenstein-Karte mit drei großen Feuerwerks-Salven, längerer Anzeigedauer und eigenem Chattext (`{user}` `{count}` `{streak}` `{record}`).
+- **Streak** = Stream-Tage in Folge, an denen die Person da war. Ein Stream-Tag ist ein Tag, an dem mindestens eine Person eingecheckt hat; Besuche von früher werden beim ersten Mal automatisch nachgetragen. Die **Schonfrist** (Standard 1) verzeiht so viele verpasste Streams, danach reißt die Streak. Der **Rekord** bleibt erhalten. Auf der Check-in-Karte steht ab 2 Streams „🔥 N Streams in Folge“, im Chat sind `{streak}` und `{record}` nutzbar, im Admin siehst du beides pro Person.
+- **Streak-Retter**: ein dritter Kanalpunkte-Reward (Standard „Streak-Retter“, 500 Punkte). Er schließt die jüngste Lücke aus verpassten Streams, wenn sie länger als die Schonfrist, höchstens so lang wie eingestellt (Standard 3 Streams) und nicht älter als 7 Stream-Tage ist. Ist nichts zu retten oder die Lücke zu lang, gibt es einen Hinweis im Chat und die Punkte zurück. Dieselbe Lücke lässt sich nur einmal retten.
+- **Nach dem Update:** Einmal auf **Reward & Webhook einrichten** klicken, damit der Streak-Retter-Reward angelegt und abonniert wird.
+
 ## Raids: Chat, Shoutout und Clip
 
 Wenn jemand in deinen Kanal raidet, passiert automatisch:

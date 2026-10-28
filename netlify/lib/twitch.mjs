@@ -108,8 +108,15 @@ export async function ensureRewards(settings) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.checkoutRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.checkoutRewardId;
   }
+  let streak = null;
+  if (settings.streakRescueEnabled) {
+    streak = await make({ stateKey: 'streakRewardId', title: settings.streakRewardTitle, cost: settings.streakRewardCost, prompt: 'Rettet deine Check-in-Streak, wenn du Streams verpasst hast.', color: '#E5533D' });
+  } else if (state.streakRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.streakRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.streakRewardId;
+  }
   await db.set('config/state', state);
-  return { checkin, checkout };
+  return { checkin, checkout, streak };
 }
 
 export const EVENT_TYPE = 'channel.channel_points_custom_reward_redemption.add';

@@ -4,6 +4,7 @@ import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
 import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
 import { raiderPackage, raidVars, visitText } from '../lib/raid.mjs';
 import { buildAlert } from '../lib/alerts.mjs';
+import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
 import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
 
@@ -68,7 +69,7 @@ export default async (req) => {
       if (tokens && process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
         try {
           const subs = await listSubscriptions(webhookUrl);
-          const expected = (state.checkoutRewardId ? 2 : 1) + (settings.raidEnabled ? 1 : 0) + (settings.alertsEnabled ? 5 : 0);
+          const expected = 1 + (state.checkoutRewardId ? 1 : 0) + (state.streakRewardId ? 1 : 0) + (settings.raidEnabled ? 1 : 0) + (settings.alertsEnabled ? 5 : 0);
           const notReady = subs.find((x) => x.status !== 'enabled');
           subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
         } catch (e) { subscriptionError = e.message; }
@@ -87,6 +88,8 @@ export default async (req) => {
         raidEnabled: settings.raidEnabled,
         rewardId: state.rewardId ?? null,
         checkoutRewardId: state.checkoutRewardId ?? null,
+        streakRewardId: state.streakRewardId ?? null,
+        streakRescueEnabled: settings.streakRescueEnabled,
         checkoutEnabled: settings.checkoutEnabled,
         revoked: state.revoked ?? null,
         subscription, subscriptionError,
@@ -106,13 +109,12 @@ export default async (req) => {
     if (route[0] === 'setup' && method === 'POST') {
       if (!process.env.EVENTSUB_SECRET) return json({ error: 'EVENTSUB_SECRET ist nicht gesetzt' }, 400);
       const settings = await getSettings();
-      if (settings.checkoutEnabled && settings.rewardTitle === settings.checkoutRewardTitle) {
-        return json({ error: 'Check-in und Check-out brauchen verschiedene Reward-Namen' }, 400);
-      }
-      const { checkin, checkout } = await ensureRewards(settings);
-      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : [])], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
+      const titles = [settings.rewardTitle, ...(settings.checkoutEnabled ? [settings.checkoutRewardTitle] : []), ...(settings.streakRescueEnabled ? [settings.streakRewardTitle] : [])];
+      if (new Set(titles).size !== titles.length) return json({ error: 'Check-in, Check-out und Streak-Retter brauchen verschiedene Reward-Namen' }, 400);
+      const { checkin, checkout, streak } = await ensureRewards(settings);
+      await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : [])], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
       await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
-      return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null });
+      return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null, streak: streak?.title ?? null });
     }
 
     // ---- Tests (verändern keine Zähler)
@@ -149,6 +151,12 @@ export default async (req) => {
         if (body.target === 'raid-chat') await sendChat(fill(settings.raidTemplate, raidVars(pkg, viewers, raids)));
         else await pushOverlay({ type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, raids, clip: pkg.clip });
         return json({ ok: true, clip: pkg.clip?.title ?? null });
+      } else if (body.target === 'milestone' || body.target === 'milestone-chat') {
+        const level = Math.max(1, Number(body.count) || 100);
+        if (body.target === 'milestone') await pushOverlay({ type: 'checkin', user, count: level, streak: 12, milestone: true });
+        else await sendChat(fill(settings.milestoneTemplate, { user, count: level, streak: 12, record: 15 }));
+      } else if (body.target === 'rescue') {
+        await pushOverlay({ type: 'alert', kind: 'rescue', user, streak: 12, days: 2 });
       } else if (body.target === 'checkout-chat') {
         await sendChat(fill(settings.checkoutTemplate, { user, count, duration: fmtDuration(134) }));
       } else {
@@ -197,8 +205,11 @@ export default async (req) => {
     // ---- Nutzer
     if (route[0] === 'users') {
       if (route.length === 1 && method === 'GET') {
-        const users = (await allUsers()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-        return json(users);
+        const settings = await getSettings();
+        const streamDays = await getStreamDays();
+        const today = streamDay(settings);
+        const users = (await allUsers()).map((u) => ({ ...u, ...(({ current, record }) => ({ streak: current, record }))(computeStreak(u, streamDays, today, settings.streakGrace)) }));
+        return json(users.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)));
       }
       const id = route[1];
       const user = id && (await db.get(`user/${id}`));
@@ -213,6 +224,7 @@ export default async (req) => {
           user.last ??= user.first;
           await db.set(`user/${id}`, user);
           await db.set(`checked/${body.day}/${id}`, 1);
+          await db.setIfNew(`streamday/${body.day}`, 1);
         }
         return json({ id, ...user });
       }

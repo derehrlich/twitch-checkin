@@ -62,6 +62,7 @@ const auth = (await import('../netlify/functions/auth.mjs')).default;
 const sound = (await import('../netlify/functions/sound.mjs')).default;
 const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/checkin.mjs');
 const { getSettings } = await import('../netlify/lib/settings.mjs');
+const { computeStreak, findRescue, parseLevels } = await import('../netlify/lib/streak.mjs');
 
 const BASE = 'https://beispiel.netlify.app';
 let n = 0;
@@ -115,19 +116,20 @@ await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', asy
 await test('Setup legt beide Rewards an und abonniert je einen Webhook mit reward_id', async () => {
   const res = await admin(adminReq('POST', 'setup', {}, cookie));
   assert.equal(res.status, 200, await res.clone().text());
-  assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out' });
+  assert.deepEqual(await res.json(), { ok: true, reward: 'Check-in', checkout: 'Check-out', streak: 'Streak-Retter' });
   const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
-  assert.deepEqual(created.map((c) => c.body.condition.reward_id).filter(Boolean).sort(), ['reward1', 'reward2']);
+  assert.deepEqual(created.map((c) => c.body.condition.reward_id).filter(Boolean).sort(), ['reward1', 'reward2', 'reward3']);
   const raidSub = created.find((c) => c.body.type === 'channel.raid');
   assert.deepEqual(raidSub.body.condition, { to_broadcaster_user_id: '999' }, 'Raid-Subscription für den eigenen Kanal');
   assert.ok(created.every((c) => c.body.transport.method === 'webhook' && c.body.transport.callback === BASE + '/api/twitch-webhook'));
   const state = await db.get('config/state');
   assert.equal(state.rewardId, 'reward1');
   assert.equal(state.checkoutRewardId, 'reward2');
+  assert.equal(state.streakRewardId, 'reward3');
   // Zweites Einrichten legt nichts doppelt an und ersetzt die Subscriptions
   await admin(adminReq('POST', 'setup', {}, cookie));
-  assert.equal(rewards.length, 2);
-  assert.equal(subs.length, 3);
+  assert.equal(rewards.length, 3);
+  assert.equal(subs.length, 4);
 });
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
@@ -136,10 +138,12 @@ await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () =>
   assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
-await test('Setup lehnt gleiche Namen für Check-in und Check-out ab', async () => {
+await test('Setup lehnt gleiche Namen für die Rewards ab', async () => {
   await admin(adminReq('PUT', 'settings', { checkoutRewardTitle: 'Check-in' }, cookie));
   assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 400);
-  await admin(adminReq('PUT', 'settings', { checkoutRewardTitle: 'Check-out' }, cookie));
+  await admin(adminReq('PUT', 'settings', { checkoutRewardTitle: 'Check-out', streakRewardTitle: 'Check-out' }, cookie));
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 400);
+  await admin(adminReq('PUT', 'settings', { streakRewardTitle: 'Streak-Retter' }, cookie));
 });
 
 // ---- Webhook
@@ -457,6 +461,103 @@ await test('Raid: Erster Raid heißt „zum ersten Mal“, Nachtragen im Admin u
   assert.equal(list[0].count, 10);
 });
 
+// ---- Streak, Meilensteine, Streak-Retter
+const D = (n) => `2030-01-${String(n).padStart(2, '0')}`; // Stream-Tag n im Januar 2030
+const allDays = Array.from({ length: 12 }, (_, i) => D(i + 1));
+
+await test('Streak: Schonfrist verzeiht einen verpassten Stream, zwei reißen sie, Rekord bleibt, heute zählt erst nach Ende', async () => {
+  const run = (days, saved, today = D(12), grace = 1) => computeStreak({ days, saved }, allDays, today, grace);
+  assert.deepEqual(run(allDays.slice(0, 5), [], D(5)), { current: 5, record: 5 });
+  assert.deepEqual(run([D(1), D(2), D(3), D(5), D(6)], [], D(6)), { current: 5, record: 5 }, 'ein verpasster Stream wird verziehen, zählt aber nicht mit');
+  assert.deepEqual(run([D(1), D(2), D(3), D(6), D(7)], [], D(7)), { current: 2, record: 3 }, 'zwei verpasste reißen, Rekord 3 bleibt');
+  assert.deepEqual(run([D(1), D(2), D(3)], [], D(5)), { current: 3, record: 3 }, 'zwei verpasste seit D3 aber noch nicht gerissen: nur D4 ist vorbei');
+  assert.deepEqual(run([D(1), D(2), D(3)], [], D(6)), { current: 0, record: 3 }, 'D4 und D5 verpasst');
+  assert.deepEqual(run([D(1), D(2), D(3)], [], D(4)), { current: 3, record: 3 }, 'heute noch nicht eingecheckt ist kein Fehltag');
+  assert.deepEqual(run([D(1), D(2), D(3), D(6), D(7)], [D(4), D(5)], D(7)), { current: 5, record: 5 }, 'gerettete Tage überbrücken');
+  assert.deepEqual(run([D(1), D(3)], [], D(3), 0), { current: 1, record: 1 }, 'ohne Schonfrist reißt jeder verpasste Stream');
+});
+
+await test('Streak-Retter: findet nur die jüngste, rettbare Lücke', async () => {
+  const f = (days, saved, today, max = 3) => findRescue({ days, saved }, allDays, today, 1, max);
+  assert.deepEqual(f([D(1), D(2), D(3), D(6), D(7)], [], D(8)), { status: 'ok', days: [D(4), D(5)] });
+  assert.equal(f([D(1), D(2), D(3), D(4)], [], D(5)).status, 'none', 'nichts verpasst');
+  assert.equal(f([D(1), D(2), D(4)], [], D(5)).status, 'none', 'ein Stream ist verziehen, kein Retter nötig');
+  assert.equal(f([D(1), D(7)], [], D(8)).status, 'toolong', 'fünf verpasste sind mehr als drei');
+  assert.equal(f([D(1), D(2), D(3), D(6), D(7)], [D(4), D(5)], D(8)).status, 'none', 'schon gerettet');
+  assert.deepEqual(parseLevels('10, 25;50 abc -3 25'), [10, 25, 50]);
+});
+
+await test('Meilenstein: bei der eingestellten Zahl eigene Karte und eigener Chattext, sonst normal', async () => {
+  await admin(adminReq('PUT', 'settings', { milestoneLevels: '3,10' }, cookie));
+  await db.set('user/40', { name: 'Treu', count: 2, first: '2030-01-01T10:00:00Z', last: '2030-01-02T10:00:00Z', days: ['2030-01-01', '2030-01-02'] });
+  const cur = await cursor();
+  await webhook(signed('notification', redemption('m1', '40', 'Treu')));
+  const ev = (await eventsSince(cur)).find((e) => e.type === 'checkin');
+  assert.equal(ev.milestone, true);
+  assert.equal(ev.count, 3);
+  assert.match(chats().at(-1), /🏆 Treu ist zum 3\. Mal dabei/);
+  const cur2 = await cursor();
+  await webhook(signed('notification', redemption('m2', '41', 'Neu')));
+  assert.equal((await eventsSince(cur2)).find((e) => e.type === 'checkin').milestone, false);
+  assert.match(chats().at(-1), /Hi Neu #1/);
+  await admin(adminReq('PUT', 'settings', { milestoneEnabled: false }, cookie));
+  await db.set('user/42', { name: 'Aus', count: 2, first: 'x', last: 'x', days: ['2030-01-01', '2030-01-02'] });
+  const cur3 = await cursor();
+  await webhook(signed('notification', redemption('m3', '42', 'Aus')));
+  assert.equal((await eventsSince(cur3)).find((e) => e.type === 'checkin').milestone, false, 'ausgeschaltet');
+  await admin(adminReq('PUT', 'settings', { milestoneEnabled: true }, cookie));
+});
+
+await test('Streak-Retter-Einlösung: rettet die Lücke einmalig, sonst Hinweis und Punkte zurück', async () => {
+  // Stream-Tage 2031-03-01 bis -08, Person war an 1, 2, 3 und 8 da (4 bis 7 fehlen): zu lang für 3
+  const sd = (n) => `2031-03-0${n}`;
+  for (let n = 1; n <= 8; n++) await db.setIfNew(`streamday/${sd(n)}`, 1);
+  await db.set('user/50', { name: 'Retter', count: 4, first: 'x', last: 'x', days: [sd(1), sd(2), sd(3), sd(8)] });
+  const status = () => calls.filter((c) => c.path.endsWith('/redemptions')).at(-1).body.status;
+  const day = (n) => new Date(`2031-03-0${n}T12:00:00+01:00`);
+  const { handleRescue } = await import('../netlify/lib/checkin.mjs');
+  const rd = (id) => ({ id, user_id: '50', user_name: 'Retter', reward: { id: 'reward3' } });
+
+  let r = await handleRescue(rd('s1'), await getSettings(), day(9));
+  assert.equal(r.ok, false);
+  assert.equal(status(), 'CANCELED');
+  assert.match(chats().at(-1), /zu lang oder zu lange her/);
+
+  await db.set('user/50', { name: 'Retter', count: 4, first: 'x', last: 'x', days: [sd(1), sd(2), sd(3), sd(6), sd(7), sd(8)] }); // nur 4 und 5 fehlen
+  const cur = await cursor();
+  r = await handleRescue(rd('s2'), await getSettings(), day(9));
+  assert.deepEqual([r.ok, r.saved], [true, 2]);
+  assert.equal(status(), 'FULFILLED');
+  assert.deepEqual((await db.get('user/50')).saved, [sd(4), sd(5)]);
+  assert.match(chats().at(-1), /Retter rettet die Streak! 2 verpasste/);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'alert').kind, 'rescue');
+
+  r = await handleRescue(rd('s3'), await getSettings(), day(9));
+  assert.equal(r.ok, false, 'dieselbe Lücke nicht zweimal');
+  assert.match(chats().at(-1), /nicht in Gefahr/);
+  assert.equal(status(), 'CANCELED');
+});
+
+await test('Streak-Retter über den Webhook: nutzt die Reward-ID aus dem Setup', async () => {
+  const before = calls.length;
+  await db.set('user/51', { name: 'Neuling', count: 1, first: 'x', last: 'x', days: [D(1)] });
+  assert.equal((await webhook(signed('notification', redemption('hook-s1', '51', 'Neuling', 'reward3')))).status, 204);
+  assert.ok(calls.slice(before).some((c) => c.path.endsWith('/redemptions') && c.body.status === 'CANCELED'), 'nicht nötig: Punkte zurück');
+  assert.equal(await db.get('seen/hook-s1') !== null, true);
+});
+
+await test('Admin: Nutzerliste zeigt Streak und Rekord, Einstellungen bereinigen Meilenstein-Stufen', async () => {
+  const users = await (await admin(adminReq('GET', 'users', null, cookie))).json();
+  assert.ok(users.every((u) => Number.isInteger(u.streak) && Number.isInteger(u.record)));
+  const saved = await (await admin(adminReq('PUT', 'settings', { milestoneLevels: '100, 5 ,abc, 5, 0, 50', streakGrace: 99 }, cookie))).json();
+  assert.equal(saved.milestoneLevels, '5,50,100');
+  assert.equal(saved.streakGrace, 5);
+  await admin(adminReq('PUT', 'settings', { milestoneLevels: '10,25,50,100,250,500,1000', streakGrace: 1 }, cookie));
+  const cur = await cursor();
+  assert.equal((await admin(adminReq('POST', 'test', { target: 'milestone', user: 'T', count: 100 }, cookie))).status, 200);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'checkin').milestone, true);
+});
+
 // ---- Alerts
 const alertEvent = (type, event) => ({ subscription: { type }, event: { user_name: 'Fan', ...event } });
 let alertN = 0;
@@ -481,7 +582,7 @@ await test('Setup abonniert Alert-Events mit richtiger Version und Bedingung', a
   for (const t of ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift', 'channel.cheer']) {
     assert.deepEqual(created.find((c) => c.body.type === t).body.condition, { broadcaster_user_id: '999' }, t);
   }
-  assert.equal(subs.length, 8);
+  assert.equal(subs.length, 9);
 });
 
 await test('Alerts: Follow, Sub, Resub, Gift und Bits erzeugen die richtigen Karten', async () => {

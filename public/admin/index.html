@@ -117,6 +117,11 @@
         <button id="testCheckoutChat" class="ghost">Check-out im Chat testen</button>
       </div>
       <div class="row" style="margin-top:12px">
+        <button id="testMilestone" class="ghost">Meilenstein im Overlay testen</button>
+        <button id="testMilestoneChat" class="ghost">Meilenstein im Chat testen</button>
+        <button id="testRescue" class="ghost">Streak-Rettung testen</button>
+      </div>
+      <div class="row" style="margin-top:12px">
         <button id="testAlertFollow" class="ghost">Follow testen</button>
         <button id="testAlertSub" class="ghost">Sub testen</button>
         <button id="testAlertResub" class="ghost">Resub testen</button>
@@ -168,6 +173,30 @@
         <label for="noCheckinTemplate">Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)</label>
         <textarea id="noCheckinTemplate" maxlength="400"></textarea>
         <p class="muted">Zusätzlicher Platzhalter: <code>{duration}</code> Dauer, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+
+        <h2 style="margin-top:22px">Meilensteine &amp; Streak</h2>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="milestoneEnabled" type="checkbox"> Meilensteine feiern (Sonder-Feuerwerk, eigene Karte und Chattext)</label>
+        <label for="milestoneLevels">Bei diesen Gesamtbesuchen (mit Komma getrennt)</label>
+        <input id="milestoneLevels" placeholder="10,25,50,100,250,500,1000">
+        <label for="milestoneTemplate">Chatnachricht beim Meilenstein</label>
+        <textarea id="milestoneTemplate" maxlength="400"></textarea>
+        <div class="grid2">
+          <div><label for="streakGrace">Schonfrist: so viele Streams darf man verpassen</label><input id="streakGrace" type="number" min="0" max="5"></div>
+        </div>
+        <p class="muted">Meilensteine zählen die <b>Gesamtbesuche</b> und gehen nie verloren. Die <b>Streak</b> zählt Stream-Tage in Folge (ein Stream-Tag ist ein Tag mit mindestens einem Check-in), der Rekord bleibt erhalten. Platzhalter überall: <code>{streak}</code> aktuelle Streak, <code>{record}</code> Rekord, im Check-in-Text nutzbar, z. B. „… Streak: {streak} 🔥“.</p>
+        <label class="check" style="font-size:16px;color:var(--ink)"><input id="streakRescueEnabled" type="checkbox"> Streak-Retter aktivieren (dritter Kanalpunkte-Reward)</label>
+        <div class="grid2">
+          <div><label for="streakRewardTitle">Reward-Name</label><input id="streakRewardTitle" maxlength="45"></div>
+          <div><label for="streakRewardCost">Preis (Kanalpunkte)</label><input id="streakRewardCost" type="number" min="1"></div>
+          <div><label for="rescueMaxDays">Rettet höchstens so viele verpasste Streams</label><input id="rescueMaxDays" type="number" min="1" max="14"></div>
+        </div>
+        <label for="rescueTemplate">Chatnachricht bei erfolgreicher Rettung</label>
+        <textarea id="rescueTemplate" maxlength="400"></textarea>
+        <label for="rescueNotNeededTemplate">Nachricht, wenn die Streak nicht in Gefahr ist (Punkte werden erstattet)</label>
+        <textarea id="rescueNotNeededTemplate" maxlength="400"></textarea>
+        <label for="rescueTooLongTemplate">Nachricht, wenn die Lücke zu lang oder zu alt ist (Punkte werden erstattet)</label>
+        <textarea id="rescueTooLongTemplate" maxlength="400"></textarea>
+        <p class="muted">Platzhalter: <code>{user}</code> <code>{streak}</code> <code>{days}</code> Anzahl überbrückter Streams. Der Retter schließt nur die jüngste Lücke der letzten 7 Stream-Tage. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
 
         <h2 style="margin-top:22px">Raids</h2>
         <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidEnabled" type="checkbox"> Auf eingehende Raids reagieren</label>
@@ -226,7 +255,7 @@
         <a class="btn ghost" href="/api/admin/export.csv">CSV-Export</a>
       </div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Name</th><th>Besuche</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
+        <thead><tr><th>Name</th><th>Besuche</th><th>Streak (Rekord)</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
         <tbody id="users"></tbody>
       </table></div>
       <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
@@ -282,6 +311,7 @@ async function loadState() {
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
     (s.missingScopes.length ? check('warn', `Es fehlen Twitch-Berechtigungen (${esc(s.missingScopes.join(', '))}) – bitte „Mit Twitch verbinden“ erneut klicken`) : '') +
     check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Check-in-Reward angelegt' : 'Reward noch nicht angelegt') +
+    (s.streakRescueEnabled ? check(s.streakRewardId ? 'ok' : 'warn', s.streakRewardId ? 'Streak-Retter-Reward angelegt' : 'Streak-Retter-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Streak-Retter ist ausgeschaltet')) +
     (s.checkoutEnabled ? check(s.checkoutRewardId ? 'ok' : 'warn', s.checkoutRewardId ? 'Check-out-Reward angelegt' : 'Check-out-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Check-out ist ausgeschaltet')) +
     check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
       s.revoked ? `Webhook widerrufen (${esc(s.revoked)}), bitte neu einrichten`
@@ -349,8 +379,8 @@ $('soundReset').addEventListener('click', run(async () => {
   renderSound(); toast('Eingebauter Ton aktiv ✓');
 }));
 
-const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
-const CHECKS = ['chatEnabled', 'checkoutEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
+const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const CHECKS = ['chatEnabled', 'checkoutEnabled', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
   for (const f of FIELDS) $(f).value = settings[f];
@@ -381,7 +411,7 @@ $('settingsForm').addEventListener('submit', run(async (e) => {
 // ---- Aktionen
 $('setup').addEventListener('click', run(async () => {
   $('setup').disabled = true;
-  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? ` und „${r.checkout}“` : ''} und Webhook eingerichtet ✓`); await loadState(); }
+  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? `, „${r.checkout}“` : ''}${r.streak ? `, „${r.streak}“` : ''} und Webhook eingerichtet ✓`); await loadState(); }
   finally { $('setup').disabled = false; }
 }));
 $('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
@@ -397,6 +427,9 @@ $('raidSeed').addEventListener('click', run(async () => {
   const r = await api('POST', 'raids', { login: $('raidSeedLogin').value, count: $('raidSeedCount').value });
   toast(`${r.name}: ${r.count} bisherige Raids gespeichert ✓`);
 }));
+$('testMilestone').addEventListener('click', run(async () => { await api('POST', 'test', testBody('milestone')); toast('Meilenstein-Test gesendet (dauert bis ca. 3 s) – „Besuch Nr.“ bestimmt die Zahl'); }));
+$('testMilestoneChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('milestone-chat')); toast('Meilenstein-Nachricht im Chat gesendet ✓'); }));
+$('testRescue').addEventListener('click', run(async () => { await api('POST', 'test', testBody('rescue')); toast('Streak-Rettung gesendet (dauert bis ca. 3 s)'); }));
 const raidBody = (target) => ({ target, raider: $('testRaider').value, count: $('testCount').value });
 $('testRaid').addEventListener('click', run(async () => { const r = await api('POST', 'test', raidBody('raid')); toast(r.clip ? `Raid-Test gesendet mit Clip „${r.clip}“ (dauert bis ca. 3 s)` : 'Raid-Test gesendet – es wurde kein passender Clip gefunden'); }));
 $('testRaidChat').addEventListener('click', run(async () => { await api('POST', 'test', raidBody('raid-chat')); toast('Raid-Nachricht im Chat gesendet ✓'); }));
@@ -416,7 +449,7 @@ function renderUsers() {
   const key = { count: (u) => -u.count, total: (u) => -stats(u).total, avg: (u) => -stats(u).avg, name: (u) => u.name.toLowerCase() }[by];
   const list = users.filter((u) => u.name.toLowerCase().includes(q)).sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0)).slice(0, 200);
   $('users').innerHTML = list.map((u) => { const st = stats(u);
-    return `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${st.n ? fmtDuration(st.total) : '–'}</td><td>${st.n ? fmtDuration(st.avg) : '–'}</td><td>${fmtDate(u.last)}</td></tr>`; }).join('')
+    return `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${u.streak ?? 0} (${u.record ?? 0})</td><td>${st.n ? fmtDuration(st.total) : '–'}</td><td>${st.n ? fmtDuration(st.avg) : '–'}</td><td>${fmtDate(u.last)}</td></tr>`; }).join('')
     || '<tr><td colspan="5" class="muted">Noch keine Besucher.</td></tr>';
 }
 $('sort').addEventListener('change', renderUsers);
@@ -428,7 +461,7 @@ function renderDetail() {
   $('detail').classList.toggle('hidden', !u);
   if (!u) return;
   const st = stats(u);
-  $('dName').textContent = `${u.name} – ${u.count} Besuche` + (st.n ? `, ${fmtDuration(st.total)} gesamt (Ø ${fmtDuration(st.avg)})` : '');
+  $('dName').textContent = `${u.name} – ${u.count} Besuche, Streak ${u.streak ?? 0} (Rekord ${u.record ?? 0})` + (st.n ? `, ${fmtDuration(st.total)} gesamt (Ø ${fmtDuration(st.avg)})` : '');
   const label = (d) => { const x = u.sessions?.[d]; return x ? (x.minutes != null ? ` · ${fmtDuration(x.minutes)}` : ' · ohne Check-out') : ''; };
   $('dDays').innerHTML = [...u.days].reverse().map((d) => `<span class="chip">${esc(d)}${label(d)}<button data-day="${esc(d)}" title="Besuch entfernen">×</button></span>`).join('');
 }
