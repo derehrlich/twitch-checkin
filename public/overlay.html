@@ -169,7 +169,7 @@ async function showRaid(ev) {
       <div class="row">
         <div class="coin raid"><small>Raid</small><b style="font-size:${coinSize(ev.viewers)}px">${esc(ev.viewers)}</b></div>
         <div class="txt">
-          <div class="tag"><i class="raid"></i>Raid eingetroffen</div>
+          <div class="tag"><i class="raid"></i>Raid eingetroffen${ev.raids > 1 ? ` · ${esc(ev.raids)}. Mal` : ''}</div>
           <div class="name" style="font-size:${nameSize(ev.raider)}px">${esc(ev.raider)}</div>
           <div class="sub">${ev.game ? `zuletzt: ${esc(ev.game)}` : 'willkommen im Stream!'}</div>
         </div>
@@ -271,7 +271,7 @@ if (params.has('demo')) {
   const show = () => {
     const n = i % names.length;
     if (i % 5 === 2) queue.push([{ type: 'alert', kind: 'follow', user: names[n] }, { type: 'alert', kind: 'gift', user: names[n], total: 5 }, { type: 'alert', kind: 'cheer', user: names[n], bits: 500, message: 'Cheer500 für dich!' }][i % 3]);
-    else if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', clip: null });
+    else if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', raids: [1, 3, 12, 2][n], clip: null });
     else queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
     i++; next();
   };

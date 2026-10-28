@@ -180,7 +180,13 @@
         <label for="raidTemplate">Chatnachricht beim Raid</label>
         <textarea id="raidTemplate" maxlength="400"></textarea>
         <div class="preview" id="preview3"></div>
-        <p class="muted">Platzhalter: <code>{raider}</code> Name, <code>{viewers}</code> Zuschauer, <code>{game}</code> zuletzt gespieltes Spiel, <code>{url}</code> Kanallink. Nach dem Aktivieren oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken. Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleibt dann nur der Chattext und die Overlay-Karte.</p>
+        <p class="muted">Platzhalter: <code>{raider}</code> Name, <code>{viewers}</code> Zuschauer, <code>{game}</code> zuletzt gespieltes Spiel, <code>{url}</code> Kanallink, <code>{raids}</code> Anzahl der Raids dieses Kanals bei dir, <code>{visit}</code> fertiger Satzteil („zum ersten Mal bei uns“ / „schon zum 3. Mal bei uns“). Gezählt wird ab dem ersten empfangenen Raid, frühere lassen sich unten nachtragen. Nach dem Aktivieren oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken. Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleibt dann nur der Chattext und die Overlay-Karte.</p>
+
+        <label for="raidSeedLogin">Frühere Raids nachtragen (Kanalname, bisherige Anzahl)</label>
+        <div class="row">
+          <input id="raidSeedLogin" placeholder="kanalname" style="max-width:220px"><input id="raidSeedCount" type="number" min="0" value="1" style="max-width:100px">
+          <button type="button" id="raidSeed" class="ghost">Eintragen</button>
+        </div>
 
         <h2 style="margin-top:22px">Alerts</h2>
         <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertsEnabled" type="checkbox"> Alerts aktiv (Follow, Sub, Gift-Sub, Bits) – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt</label>
@@ -355,7 +361,7 @@ async function loadSettings() {
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
 function updatePreview() {
   $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 });
-  $('preview3').textContent = 'Vorschau: ' + fill($('raidTemplate').value, { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka' });
+  $('preview3').textContent = 'Vorschau: ' + fill($('raidTemplate').value, { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka', raids: 3, visit: 'schon zum 3. Mal bei uns' });
   $('preview2').textContent = 'Vorschau: ' + fill($('checkoutTemplate').value, { user: 'Max', count: 7, duration: '2 Std 14 Min' });
 }
 $('raidTemplate').addEventListener('input', updatePreview);
@@ -387,6 +393,10 @@ $('testCheckoutChat').addEventListener('click', run(async () => { await api('POS
 for (const k of ['Follow', 'Sub', 'Resub', 'Gift', 'Cheer']) {
   $('testAlert' + k).addEventListener('click', run(async () => { await api('POST', 'test', testBody('alert-' + k.toLowerCase())); toast('Alert-Test gesendet (dauert bis ca. 3 s)'); }));
 }
+$('raidSeed').addEventListener('click', run(async () => {
+  const r = await api('POST', 'raids', { login: $('raidSeedLogin').value, count: $('raidSeedCount').value });
+  toast(`${r.name}: ${r.count} bisherige Raids gespeichert ✓`);
+}));
 const raidBody = (target) => ({ target, raider: $('testRaider').value, count: $('testCount').value });
 $('testRaid').addEventListener('click', run(async () => { const r = await api('POST', 'test', raidBody('raid')); toast(r.clip ? `Raid-Test gesendet mit Clip „${r.clip}“ (dauert bis ca. 3 s)` : 'Raid-Test gesendet – es wurde kein passender Clip gefunden'); }));
 $('testRaidChat').addEventListener('click', run(async () => { await api('POST', 'test', raidBody('raid-chat')); toast('Raid-Nachricht im Chat gesendet ✓'); }));

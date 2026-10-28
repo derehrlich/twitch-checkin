@@ -2,7 +2,7 @@
 import { db } from '../lib/store.mjs';
 import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
 import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
-import { raiderPackage, raidVars } from '../lib/raid.mjs';
+import { raiderPackage, raidVars, visitText } from '../lib/raid.mjs';
 import { buildAlert } from '../lib/alerts.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
 import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
@@ -145,8 +145,9 @@ export default async (req) => {
         if (!who) return json({ error: 'Kanal nicht gefunden' }, 404);
         const viewers = Math.max(1, Number(body.count) || 42);
         const pkg = await raiderPackage(who.id, who.display_name, settings);
-        if (body.target === 'raid-chat') await sendChat(fill(settings.raidTemplate, raidVars(pkg, viewers)));
-        else await pushOverlay({ type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, clip: pkg.clip });
+        const raids = ((await db.get(`raid/${who.id}`))?.count ?? 0) + 1; // so würde der nächste Raid gezählt, der Test ändert nichts
+        if (body.target === 'raid-chat') await sendChat(fill(settings.raidTemplate, raidVars(pkg, viewers, raids)));
+        else await pushOverlay({ type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, raids, clip: pkg.clip });
         return json({ ok: true, clip: pkg.clip?.title ?? null });
       } else if (body.target === 'checkout-chat') {
         await sendChat(fill(settings.checkoutTemplate, { user, count, duration: fmtDuration(134) }));
@@ -154,6 +155,25 @@ export default async (req) => {
         await pushOverlay({ type: 'checkin', user, count });
       }
       return json({ ok: true });
+    }
+
+    // ---- Raid-Verlauf (Twitch liefert keinen, hier lässt sich der Stand früherer Raids nachtragen)
+    if (route[0] === 'raids') {
+      if (method === 'GET') {
+        const keys = await db.list('raid/');
+        const rows = await Promise.all(keys.map(async (k) => ({ id: k.slice(5), ...(await db.get(k)) })));
+        return json(rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)));
+      }
+      if (method === 'POST') {
+        const login = String(body.login || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 25);
+        const count = Math.round(Number(body.count));
+        if (!login || !Number.isFinite(count) || count < 0 || count > 10_000) return json({ error: 'Kanalname und Anzahl (0 bis 10000) angeben' }, 400);
+        const who = await userByLogin(login);
+        if (!who) return json({ error: 'Kanal nicht gefunden' }, 404);
+        const rec = (await db.get(`raid/${who.id}`)) ?? { viewers: 0, first: null, last: null };
+        await db.set(`raid/${who.id}`, { ...rec, name: who.display_name, count });
+        return json({ id: who.id, name: who.display_name, count });
+      }
     }
 
     // ---- Eigener Ton

@@ -373,6 +373,8 @@ await test('Schreibende Admin-Aufrufe ohne JSON werden abgelehnt', async () => {
 });
 
 // ---- Raids
+const eventsSince = async (cur) => (await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json()).events;
+const cursor = async () => (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
 const raidEvent = (viewers = 42) => ({ subscription: { type: 'channel.raid' }, event: { from_broadcaster_user_id: '777', from_broadcaster_user_name: 'raiderin', to_broadcaster_user_id: '999', viewers } });
 await test('Raid: Chat, Shoutout und Overlay-Karte mit passendem Clip', async () => {
   const cur = (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
@@ -432,10 +434,31 @@ await test('Raid-Test im Admin nutzt echte Kanaldaten, löst aber keinen Shoutou
   assert.equal((await admin(adminReq('POST', 'test', { target: 'raid-chat', raider: 'RaiderIn' }, cookie))).status, 200);
 });
 
+await test('Raid: zählt, wie oft der Kanal schon geraidet hat, im Chat und im Overlay', async () => {
+  assert.equal((await db.get('raid/777')).count, 5, 'alle fünf eingegangenen Raids zählen, auch zu kleine und bei ausgeschalteter Reaktion');
+  const cur = await cursor();
+  await webhook(signed('notification', raidEvent(20), { id: 'raid-count-1' }));
+  assert.equal((await db.get('raid/777')).count, 6);
+  assert.match(chats().at(-1), /schon zum 6\. Mal bei uns/);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'raid').raids, 6);
+});
+
+await test('Raid: Erster Raid heißt „zum ersten Mal“, Nachtragen im Admin und Test ändern keine Zähler', async () => {
+  const { visitText } = await import('../netlify/lib/raid.mjs');
+  assert.equal(visitText(1), 'zum ersten Mal bei uns');
+  assert.equal((await admin(adminReq('POST', 'raids', { login: 'RaiderIn', count: 10 }, cookie))).status, 200);
+  assert.equal((await db.get('raid/777')).count, 10);
+  assert.equal((await admin(adminReq('POST', 'raids', { login: 'x', count: -1 }, cookie))).status, 400);
+  const cur = await cursor();
+  await admin(adminReq('POST', 'test', { target: 'raid', raider: 'RaiderIn' }, cookie));
+  assert.equal((await db.get('raid/777')).count, 10);
+  assert.equal((await eventsSince(cur)).find((e) => e.type === 'raid').raids, 11, 'Test zeigt den nächsten Stand');
+  const list = await (await admin(adminReq('GET', 'raids', null, cookie))).json();
+  assert.equal(list[0].count, 10);
+});
+
 // ---- Alerts
 const alertEvent = (type, event) => ({ subscription: { type }, event: { user_name: 'Fan', ...event } });
-const eventsSince = async (cur) => (await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json()).events;
-const cursor = async () => (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
 let alertN = 0;
 const sendAlert = async (type, event) => {
   const cur = await cursor();

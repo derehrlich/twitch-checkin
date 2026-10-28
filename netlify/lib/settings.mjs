@@ -23,8 +23,8 @@ export const DEFAULTS = {
   // Raids: Chatnachricht, Shoutout und Clip, wenn jemand rein raidet
   raidEnabled: true,
   raidMinViewers: 1,
-  // Platzhalter: {raider} {viewers} {game} {url}
-  raidTemplate: '💜 RAID! {raider} ist mit {viewers} Leuten da – willkommen! Zuletzt gespielt: {game}. Schaut bei {url} vorbei!',
+  // Platzhalter: {raider} {viewers} {game} {url} {raids} {visit}
+  raidTemplate: '💜 RAID! {raider} ist mit {viewers} Leuten da – {visit}, danke dir! Zuletzt gespielt: {game}. Schaut bei {url} vorbei!',
   raidShoutout: true,
   raidClip: true,
   raidClipMaxSeconds: 30,

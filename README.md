@@ -51,6 +51,8 @@ Wenn jemand in deinen Kanal raidet, passiert automatisch:
 - **Offizieller Twitch-Shoutout** (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten; klappt er nicht, läuft der Rest trotzdem
 - **Overlay-Karte** mit Name und Zuschauerzahl, danach spielt ein **zufälliger Clip aus den beliebtesten Clips des Raiders** (einstellbare Höchstlänge, Standard 30 s)
 
+**Raid-Zähler:** Der Bot merkt sich, wie oft ein Kanal schon bei dir geraidet hat, und sagt es im Chat und auf der Overlay-Karte („schon zum 3. Mal bei uns“, Platzhalter `{raids}` und `{visit}`). Twitch liefert keinen Raid-Verlauf, gezählt wird deshalb ab dem ersten empfangenen Raid. Frühere Raids trägst du im Admin unter *Raids → Frühere Raids nachtragen* ein. Der Zähler läuft auch bei ausgeschalteter Raid-Reaktion weiter. Wer den Raid-Text im Admin schon gespeichert hat, muss `{visit}` selbst einfügen, der neue Standardtext gilt nur für ungespeicherte Einstellungen.
+
 Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu eine Mindestzahl an Raidern. Unter *OBS-Overlay* gibt es Raid-Tests mit echten Kanaldaten (Shoutouts werden im Test nie ausgelöst).
 
 **Wichtig nach dem Update:** Einmal auf **Mit Twitch verbinden** klicken (neue Berechtigung `moderator:manage:shoutouts`) und danach auf **Reward & Webhook einrichten**, damit der Raid-Webhook (`channel.raid`) angelegt wird. Der Status oben zeigt, falls die Berechtigung noch fehlt.
