@@ -66,6 +66,16 @@ Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu e
 
 Hinweise: Der Clip läuft über den offiziellen Twitch-Embed-Player. Clips sind Inhalte des Raiders und seiner Community; wer das nicht möchte, schaltet die Clip-Option aus.
 
+## Kanalpunkte-Soundboard
+
+Im Admin unter *Kanalpunkte-Soundboard* legst du Einträge an. Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit Name, Preis, Abklingzeit, Lautstärke und einer Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB). Löst ein Zuschauer ihn ein, spielt das Overlay den Sound sofort ab (unabhängig von der Warteschlange der Alerts) und zeigt unten links kurz ein kleines Holz-Schild mit Name und Sound. Optional schreibt der Bot eine Nachricht in den Chat (Platzhalter `{user}` `{title}`).
+
+- **Abklingzeit:** Sie wird von Twitch selbst erzwungen (globale Abklingzeit des Rewards).
+- **Einrichten:** Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ auf *Rewards mit Twitch abgleichen* klicken (entspricht *Reward & Webhook einrichten*). Einträge ohne Ton oder ohne Haken bei „Aktiv“ werden in Twitch ausgeschaltet. Beim Löschen eines Eintrags wird auch sein Reward in Twitch gelöscht.
+- **Namen** müssen auf deinem Kanal eindeutig sein. Gibt es schon einen Reward gleichen Namens, der nicht von dieser App stammt, meldet der Abgleich das.
+- **Grenzen:** höchstens 20 Einträge, ein Ton endet nach spätestens 20 Sekunden. Die Töne werden im Overlay vorab geladen, damit sie ohne Verzögerung spielen.
+- Ein Soundboard-Reward zählt **nicht** als Check-in.
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).
