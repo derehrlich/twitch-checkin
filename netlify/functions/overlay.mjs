@@ -4,6 +4,7 @@ import { db } from '../lib/store.mjs';
 import { getSettings } from '../lib/settings.mjs';
 import { json } from '../lib/http.mjs';
 import { SLOTS } from '../lib/sounds.mjs';
+import { IMAGE_SLOTS } from '../lib/images.mjs';
 
 export const config = { path: '/api/overlay' };
 
@@ -15,6 +16,9 @@ export default async (req) => {
   const view = {
     volume: settings.volume,
     duration: settings.duration,
+    alertDuration: settings.alertDuration,
+    raidDuration: settings.raidDuration,
+    images: Object.fromEntries(IMAGE_SLOTS.flatMap((slot) => (settings.images?.[slot]?.version ? [[slot, `/api/image?slot=${slot}&v=${settings.images[slot].version}`]] : []))),
     sound: settings.soundVersion ? `/api/sound?v=${settings.soundVersion}` : null,
     // Eigene Töne je Platz (Adresse nur, wenn hochgeladen)
     sounds: Object.fromEntries(SLOTS.flatMap((slot) => {

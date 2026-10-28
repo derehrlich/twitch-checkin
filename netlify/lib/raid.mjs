@@ -1,5 +1,5 @@
 import { db } from './store.mjs';
-import { fill, pushOverlay } from './checkin.mjs';
+import { fill, pushOverlay, signText } from './checkin.mjs';
 import { channelInfo, pickClip, sendChat, shoutout } from './twitch.mjs';
 
 // Sammelt alles, was zu einem Raider angezeigt wird. Jeder Teil ist optional: fällt einer aus, läuft der Rest weiter.
@@ -31,6 +31,13 @@ export const raidVars = (pkg, viewers, raids = 1) => ({
   url: `twitch.tv/${pkg.login}`,
 });
 
+// Overlay-Ereignis eines Raids (wird auch vom Admin-Test genutzt)
+export function raidCard(pkg, viewers, raids, settings) {
+  const extra = [pkg.game && `zuletzt: ${pkg.game}`, raids > 1 && `${raids}. Mal bei uns`].filter(Boolean).join(' · ');
+  return { type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, raids, clip: pkg.clip, extra,
+    ...signText(settings, 'raid', { user: pkg.name, viewers, raids, game: pkg.game || 'unbekannt' }) };
+}
+
 /** Eingehender Raid: Chatnachricht, offizieller Shoutout und Overlay-Karte mit Clip. */
 export async function handleRaid(event, settings) {
   const viewers = Number(event.viewers) || 0;
@@ -38,7 +45,7 @@ export async function handleRaid(event, settings) {
   if (!settings.raidEnabled || viewers < settings.raidMinViewers) return { ok: false, skipped: true };
 
   const pkg = await raiderPackage(event.from_broadcaster_user_id, event.from_broadcaster_user_name, settings);
-  await pushOverlay({ type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, raids, clip: pkg.clip });
+  await pushOverlay(raidCard(pkg, viewers, raids, settings));
   if (settings.chatEnabled) await sendChat(fill(settings.raidTemplate, raidVars(pkg, viewers, raids))).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
   if (settings.raidShoutout) await shoutout(event.from_broadcaster_user_id).catch((e) => console.warn('Shoutout fehlgeschlagen:', e.message));
   return { ok: true, raids, clip: pkg.clip?.id ?? null };

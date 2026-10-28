@@ -60,6 +60,7 @@ const overlay = (await import('../netlify/functions/overlay.mjs')).default;
 const admin = (await import('../netlify/functions/admin.mjs')).default;
 const auth = (await import('../netlify/functions/auth.mjs')).default;
 const sound = (await import('../netlify/functions/sound.mjs')).default;
+const image = (await import('../netlify/functions/image.mjs')).default;
 const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/checkin.mjs');
 const { getSettings } = await import('../netlify/lib/settings.mjs');
 const { computeStreak, findRescue, parseLevels } = await import('../netlify/lib/streak.mjs');
@@ -487,6 +488,42 @@ await test('Raid: Erster Raid heißt „zum ersten Mal“, Nachtragen im Admin u
   assert.equal(list[0].count, 10);
 });
 
+// ---- Schild-Texte, Bilder, Anzeigedauern
+await test('Schild-Texte und Dauern: anpassbar, Nachricht darf leer sein, Raid-Karte bringt Texte mit', async () => {
+  const saved = await (await admin(adminReq('PUT', 'settings', { followMessage: 'Schön, dass du da bist', subTitle: 'Neuer Held!', raidMessage: '', alertDuration: 99_999, raidDuration: 12000 }, cookie))).json();
+  assert.equal(saved.followMessage, 'Schön, dass du da bist');
+  assert.equal(saved.raidMessage, '', 'leere Nachricht wird gespeichert');
+  assert.equal(saved.alertDuration, 30_000, 'Dauer wird begrenzt');
+  const poll = await (await overlay(new Request(BASE + '/api/overlay'))).json();
+  assert.equal(poll.alertDuration, 30_000); assert.equal(poll.raidDuration, 12_000);
+  const cur = await cursor();
+  await admin(adminReq('POST', 'test', { target: 'raid', raider: 'RaiderIn', count: 9 }, cookie));
+  const raid = (await eventsSince(cur)).find((e) => e.type === 'raid');
+  assert.deepEqual([raid.title, raid.message], ['Raid-Alarm!', '']);
+  assert.match(raid.extra, /^zuletzt: Hades · \d+\. Mal bei uns$/);
+  await admin(adminReq('PUT', 'settings', { followMessage: '', subTitle: 'Neues Abo!', raidMessage: 'Bringt {viewers} Leute mit!', alertDuration: 8000, raidDuration: 11000 }, cookie));
+});
+
+await test('Alert-Bilder: Upload je Platz mit Typprüfung, Auslieferung, Overlay-Liste, Zurücksetzen', async () => {
+  const gif = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(30)]);
+  const up = (slot, buf, name = 'lama.gif') => admin(adminReq('POST', 'image', { slot, name, data: buf.toString('base64') }, cookie));
+  assert.equal((await up('quatsch', gif)).status, 400);
+  assert.equal((await up('follow', Buffer.from('<svg onload=alert(1)>'))).status, 400, 'nur echte Bilder');
+  assert.equal((await up('follow', Buffer.alloc(3_100_000, 1))).status, 413);
+  const r = await (await up('follow', gif, 'f<o>llow.gif')).json();
+  assert.equal(r.images.follow.name, 'follow.gif');
+  await up('raid', Buffer.concat([Buffer.from([0x89]), Buffer.from('PNG'), Buffer.alloc(20)]), 'raid.png');
+  const poll = await (await overlay(new Request(BASE + '/api/overlay'))).json();
+  assert.deepEqual(Object.keys(poll.images).sort(), ['follow', 'raid']);
+  const served = await image(new Request(BASE + poll.images.follow));
+  assert.equal(served.headers.get('content-type'), 'image/gif');
+  assert.equal((await image(new Request(BASE + '/api/image?slot=cheer'))).status, 404);
+  assert.equal((await admin(adminReq('PUT', 'settings', { volume: 0.5 }, cookie)).then((x) => x.json())).images.follow.name, 'follow.gif', 'Einstellungen speichern lässt Bilder unberührt');
+  assert.equal((await (await admin(adminReq('DELETE', 'image', { slot: 'follow' }, cookie))).json()).images.follow, undefined);
+  await admin(adminReq('DELETE', 'image', { slot: 'raid' }, cookie));
+  assert.deepEqual((await (await overlay(new Request(BASE + '/api/overlay'))).json()).images, {});
+});
+
 // ---- Streak, Meilensteine, Streak-Retter
 const D = (n) => `2030-01-${String(n).padStart(2, '0')}`; // Stream-Tag n im Januar 2030
 const allDays = Array.from({ length: 12 }, (_, i) => D(i + 1));
@@ -612,15 +649,16 @@ await test('Setup abonniert Alert-Events mit richtiger Version und Bedingung', a
 });
 
 await test('Alerts: Follow, Sub, Resub, Gift und Bits erzeugen die richtigen Karten', async () => {
-  assert.deepEqual(await sendAlert('channel.follow', {}), [{ type: 'alert', kind: 'follow', user: 'Fan' }]);
+  assert.deepEqual(await sendAlert('channel.follow', {}), [{ type: 'alert', kind: 'follow', user: 'Fan', title: 'Neuer Follower!', message: '' }]);
   const [sub] = await sendAlert('channel.subscribe', { tier: '1000', is_gift: false });
   assert.equal(sub.kind, 'sub'); assert.equal(sub.tier, 'Stufe 1');
+  assert.deepEqual([sub.title, sub.message], ['Neues Abo!', 'Tier 1 (1 Monate)'], 'Schild-Texte wie im alten Meld-Alert');
   const [resub] = await sendAlert('channel.subscription.message', { tier: '2000', cumulative_months: 9, message: { text: 'Weiter so!' } });
-  assert.deepEqual([resub.kind, resub.months, resub.tier, resub.message], ['resub', 9, 'Stufe 2', 'Weiter so!']);
+  assert.deepEqual([resub.kind, resub.months, resub.tier, resub.extra, resub.message], ['resub', 9, 'Stufe 2', 'Weiter so!', 'Tier 2 (9 Monate)']);
   const [gift] = await sendAlert('channel.subscription.gift', { tier: '1000', total: 5, is_anonymous: true, user_name: null });
-  assert.deepEqual([gift.kind, gift.total, gift.user], ['gift', 5, 'Anonym']);
+  assert.deepEqual([gift.kind, gift.total, gift.user, gift.message], ['gift', 5, 'Anonym', 'verschenkt 5 Sub(s)!']);
   const [cheer] = await sendAlert('channel.cheer', { bits: 250, message: 'Cheer250 hi' });
-  assert.deepEqual([cheer.kind, cheer.bits, cheer.message], ['cheer', 250, 'Cheer250 hi']);
+  assert.deepEqual([cheer.kind, cheer.bits, cheer.extra, cheer.message, cheer.title], ['cheer', 250, 'Cheer250 hi', '250 Bits', 'Neuer Cheer!']);
 });
 
 await test('Alerts: geschenkter Sub zählt nicht doppelt, Schalter und Mindest-Bits wirken, Wiederholung nur einmal', async () => {

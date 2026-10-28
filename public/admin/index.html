@@ -138,6 +138,9 @@
       <h2 style="margin-top:26px">Töne</h2>
       <p class="muted">Jeder Alert kann einen eigenen Ton haben (MP3, WAV oder OGG, höchstens 1,5 MB). Ohne eigene Datei spielt das Overlay einen eingebauten Klang, der je Alert anders klingt. Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton.</p>
       <div id="soundRows"></div>
+      <h2 style="margin-top:26px">Bilder &amp; GIFs</h2>
+      <p class="muted">Ein großes Bild oder GIF schaut über dem Alert-Schild hervor (GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch mit transparentem Hintergrund, etwa 320 × 320). Ohne Bild sitzt das Lama auf dem Schild. Resub nimmt ohne eigenes Bild das Sub-Bild.</p>
+      <div id="imageRows"></div>
       <p class="muted">Ein neuer Ton gilt im Overlay nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig. Die Lautstärke stellst du unter „Einstellungen“ ein.</p>
     </section>
 
@@ -222,6 +225,28 @@
         <label for="giftTemplate">Chat-Text Gift-Sub</label><textarea id="giftTemplate" maxlength="400"></textarea>
         <label for="cheerTemplate">Chat-Text Bits</label><textarea id="cheerTemplate" maxlength="400"></textarea>
         <p class="muted">Platzhalter: <code>{user}</code> <code>{tier}</code> <code>{months}</code> <code>{total}</code> <code>{bits}</code>. Nach dem Ein- oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+
+        <h2 style="margin-top:22px">Alert-Schilder im Overlay</h2>
+        <p class="muted">So sehen die Schilder aus: oben ein Bild oder GIF (siehe „Bilder“ unten), darunter Titel, Name und Nachricht. Platzhalter: <code>{user}</code> <code>{tier}</code> (1 bis 3) <code>{months}</code> <code>{total}</code> <code>{bits}</code> <code>{viewers}</code> <code>{raids}</code> <code>{game}</code> <code>{streak}</code> <code>{days}</code>. Die Nachricht darf leer sein.</p>
+        <div class="grid2">
+          <div><label for="followTitle">Follow: Titel</label><input id="followTitle" maxlength="60"></div>
+          <div><label for="followMessage">Follow: Nachricht unter dem Namen</label><input id="followMessage" maxlength="120"></div>
+          <div><label for="subTitle">Sub / Prime: Titel</label><input id="subTitle" maxlength="60"></div>
+          <div><label for="subMessage">Sub / Prime: Nachricht unter dem Namen</label><input id="subMessage" maxlength="120"></div>
+          <div><label for="resubTitle">Resub: Titel</label><input id="resubTitle" maxlength="60"></div>
+          <div><label for="resubMessage">Resub: Nachricht unter dem Namen</label><input id="resubMessage" maxlength="120"></div>
+          <div><label for="giftTitle">Gift-Subs: Titel</label><input id="giftTitle" maxlength="60"></div>
+          <div><label for="giftMessage">Gift-Subs: Nachricht unter dem Namen</label><input id="giftMessage" maxlength="120"></div>
+          <div><label for="cheerTitle">Bits: Titel</label><input id="cheerTitle" maxlength="60"></div>
+          <div><label for="cheerMessage">Bits: Nachricht unter dem Namen</label><input id="cheerMessage" maxlength="120"></div>
+          <div><label for="raidTitle">Raid: Titel</label><input id="raidTitle" maxlength="60"></div>
+          <div><label for="raidMessage">Raid: Nachricht unter dem Namen</label><input id="raidMessage" maxlength="120"></div>
+          <div><label for="rescueTitle">Streak-Rettung: Titel</label><input id="rescueTitle" maxlength="60"></div>
+          <div><label for="rescueMessage">Streak-Rettung: Nachricht unter dem Namen</label><input id="rescueMessage" maxlength="120"></div>
+          <div><label for="alertDuration">Anzeigedauer Alerts (ms)</label><input id="alertDuration" type="number" min="2000" max="30000" step="500"></div>
+          <div><label for="raidDuration">Anzeigedauer Raid (ms)</label><input id="raidDuration" type="number" min="2000" max="30000" step="500"></div>
+        </div>
+        <p class="muted">Ist ein hochgeladener Ton länger als die Anzeigedauer, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 Sekunden). Warten mehrere Ereignisse, gilt die Reihenfolge: Raid, Sub, Cheer, Follow, danach Meilenstein, Check-in und Check-out.</p>
 
         <h2 style="margin-top:22px">Allgemein</h2>
         <div class="grid2">
@@ -359,6 +384,47 @@ function renderSound() {
     </div>`;
   }).join('');
 }
+// ---- Bilder/GIFs (ein Platz je Alert)
+const IMAGE_SLOTS = [['follow', 'Follow'], ['sub', 'Sub / Prime'], ['resub', 'Resub (sonst Sub-Bild)'], ['gift', 'Gift-Subs'], ['cheer', 'Bits'], ['raid', 'Raid'], ['rescue', 'Streak-Rettung']];
+function renderImages() {
+  $('imageRows').innerHTML = IMAGE_SLOTS.map(([slot, label]) => {
+    const m = settings.images?.[slot];
+    return `<div class="row" style="margin-top:10px;align-items:end" data-slot="${slot}">
+      <div style="flex:0 0 150px"><b>${label}</b><br><span class="muted">${m ? esc(m.name) : 'Lama'}</span></div>
+      ${m ? `<img src="/api/image?slot=${slot}&v=${m.version}" alt="" style="height:56px;width:56px;object-fit:contain;flex:none">` : ''}
+      <div><input type="file" accept="image/gif,image/png,image/jpeg,image/webp,.gif,.png,.jpg,.jpeg,.webp"></div>
+      <button data-act="up">Hochladen</button>
+      <button data-act="reset" class="ghost" ${m ? '' : 'disabled'}>Zurücksetzen</button>
+    </div>`;
+  }).join('');
+}
+$('imageRows').addEventListener('click', run(async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const row = btn.closest('[data-slot]');
+  const slot = row.dataset.slot;
+  if (btn.dataset.act === 'up') {
+    const file = row.querySelector('input[type=file]').files[0];
+    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
+    if (file.size > 3_000_000) return toast('Die Datei ist zu groß (maximal 3 MB)', true);
+    btn.disabled = true;
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1]);
+        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+        r.readAsDataURL(file);
+      });
+      settings = await api('POST', 'image', { slot, name: file.name, data });
+      renderImages(); toast('Bild hochgeladen ✓');
+    } finally { btn.disabled = false; }
+  } else if (btn.dataset.act === 'reset') {
+    if (!confirm('Eigenes Bild entfernen und wieder das Lama zeigen?')) return;
+    settings = await api('DELETE', 'image', { slot });
+    renderImages(); toast('Lama aktiv ✓');
+  }
+}));
+
 let preview = null;
 $('soundRows').addEventListener('click', run(async (e) => {
   const btn = e.target.closest('button[data-act]');
@@ -394,7 +460,7 @@ $('soundRows').addEventListener('click', run(async (e) => {
   }
 }));
 
-const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
+const FIELDS = ['followTitle', 'followMessage', 'subTitle', 'subMessage', 'resubTitle', 'resubMessage', 'giftTitle', 'giftMessage', 'cheerTitle', 'cheerMessage', 'raidTitle', 'raidMessage', 'rescueTitle', 'rescueMessage', 'alertDuration', 'raidDuration', 'chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
 const CHECKS = ['chatEnabled', 'checkoutEnabled', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
 async function loadSettings() {
   settings = await api('GET', 'settings');
@@ -402,6 +468,7 @@ async function loadSettings() {
   for (const c of CHECKS) $(c).checked = settings[c];
   updatePreview();
   renderSound();
+  renderImages();
 }
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
 function updatePreview() {

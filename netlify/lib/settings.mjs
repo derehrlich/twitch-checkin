@@ -58,6 +58,19 @@ export const DEFAULTS = {
   subTemplate: '⭐ {user} hat abonniert ({tier}, {months} Monate) – vielen Dank!',
   giftTemplate: '🎁 {user} verschenkt {total} Sub(s) – du bist großartig!',
   cheerTemplate: '💎 {user} schickt {bits} Bits – danke!',
+  // Schild-Texte der Alerts (Titel oben, Nachricht unter dem Namen). Platzhalter je nach Alert:
+  // {user} {tier} {months} {total} {bits} {viewers} {raids} {game} {streak} {days}
+  followTitle: 'Neuer Follower!', followMessage: '',
+  subTitle: 'Neues Abo!', subMessage: 'Tier {tier} ({months} Monate)',
+  resubTitle: 'Abo-Treue!', resubMessage: 'Tier {tier} ({months} Monate)',
+  giftTitle: 'Sub-Geschenk!', giftMessage: 'verschenkt {total} Sub(s)!',
+  cheerTitle: 'Neuer Cheer!', cheerMessage: '{bits} Bits',
+  raidTitle: 'Raid-Alarm!', raidMessage: 'Bringt {viewers} Leute mit!',
+  rescueTitle: 'Streak gerettet!', rescueMessage: '{days} verpasste(r) Stream(s) überbrückt – Streak: {streak}',
+  alertDuration: 8000, // Anzeigedauer der Alert-Schilder in ms (ist ein Ton länger, bleibt das Schild bis zu seinem Ende)
+  raidDuration: 11000,
+  // Eigene Bilder je Alert (wie die Sounds): { follow: { name, version }, ... }
+  images: {},
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -82,6 +95,12 @@ function sanitize(input) {
   str('checkoutDuplicateTemplate', 400);
   str('noCheckinTemplate', 400);
   str('raidTemplate', 400);
+  for (const k of ['follow', 'sub', 'resub', 'gift', 'cheer', 'raid', 'rescue']) {
+    str(k + 'Title', 60);
+    if (typeof input[k + 'Message'] === 'string') out[k + 'Message'] = input[k + 'Message'].trim().slice(0, 120); // darf leer sein
+  }
+  num('alertDuration', 2000, 30_000);
+  num('raidDuration', 2000, 30_000);
   for (const k of ['milestoneTemplate', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate']) str(k, 400);
   str('streakRewardTitle', 45);
   num('streakRewardCost', 1, 1_000_000);
@@ -121,6 +140,15 @@ export async function saveSettings(input) {
 
 // Ton-Metadaten setzen, ohne die Eingabe-Bereinigung der normalen Einstellungen.
 // Der Check-in-Ton behält seine alten Felder, alle anderen Plätze liegen unter sounds.
+export async function setImage(meta, slot) {
+  const cur = await getSettings();
+  const images = { ...(cur.images ?? {}) };
+  if (meta) images[slot] = { name: meta.name, version: meta.version }; else delete images[slot];
+  const next = { ...cur, images };
+  await db.set('config/settings', next);
+  return next;
+}
+
 export async function setSound(meta, slot = 'checkin') {
   const cur = await getSettings();
   let next;

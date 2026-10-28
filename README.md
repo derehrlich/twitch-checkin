@@ -66,6 +66,15 @@ Alles ist im Admin unter *Einstellungen → Raids* ein- und ausschaltbar, dazu e
 
 Hinweise: Der Clip läuft über den offiziellen Twitch-Embed-Player. Clips sind Inhalte des Raiders und seiner Community; wer das nicht möchte, schaltet die Clip-Option aus.
 
+## Alert-Schilder im Meld-Stil
+
+Alerts (Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) und Raids erscheinen als Holz-Schild: oben ein großes **Bild oder GIF** (Admin → *OBS-Overlay → Bilder & GIFs*, je Alert eins; ohne Bild sitzt das Lama auf dem Schild), darunter **Titel, Name und Nachricht**. Titel und Nachricht stellst du unter *Einstellungen → Alert-Schilder im Overlay* ein, die Standardtexte entsprechen deinem früheren Meld-Alert („Neuer Follower!“, „Neues Abo! – Tier 1 (6 Monate)“, „Raid-Alarm! – Bringt 42 Leute mit!“, „Neuer Cheer! – 500 Bits“).
+
+- **Anzeigedauer:** 8 s für Alerts, 11 s für Raids (einstellbar). Ist ein hochgeladener Ton länger, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 s), der Ton wird nie abgeschnitten.
+- **Reihenfolge**, wenn mehrere warten: Raid, Sub (auch Resub und Gift), Cheer, Follow, danach Meilenstein, Check-in und Check-out. Zwischen zwei Ereignissen liegt eine kurze Pause von 0,8 s.
+- **Feuerwerk:** Beim Raid gibt es zusätzliche Salven nach 2,5 s und 5 s.
+- **Bilder:** GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch (etwa 320 × 320) mit transparentem Hintergrund. Resub nimmt ohne eigenes Bild das Sub-Bild.
+
 ## Alerts: Follow, Sub, Gift-Sub, Bits
 
 Im Holz-Look des Overlays, mit eigener Münze je Alert: **Follow**, **Sub/Resub** (mit Monaten und Nachricht), **Gift-Subs** (ein Alert pro Paket, die einzelnen geschenkten Subs werden unterdrückt) und **Bits** (mit Mindestwert und Nachricht). Optional kommt zusätzlich ein Dank im Chat, alle Texte sind anpassbar.

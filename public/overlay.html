@@ -43,13 +43,23 @@
   .tag i.gold { background: #ffd45e; box-shadow: 0 0 10px 2px rgba(255, 212, 94, .9); }
   .wrap.milestone .card { box-shadow: 0 0 0 3px rgba(255, 212, 94, .7), 0 0 38px 8px rgba(255, 190, 70, .55); }
   .coin.raid b { font-size: 40px; }
-  #clip { position: fixed; left: 50%; top: 470px; width: 720px; transform: translateX(-50%); padding: 14px; box-sizing: border-box; animation: clipin .6s cubic-bezier(.2, .9, .3, 1) both; }
+  #clip { position: fixed; left: 50%; top: 580px; width: 720px; transform: translateX(-50%); padding: 14px; box-sizing: border-box; animation: clipin .6s cubic-bezier(.2, .9, .3, 1) both; }
   #clip.out { animation: clipout .5s ease-in forwards; }
   #clip .frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
   #clip iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   #clip .cap { margin-top: 8px; font-size: 18px; font-weight: 600; color: #ecd9b6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @keyframes clipin { from { opacity: 0; transform: translate(-50%, 40px) scale(.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
   @keyframes clipout { to { opacity: 0; transform: translate(-50%, 30px) scale(.96); } }
+
+  /* Schild-Layout für Alerts und Raids (wie im alten Meld-Alert): Titel, Name, Nachricht, darüber ein großes Bild/GIF */
+  .sign .card { min-width: 440px; max-width: 620px; text-align: center; padding: 30px 44px 26px; }
+  .sign.gif .card { padding-top: 138px; }
+  .gifbox { position: absolute; left: 50%; top: -190px; transform: translateX(-50%); width: 320px; height: 320px; z-index: 4; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 15px 20px rgba(0, 0, 0, .6)); pointer-events: none; }
+  .gifbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .title { font-size: 22px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: rgba(254, 215, 170, .92); text-shadow: 2px 2px 0 rgba(0, 0, 0, .5); }
+  .sign .name { text-align: center; margin: 6px 0 4px; }
+  .msg { font-size: 23px; font-style: italic; font-weight: 500; color: #ecd9b6; text-shadow: 2px 2px 0 rgba(0, 0, 0, .45); opacity: .92; margin-top: 4px; }
+  .extra { font-size: 18px; margin-top: 6px; color: #d9c39b; }
 
   @keyframes drop {
     0%   { transform: translateY(-320px); opacity: 0; animation-timing-function: cubic-bezier(.2, .9, .3, 1); }
@@ -73,6 +83,7 @@
 const params = new URLSearchParams(location.search);
 let volume = Number(params.get('volume') ?? 0.6);
 let duration = Number(params.get('duration') ?? 5000);
+let alertDuration = 8000, raidDuration = 11000;
 const pollMs = Math.max(1000, Number(params.get('poll') ?? 3000));
 
 // ---------- Ton ----------
@@ -105,16 +116,35 @@ function slotFor(ev) {
   return ev.milestone ? 'milestone' : 'checkin';
 }
 
-function playSound(slot = 'checkin') {
+// Wählt den Ton für einen Platz: { audio } bei einer Datei, sonst { slot } für den eingebauten Klang
+function pickSound(slot = 'checkin') {
   let file = null, inCheckinFamily = false;
   for (let s = slot; s; s = FALLBACK[s]) {
     if (uploaded[s]) { file = uploaded[s].audio; break; }
     if (s === 'checkin') inCheckinFamily = true;
   }
   file ??= inCheckinFamily ? staticSound : null;
-  if (file) { file.currentTime = 0; file.play().catch(() => playChime(volume, slot)); return; }
-  playChime(volume, slot);
+  return { slot, audio: file };
 }
+// Länge einer Sounddatei in ms (höchstens 30 s): das Schild bleibt so lange stehen, der Ton wird nie abgeschnitten
+const soundMs = (pick) => (pick.audio && Number.isFinite(pick.audio.duration) ? Math.min(30_000, Math.ceil(pick.audio.duration * 1000) + 200) : 0);
+let currentAudio = null;
+function startSound(pick) {
+  if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch { /* egal */ } currentAudio = null; } // nichts überlappt
+  if (!pick.audio) return playChime(volume, pick.slot);
+  currentAudio = pick.audio;
+  pick.audio.currentTime = 0;
+  pick.audio.play().catch(() => playChime(volume, pick.slot));
+}
+
+// ---------- Bilder/GIFs über den Schildern (Platz wie beim Ton; Resub nimmt ohne eigenes Bild das Sub-Bild) ----------
+let images = {};
+const IMAGE_FALLBACK = { resub: 'sub' };
+function useImages(map) {
+  for (const [slot, url] of Object.entries(map)) if (images[slot] !== url) new Image().src = url; // vorladen
+  images = map;
+}
+const imageFor = (slot) => images[slot] ?? images[IMAGE_FALLBACK[slot]] ?? null;
 
 // ---------- Funken (warm, weich) ----------
 const canvas = document.getElementById('fx');
@@ -162,7 +192,7 @@ function tick() {
   if (particles.length) requestAnimationFrame(tick);
 }
 
-// ---------- Warteschlange, damit mehrere Check-ins nacheinander laufen ----------
+// ---------- Warteschlange, damit mehrere Ereignisse nacheinander laufen ----------
 const stage = document.getElementById('stage');
 const queue = [];
 let busy = false;
@@ -177,30 +207,40 @@ function coinFor(ev) {
   return m < 60 ? { small: 'Minuten', big: m } : { small: 'Stunden', big: `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` };
 }
 
+// Reihenfolge, wenn mehrere warten: Raid vor Sub vor Cheer vor Follow, dann Meilenstein, Check-in/-out zuletzt
+const PRIORITY = { raid: 1, sub: 2, resub: 2, gift: 2, cheer: 3, rescue: 3, follow: 4, milestone: 5, checkin: 6, checkout: 6 };
+function enqueue(ev) {
+  const p = PRIORITY[slotFor(ev)] ?? 9;
+  const i = queue.findIndex((q) => (PRIORITY[slotFor(q)] ?? 9) > p); // hinter alle mit gleicher oder besserer Priorität
+  if (i < 0) queue.push(ev); else queue.splice(i, 0, ev);
+}
+
 const clipStage = document.getElementById('clipstage');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Raid: Karte mit Name, Zuschauerzahl und Spiel, danach läuft ein Clip des Raiders
-async function showRaid(ev) {
-  const clipMs = ev.clip ? (Number(ev.clip.duration) || 15) * 1000 : 0;
-  const cardMs = Math.max(duration, 6000);
-  stage.innerHTML = `<div class="wrap" style="animation-duration:${cardMs}ms">
-    <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
+// Alert- und Raid-Schild: Bild/GIF darüber, Titel, Name, Nachricht (Texte kommen aus dem Admin). Bei einem Raid folgt ein Clip.
+async function showSign(ev) {
+  const isRaid = ev.type === 'raid';
+  const slot = slotFor(ev);
+  const pick = pickSound(slot);
+  const cardMs = Math.max(isRaid ? raidDuration : alertDuration, soundMs(pick));
+  const img = imageFor(slot);
+  const name = String(isRaid ? ev.raider : ev.user);
+  const clipMs = isRaid && ev.clip ? (Number(ev.clip.duration) || 15) * 1000 : 0;
+  stage.innerHTML = `<div class="wrap sign${img ? ' gif' : ''}" style="animation-duration:${cardMs}ms">
+    ${img ? `<div class="gifbox"><img src="${esc(img)}" alt=""></div>` : '<img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">'}
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
     <div class="card panel">
-      <div class="row">
-        <div class="coin raid"><small>Raid</small><b style="font-size:${coinSize(ev.viewers)}px">${esc(ev.viewers)}</b></div>
-        <div class="txt">
-          <div class="tag"><i class="raid"></i>Raid eingetroffen${ev.raids > 1 ? ` · ${esc(ev.raids)}. Mal` : ''}</div>
-          <div class="name" style="font-size:${nameSize(ev.raider)}px">${esc(ev.raider)}</div>
-          <div class="sub">${ev.game ? `zuletzt: ${esc(ev.game)}` : 'willkommen im Stream!'}</div>
-        </div>
-      </div>
+      <div class="title">${esc(ev.title ?? '')}</div>
+      <div class="name" style="font-size:${Math.round(nameSize(name) * 0.9)}px">${esc(name)}</div>
+      ${ev.message ? `<div class="msg">${esc(ev.message)}</div>` : ''}
+      ${ev.extra ? `<div class="extra">${esc(ev.extra)}</div>` : ''}
       <div class="bar"><span style="animation-duration:${cardMs}ms"></span></div>
     </div>
   </div>`;
-  playSound('raid');
+  startSound(pick);
   setTimeout(burst, cardMs * 0.14);
+  if (isRaid) [2500, 5000].forEach((t) => setTimeout(burst, t)); // wie beim alten Raid-Alarm: weitere Salven
   const started = Date.now();
   if (clipMs) {
     await sleep(1500);
@@ -212,7 +252,7 @@ async function showRaid(ev) {
     await sleep(500);
     clipStage.innerHTML = '';
   }
-  // Karte mindestens so lange stehen lassen, wie ihre Animation dauert (auch ohne Clip)
+  // Schild mindestens so lange stehen lassen, wie seine Animation dauert (auch ohne Clip)
   await sleep(Math.max(0, cardMs - (Date.now() - started)) + 300);
   stage.innerHTML = '';
 }
@@ -225,31 +265,11 @@ function checkView(ev) {
   return { small: coin.small, big: coin.big, dot: out ? 'out' : '', tag: out ? 'Ausgecheckt' : 'Eingecheckt', sub: out ? 'bis zum nächsten Mal!' : 'schön, dass du da bist!' };
 }
 
-// Follow, Sub, Resub, Gift-Sub, Bits: gleiche Karte, andere Münze und Texte
-function alertView(ev) {
-  switch (ev.kind) {
-    case 'follow': return { small: 'Follow', big: '♥', dot: 'raid', tag: 'Neuer Follower', sub: 'willkommen in der Runde!' };
-    case 'sub': return { small: 'Sub', big: '★', dot: 'raid', tag: 'Neuer Sub', sub: `${ev.tier} – danke für die Unterstützung!` };
-    case 'resub': return { small: 'Monate', big: ev.months, dot: 'raid', tag: 'Sub-Treue', sub: ev.message || `${ev.tier} – danke für die Treue!` };
-    case 'gift': return { small: 'Subs', big: ev.total, dot: 'raid', tag: 'Sub-Geschenk', sub: `verschenkt ${ev.total} Sub${ev.total === 1 ? '' : 's'}!` };
-    case 'rescue': return { small: 'Streak', big: ev.streak, dot: 'gold', tag: 'Streak gerettet', sub: `🔥 ${ev.days} verpasste(r) Stream(s) überbrückt` };
-    case 'cheer': return { small: 'Bits', big: ev.bits, dot: 'raid', tag: 'Bits', sub: ev.message || 'danke für die Bits!' };
-    default: return { small: '', big: '', dot: '', tag: 'Alert', sub: '' };
-  }
-}
-
-async function next() {
-  if (busy || !queue.length) return;
-  busy = true;
-  const ev = queue.shift();
-  if (ev.type === 'raid') {
-    await showRaid(ev);
-    busy = false;
-    next();
-    return;
-  }
-  const v = ev.type === 'alert' ? alertView(ev) : checkView(ev);
-  const dur = ev.milestone ? Math.round(duration * 1.7) : duration; // Meilensteine bleiben länger stehen
+// Check-in, Check-out und Meilenstein: Karte mit Münze
+async function showCard(ev) {
+  const v = checkView(ev);
+  const pick = pickSound(slotFor(ev));
+  const dur = Math.max(ev.milestone ? Math.round(duration * 1.7) : duration, soundMs(pick)); // Meilensteine bleiben länger stehen
   stage.innerHTML = `<div class="wrap${ev.milestone ? ' milestone' : ''}" style="animation-duration:${dur}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
@@ -265,12 +285,25 @@ async function next() {
       <div class="bar"><span style="animation-duration:${dur}ms"></span></div>
     </div>
   </div>`;
-  playSound(slotFor(ev));
+  startSound(pick);
   if (ev.milestone) { // Sonder-Feuerwerk: drei große Salven
     [0.14, 0.14 + 700 / dur, 0.14 + 1500 / dur].forEach((f) => setTimeout(() => burst(180), dur * f));
   } else setTimeout(burst, dur * 0.14); // Funken, wenn die Karte aufsetzt
-  await new Promise((r) => setTimeout(r, dur + 300));
+  await sleep(dur + 300);
   stage.innerHTML = '';
+}
+
+async function next() {
+  if (busy || !queue.length) return;
+  busy = true;
+  const ev = queue.shift();
+  try {
+    await (ev.type === 'raid' || ev.type === 'alert' ? showSign(ev) : showCard(ev));
+  } catch (e) { // ein kaputtes Ereignis darf die Warteschlange nie blockieren
+    console.error('Overlay-Fehler:', e);
+    stage.innerHTML = ''; clipStage.innerHTML = '';
+  }
+  await sleep(800); // kurze Ruhe zwischen zwei Ereignissen
   busy = false;
   next();
 }
@@ -285,9 +318,12 @@ async function poll() {
     cursor = data.cursor;
     if (data.volume != null && !params.has('volume')) volume = data.volume;
     if (data.duration != null && !params.has('duration')) duration = data.duration;
+    if (data.alertDuration) alertDuration = data.alertDuration;
+    if (data.raidDuration) raidDuration = data.raidDuration;
+    useImages(data.images ?? {});
     useUploadedSounds(data.sounds ?? {});
     setSoundVolume();
-    for (const ev of data.events) if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) queue.push(ev);
+    for (const ev of data.events) if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) enqueue(ev);
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
@@ -295,15 +331,18 @@ async function poll() {
 
 if (params.has('demo')) {
   const names = ['NovelsByEverly', 'Akinasuka', 'Max', 'EinSehrLangerZuschauerName123'];
+  const demos = [
+    (n) => ({ type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] }),
+    (n) => ({ type: 'alert', kind: 'follow', user: names[n], title: 'Neuer Follower!', message: '' }),
+    (n) => ({ type: 'alert', kind: 'sub', user: names[n], title: 'Neues Abo!', message: 'Tier 1 (6 Monate)', extra: 'Immer wieder gerne!' }),
+    (n) => ({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], title: 'Raid-Alarm!', message: `Bringt ${[12, 85, 240, 3][n]} Leute mit!`, extra: 'zuletzt: Just Chatting · 3. Mal bei uns', clip: null }),
+    (n) => ({ type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 }),
+    (n) => ({ type: 'alert', kind: 'cheer', user: names[n], title: 'Neuer Cheer!', message: '500 Bits', extra: 'Cheer500 für dich!' }),
+    (n) => ({ type: 'alert', kind: 'gift', user: names[n], title: 'Sub-Geschenk!', message: 'verschenkt 5 Sub(s)!' }),
+    (n) => ({ type: 'checkin', user: names[n], count: 100, streak: 12, milestone: true }),
+  ];
   let i = 0;
-  const show = () => {
-    const n = i % names.length;
-    if (i % 7 === 6) queue.push({ type: 'checkin', user: names[n], count: 100, streak: 12, milestone: true });
-    else if (i % 5 === 2) queue.push([{ type: 'alert', kind: 'follow', user: names[n] }, { type: 'alert', kind: 'gift', user: names[n], total: 5 }, { type: 'alert', kind: 'cheer', user: names[n], bits: 500, message: 'Cheer500 für dich!' }][i % 3]);
-    else if (i % 5 === 4) queue.push({ type: 'raid', raider: names[n], viewers: [12, 85, 240, 3][n], game: 'Just Chatting', raids: [1, 3, 12, 2][n], clip: null });
-    else queue.push(i % 2 === 0 ? { type: 'checkin', user: names[n], count: [7, 42, 128, 1032][n] } : { type: 'checkout', user: names[n], minutes: [134, 45, 7, 610][n], count: 7 });
-    i++; next();
-  };
+  const show = () => { enqueue(demos[i % demos.length](i % names.length)); i++; next(); };
   show(); setInterval(show, duration + 1500);
 } else {
   poll();

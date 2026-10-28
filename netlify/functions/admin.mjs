@@ -1,10 +1,11 @@
 // Admin-API (alles außer Login nur mit Session-Cookie)
 import { db } from '../lib/store.mjs';
-import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
-import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
-import { raiderPackage, raidVars, visitText } from '../lib/raid.mjs';
+import { getSettings, saveSettings, setImage, setSound } from '../lib/settings.mjs';
+import { fill, fmtDuration, pushOverlay, signText, streamDay } from '../lib/checkin.mjs';
+import { raiderPackage, raidVars, raidCard } from '../lib/raid.mjs';
 import { buildAlert } from '../lib/alerts.mjs';
 import { SLOTS, slotKey } from '../lib/sounds.mjs';
+import { IMAGE_MAX, IMAGE_SLOTS, imageKey, sniffImage } from '../lib/images.mjs';
 import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
 import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
@@ -150,14 +151,14 @@ export default async (req) => {
         const pkg = await raiderPackage(who.id, who.display_name, settings);
         const raids = ((await db.get(`raid/${who.id}`))?.count ?? 0) + 1; // so würde der nächste Raid gezählt, der Test ändert nichts
         if (body.target === 'raid-chat') await sendChat(fill(settings.raidTemplate, raidVars(pkg, viewers, raids)));
-        else await pushOverlay({ type: 'raid', raider: pkg.name, viewers, game: pkg.game, avatar: pkg.avatar, raids, clip: pkg.clip });
+        else await pushOverlay(raidCard(pkg, viewers, raids, settings));
         return json({ ok: true, clip: pkg.clip?.title ?? null });
       } else if (body.target === 'milestone' || body.target === 'milestone-chat') {
         const level = Math.max(1, Number(body.count) || 100);
         if (body.target === 'milestone') await pushOverlay({ type: 'checkin', user, count: level, streak: 12, milestone: true });
         else await sendChat(fill(settings.milestoneTemplate, { user, count: level, streak: 12, record: 15 }));
       } else if (body.target === 'rescue') {
-        await pushOverlay({ type: 'alert', kind: 'rescue', user, streak: 12, days: 2 });
+        await pushOverlay({ type: 'alert', kind: 'rescue', user, streak: 12, days: 2, ...signText(settings, 'rescue', { user, streak: 12, days: 2 }) });
       } else if (body.target === 'checkout-chat') {
         await sendChat(fill(settings.checkoutTemplate, { user, count, duration: fmtDuration(134) }));
       } else {
@@ -202,6 +203,26 @@ export default async (req) => {
       if (method === 'DELETE') {
         await db.delete(slotKey(slot));
         return json(await setSound(null, slot));
+      }
+    }
+
+    // ---- Bilder/GIFs für die Alert-Schilder (je Platz: follow, sub, ...)
+    if (route[0] === 'image') {
+      const slot = body.slot;
+      if (!IMAGE_SLOTS.includes(slot)) return json({ error: 'Unbekannter Bild-Platz' }, 400);
+      if (method === 'POST') {
+        const buf = Buffer.from(typeof body.data === 'string' ? body.data : '', 'base64');
+        if (!buf.length) return json({ error: 'Keine Datei empfangen' }, 400);
+        if (buf.length > IMAGE_MAX) return json({ error: 'Die Datei ist zu groß (maximal 3 MB)' }, 413);
+        const type = sniffImage(buf);
+        if (!type) return json({ error: 'Nur GIF-, PNG-, JPG- oder WebP-Dateien sind erlaubt' }, 400);
+        await db.set(imageKey(slot), { type, data: buf.toString('base64') });
+        const name = String(body.name || 'Eigenes Bild').replace(/[<>"]/g, '').slice(0, 80);
+        return json(await setImage({ name, version: Date.now() }, slot));
+      }
+      if (method === 'DELETE') {
+        await db.delete(imageKey(slot));
+        return json(await setImage(null, slot));
       }
     }
 

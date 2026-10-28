@@ -19,6 +19,9 @@ export function fmtDuration(minutes) {
 
 export const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
 
+// Titel und Nachricht eines Alert-Schilds aus den Einstellungen (kind: follow, sub, resub, gift, cheer, raid, rescue)
+export const signText = (settings, kind, vars) => ({ title: fill(settings[`${kind}Title`] ?? '', vars), message: fill(settings[`${kind}Message`] ?? '', vars) });
+
 // Overlay-Ereignis ablegen; das Overlay holt es beim nächsten Abruf. Alte Einträge werden gleich mit entsorgt.
 export async function pushOverlay(event) {
   const now = Date.now();
@@ -93,7 +96,7 @@ export async function handleRescue(redemption, settings, now = new Date()) {
   await db.set(`user/${user_id}`, user);
   const { current } = await streakFor(user_id, today, settings);
 
-  await pushOverlay({ type: 'alert', kind: 'rescue', user: user_name, streak: current, days: rescue.days.length });
+  await pushOverlay({ type: 'alert', kind: 'rescue', user: user_name, streak: current, days: rescue.days.length, ...signText(settings, 'rescue', { user: user_name, streak: current, days: rescue.days.length }) });
   if (settings.chatEnabled) await sendChat(fill(settings.rescueTemplate, { user: user_name, streak: current, days: rescue.days.length })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
   await setRedemptionStatus(id, reward.id, 'FULFILLED');
   return { ok: true, saved: rescue.days.length, streak: current };
