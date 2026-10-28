@@ -88,7 +88,7 @@ Im Holz-Look des Overlays, mit eigener Münze je Alert: **Follow**, **Sub/Resub*
 Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`: Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
 
 - **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
-- **Eigener Sound**: Im Admin unter *OBS-Overlay → Ton* hochladen (MP3, WAV oder OGG, höchstens 1,5 MB). Er gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Mit „Eingebauten Ton verwenden“ kommt wieder das Glockenspiel. Reihenfolge: hochgeladener Ton, dann `public/checkin.mp3` (falls vorhanden), dann das Glockenspiel.
+- **Töne pro Alert**: Im Admin unter *OBS-Overlay → Töne* hat jeder Alert (Check-in, Check-out, Meilenstein, Raid, Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) einen eigenen Platz für eine Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB). Sie gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Fehlt eine eigene Datei, spielt das Overlay einen eingebauten Klang, der je Alert anders klingt (Horn beim Raid, Münze bei Bits, Glitzern bei Gift-Subs …). Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Beim Check-in gilt die Reihenfolge: hochgeladener Ton, `public/checkin.mp3` (falls vorhanden), eingebauter Klang. Bereits hochgeladene Check-in-Töne bleiben erhalten.
 - **Look ansehen**: `/overlay?demo` zeigt alle paar Sekunden eine Beispielkarte, ohne dass ein Check-in nötig ist.
 
 ## Hinweise

@@ -76,24 +76,44 @@ let duration = Number(params.get('duration') ?? 5000);
 const pollMs = Math.max(1000, Number(params.get('poll') ?? 3000));
 
 // ---------- Ton ----------
-// Reihenfolge: im Admin hochgeladener Ton, dann public/checkin.mp3, dann das eingebaute Glockenspiel
-let staticSound = null, uploadedSound = null, uploadedUrl = null;
+// Jeder Alert hat einen Ton-Platz (checkin, raid, follow, ...). Reihenfolge je Platz: im Admin hochgeladener Ton,
+// dann der Ersatz-Platz (Check-out und Meilenstein nehmen den Check-in-Ton, Resub den Sub-Ton),
+// bei der Check-in-Familie zusätzlich public/checkin.mp3, zuletzt ein eingebauter Klang, der je Platz anders klingt.
+const FALLBACK = { checkout: 'checkin', milestone: 'checkin', resub: 'sub' };
+let staticSound = null;
+const uploaded = {}; // Platz -> { url, audio }
 fetch('/checkin.mp3', { method: 'HEAD' }).then((r) => {
   if (r.ok) { staticSound = new Audio('/checkin.mp3'); staticSound.volume = volume; }
 }).catch(() => {});
 
-function useUploadedSound(url) {
-  if (url === uploadedUrl) return;
-  uploadedUrl = url;
-  uploadedSound = url ? new Audio(url) : null;
-  if (uploadedSound) { uploadedSound.preload = 'auto'; uploadedSound.volume = volume; }
+function useUploadedSounds(map) {
+  for (const slot of Object.keys(uploaded)) if (!map[slot]) delete uploaded[slot];
+  for (const [slot, url] of Object.entries(map)) {
+    if (uploaded[slot]?.url === url) continue;
+    const audio = new Audio(url);
+    audio.preload = 'auto'; audio.volume = volume;
+    uploaded[slot] = { url, audio };
+  }
 }
-function setSoundVolume() { for (const a of [staticSound, uploadedSound]) if (a) a.volume = volume; }
+function setSoundVolume() { for (const a of [staticSound, ...Object.values(uploaded).map((u) => u.audio)]) if (a) a.volume = volume; }
 
-function playSound() {
-  const file = uploadedSound || staticSound;
-  if (file) { file.currentTime = 0; file.play().catch(() => playChime(volume)); return; }
-  playChime(volume);
+// Platz eines Ereignisses
+function slotFor(ev) {
+  if (ev.type === 'alert') return ev.kind;
+  if (ev.type === 'raid') return 'raid';
+  if (ev.type === 'checkout') return 'checkout';
+  return ev.milestone ? 'milestone' : 'checkin';
+}
+
+function playSound(slot = 'checkin') {
+  let file = null, inCheckinFamily = false;
+  for (let s = slot; s; s = FALLBACK[s]) {
+    if (uploaded[s]) { file = uploaded[s].audio; break; }
+    if (s === 'checkin') inCheckinFamily = true;
+  }
+  file ??= inCheckinFamily ? staticSound : null;
+  if (file) { file.currentTime = 0; file.play().catch(() => playChime(volume, slot)); return; }
+  playChime(volume, slot);
 }
 
 // ---------- Funken (warm, weich) ----------
@@ -179,9 +199,9 @@ async function showRaid(ev) {
       <div class="bar"><span style="animation-duration:${cardMs}ms"></span></div>
     </div>
   </div>`;
-  playSound();
+  playSound('raid');
   setTimeout(burst, cardMs * 0.14);
-  let total = cardMs;
+  const started = Date.now();
   if (clipMs) {
     await sleep(1500);
     const src = `https://clips.twitch.tv/embed?clip=${encodeURIComponent(ev.clip.id)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true&muted=false`;
@@ -191,9 +211,9 @@ async function showRaid(ev) {
     document.getElementById('clip')?.classList.add('out');
     await sleep(500);
     clipStage.innerHTML = '';
-    total = 1500 + clipMs + 2000;
   }
-  await sleep(Math.max(0, cardMs - total) + 300);
+  // Karte mindestens so lange stehen lassen, wie ihre Animation dauert (auch ohne Clip)
+  await sleep(Math.max(0, cardMs - (Date.now() - started)) + 300);
   stage.innerHTML = '';
 }
 
@@ -245,7 +265,7 @@ async function next() {
       <div class="bar"><span style="animation-duration:${dur}ms"></span></div>
     </div>
   </div>`;
-  playSound();
+  playSound(slotFor(ev));
   if (ev.milestone) { // Sonder-Feuerwerk: drei große Salven
     [0.14, 0.14 + 700 / dur, 0.14 + 1500 / dur].forEach((f) => setTimeout(() => burst(180), dur * f));
   } else setTimeout(burst, dur * 0.14); // Funken, wenn die Karte aufsetzt
@@ -265,7 +285,7 @@ async function poll() {
     cursor = data.cursor;
     if (data.volume != null && !params.has('volume')) volume = data.volume;
     if (data.duration != null && !params.has('duration')) duration = data.duration;
-    useUploadedSound(data.sound ?? null);
+    useUploadedSounds(data.sounds ?? {});
     setSoundVolume();
     for (const ev of data.events) if (['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) queue.push(ev);
     next();

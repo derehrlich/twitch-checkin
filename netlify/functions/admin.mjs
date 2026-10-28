@@ -4,6 +4,7 @@ import { getSettings, saveSettings, setSound } from '../lib/settings.mjs';
 import { fill, fmtDuration, pushOverlay, streamDay } from '../lib/checkin.mjs';
 import { raiderPackage, raidVars, visitText } from '../lib/raid.mjs';
 import { buildAlert } from '../lib/alerts.mjs';
+import { SLOTS, slotKey } from '../lib/sounds.mjs';
 import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { adminEnabled, checkPassword, cookie, hasSession, json, makeSession, text } from '../lib/http.mjs';
 import { ensureRewards, listSubscriptions, SCOPES, sendChat, siteUrl, subscribe, userByLogin } from '../lib/twitch.mjs';
@@ -184,21 +185,23 @@ export default async (req) => {
       }
     }
 
-    // ---- Eigener Ton
+    // ---- Eigene Töne (je Platz: checkin, raid, follow, ...; ohne Angabe der Check-in-Ton)
     if (route[0] === 'sound') {
+      const slot = body.slot ?? 'checkin';
+      if (!SLOTS.includes(slot)) return json({ error: 'Unbekannter Ton-Platz' }, 400);
       if (method === 'POST') {
         const buf = Buffer.from(typeof body.data === 'string' ? body.data : '', 'base64');
         if (!buf.length) return json({ error: 'Keine Datei empfangen' }, 400);
         if (buf.length > SOUND_MAX) return json({ error: 'Die Datei ist zu groß (maximal 1,5 MB)' }, 413);
         const type = sniffAudio(buf);
         if (!type) return json({ error: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' }, 400);
-        await db.set('sound/data', { type, data: buf.toString('base64') });
+        await db.set(slotKey(slot), { type, data: buf.toString('base64') });
         const name = String(body.name || 'Eigener Ton').replace(/[<>"]/g, '').slice(0, 80);
-        return json(await setSound({ name, version: Date.now() }));
+        return json(await setSound({ name, version: Date.now() }, slot));
       }
       if (method === 'DELETE') {
-        await db.delete('sound/data');
-        return json(await setSound(null));
+        await db.delete(slotKey(slot));
+        return json(await setSound(null, slot));
       }
     }
 

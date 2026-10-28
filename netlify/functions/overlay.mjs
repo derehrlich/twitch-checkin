@@ -3,6 +3,7 @@
 import { db } from '../lib/store.mjs';
 import { getSettings } from '../lib/settings.mjs';
 import { json } from '../lib/http.mjs';
+import { SLOTS } from '../lib/sounds.mjs';
 
 export const config = { path: '/api/overlay' };
 
@@ -15,6 +16,11 @@ export default async (req) => {
     volume: settings.volume,
     duration: settings.duration,
     sound: settings.soundVersion ? `/api/sound?v=${settings.soundVersion}` : null,
+    // Eigene Töne je Platz (Adresse nur, wenn hochgeladen)
+    sounds: Object.fromEntries(SLOTS.flatMap((slot) => {
+      const v = slot === 'checkin' ? settings.soundVersion : settings.sounds?.[slot]?.version;
+      return v ? [[slot, `/api/sound?slot=${slot}&v=${v}`]] : [];
+    })),
   };
 
   if (!since) return json({ cursor, events: [], ...view });

@@ -61,6 +61,7 @@ export const DEFAULTS = {
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
+  sounds: {}, // weitere Töne je Platz: { follow: { name, version }, ... }
 };
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -118,9 +119,17 @@ export async function saveSettings(input) {
   return next;
 }
 
-// Ton-Metadaten setzen, ohne die Eingabe-Bereinigung der normalen Einstellungen
-export async function setSound(meta) {
-  const next = { ...(await getSettings()), soundName: meta?.name ?? null, soundVersion: meta?.version ?? null };
+// Ton-Metadaten setzen, ohne die Eingabe-Bereinigung der normalen Einstellungen.
+// Der Check-in-Ton behält seine alten Felder, alle anderen Plätze liegen unter sounds.
+export async function setSound(meta, slot = 'checkin') {
+  const cur = await getSettings();
+  let next;
+  if (slot === 'checkin') next = { ...cur, soundName: meta?.name ?? null, soundVersion: meta?.version ?? null };
+  else {
+    const sounds = { ...(cur.sounds ?? {}) };
+    if (meta) sounds[slot] = { name: meta.name, version: meta.version }; else delete sounds[slot];
+    next = { ...cur, sounds };
+  }
   await db.set('config/settings', next);
   return next;
 }

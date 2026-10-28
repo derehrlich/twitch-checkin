@@ -135,18 +135,10 @@
       </div>
       <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
 
-      <h2 style="margin-top:26px">Ton</h2>
-      <p id="soundCurrent"></p>
-      <div class="row">
-        <div><label for="soundFile">Eigene Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB)</label>
-          <input id="soundFile" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
-        <button id="soundUpload">Hochladen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="soundPlay" class="ghost">▶ Anhören</button>
-        <button id="soundReset" class="ghost">Eingebauten Ton verwenden</button>
-      </div>
-      <p class="muted">Der neue Ton gilt im Overlay nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig. Die Lautstärke stellst du unter „Einstellungen“ ein.</p>
+      <h2 style="margin-top:26px">Töne</h2>
+      <p class="muted">Jeder Alert kann einen eigenen Ton haben (MP3, WAV oder OGG, höchstens 1,5 MB). Ohne eigene Datei spielt das Overlay einen eingebauten Klang, der je Alert anders klingt. Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton.</p>
+      <div id="soundRows"></div>
+      <p class="muted">Ein neuer Ton gilt im Overlay nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig. Die Lautstärke stellst du unter „Einstellungen“ ein.</p>
     </section>
 
     <section class="px-box">
@@ -341,42 +333,65 @@ const stats = (u) => { const t = timed(u); const total = t.reduce((a, x) => a + 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ---- Einstellungen
-// ---- Ton
+// ---- Töne (ein Platz je Alert)
+const SOUND_SLOTS = [
+  ['checkin', 'Check-in', 'eingebaut: aufsteigendes Glockenspiel'],
+  ['checkout', 'Check-out', 'sonst Check-in-Ton'],
+  ['milestone', 'Meilenstein', 'sonst Check-in-Ton'],
+  ['raid', 'Raid', 'eingebaut: Horn-Fanfare'],
+  ['follow', 'Follow', 'eingebaut: zwei sanfte Töne'],
+  ['sub', 'Sub / Prime', 'eingebaut: Dur-Akkord'],
+  ['resub', 'Resub', 'sonst Sub-Ton'],
+  ['gift', 'Gift-Subs', 'eingebaut: Glitzern'],
+  ['cheer', 'Bits', 'eingebaut: Münzklang'],
+  ['rescue', 'Streak-Rettung', 'eingebaut: heldenhafter Aufstieg'],
+];
+const soundMeta = (slot) => (slot === 'checkin' ? (settings.soundName ? { name: settings.soundName, version: settings.soundVersion } : null) : settings.sounds?.[slot] ?? null);
 function renderSound() {
-  $('soundCurrent').innerHTML = settings.soundName
-    ? `Aktuell: <b>${esc(settings.soundName)}</b> (eigene Datei)`
-    : 'Aktuell: <b>eingebautes Glockenspiel</b>';
-  $('soundReset').disabled = !settings.soundName;
+  $('soundRows').innerHTML = SOUND_SLOTS.map(([slot, label, hint]) => {
+    const m = soundMeta(slot);
+    return `<div class="row" style="margin-top:10px;align-items:end" data-slot="${slot}">
+      <div style="flex:0 0 150px"><b>${label}</b><br><span class="muted">${m ? esc(m.name) : esc(hint)}</span></div>
+      <div><input type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
+      <button data-act="up">Hochladen</button>
+      <button data-act="play" class="ghost">▶ Anhören</button>
+      <button data-act="reset" class="ghost" ${m ? '' : 'disabled'}>Zurücksetzen</button>
+    </div>`;
+  }).join('');
 }
 let preview = null;
-$('soundPlay').addEventListener('click', run(async () => {
-  const vol = Math.min(1, Math.max(0, Number($('volume').value) || 0));
-  preview?.pause();
-  if (settings.soundVersion) { preview = new Audio(`/api/sound?v=${settings.soundVersion}`); preview.volume = vol; await preview.play(); }
-  else playChime(vol);
-}));
-$('soundUpload').addEventListener('click', run(async () => {
-  const file = $('soundFile').files[0];
-  if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
-  if (file.size > 1_500_000) return toast('Die Datei ist zu groß (maximal 1,5 MB)', true);
-  $('soundUpload').disabled = true;
-  try {
-    const data = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result).split(',')[1]);
-      r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-      r.readAsDataURL(file);
-    });
-    settings = await api('POST', 'sound', { name: file.name, data });
-    $('soundFile').value = '';
-    renderSound();
-    toast('Ton hochgeladen ✓');
-  } finally { $('soundUpload').disabled = false; }
-}));
-$('soundReset').addEventListener('click', run(async () => {
-  if (!confirm('Eigenen Ton entfernen und wieder das eingebaute Glockenspiel verwenden?')) return;
-  settings = await api('DELETE', 'sound');
-  renderSound(); toast('Eingebauter Ton aktiv ✓');
+$('soundRows').addEventListener('click', run(async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const row = btn.closest('[data-slot]');
+  const slot = row.dataset.slot;
+  const m = soundMeta(slot);
+  if (btn.dataset.act === 'play') {
+    const vol = Math.min(1, Math.max(0, Number($('volume').value) || 0));
+    preview?.pause();
+    if (m) { preview = new Audio(`/api/sound?slot=${slot}&v=${m.version}`); preview.volume = vol; await preview.play(); }
+    else playChime(vol, slot);
+  } else if (btn.dataset.act === 'up') {
+    const file = row.querySelector('input[type=file]').files[0];
+    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
+    if (file.size > 1_500_000) return toast('Die Datei ist zu groß (maximal 1,5 MB)', true);
+    btn.disabled = true;
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1]);
+        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+        r.readAsDataURL(file);
+      });
+      settings = await api('POST', 'sound', { slot, name: file.name, data });
+      renderSound();
+      toast('Ton hochgeladen ✓');
+    } finally { btn.disabled = false; }
+  } else if (btn.dataset.act === 'reset') {
+    if (!confirm('Eigenen Ton entfernen und wieder den eingebauten Klang verwenden?')) return;
+    settings = await api('DELETE', 'sound', { slot });
+    renderSound(); toast('Eingebauter Ton aktiv ✓');
+  }
 }));
 
 const FIELDS = ['chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];

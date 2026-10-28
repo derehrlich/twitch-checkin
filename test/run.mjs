@@ -376,6 +376,32 @@ await test('Schreibende Admin-Aufrufe ohne JSON werden abgelehnt', async () => {
   assert.equal(res.status, 415);
 });
 
+// ---- Töne pro Alert
+await test('Töne pro Alert: Upload je Platz, Auslieferung, Overlay-Liste, Zurücksetzen, ungültiger Platz', async () => {
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVE'), Buffer.alloc(40)]);
+  const up = (slot, name) => admin(adminReq('POST', 'sound', { slot, name, data: wav.toString('base64') }, cookie));
+  assert.equal((await up('quatsch', 'x.wav')).status, 400);
+  const r = await (await up('follow', 'follow.wav')).json();
+  assert.equal(r.sounds.follow.name, 'follow.wav');
+  assert.equal(r.soundName, null, 'der Check-in-Ton bleibt unberührt');
+  await up('raid', 'horn.wav');
+  const poll = await (await overlay(new Request(BASE + '/api/overlay'))).json();
+  assert.deepEqual(Object.keys(poll.sounds).sort(), ['follow', 'raid']);
+  assert.match(poll.sounds.follow, /^\/api\/sound\?slot=follow&v=\d+$/);
+  assert.equal(poll.sound, null);
+  const served = await sound(new Request(BASE + poll.sounds.raid));
+  assert.equal(served.headers.get('content-type'), 'audio/wav');
+  assert.equal((await sound(new Request(BASE + '/api/sound?slot=cheer'))).status, 404, 'nichts hinterlegt');
+  assert.equal((await sound(new Request(BASE + '/api/sound?slot=quatsch'))).status, 404);
+  assert.equal((await admin(adminReq('PUT', 'settings', { volume: 0.5 }, cookie)).then((x) => x.json())).sounds.follow.name, 'follow.wav', 'Einstellungen speichern lässt die Töne unberührt');
+  const del = await (await admin(adminReq('DELETE', 'sound', { slot: 'follow' }, cookie))).json();
+  assert.equal(del.sounds.follow, undefined);
+  assert.equal(del.sounds.raid.name, 'horn.wav');
+  assert.equal((await sound(new Request(BASE + '/api/sound?slot=follow'))).status, 404);
+  await admin(adminReq('DELETE', 'sound', { slot: 'raid' }, cookie));
+  assert.deepEqual((await (await overlay(new Request(BASE + '/api/overlay'))).json()).sounds, {});
+});
+
 // ---- Raids
 const eventsSince = async (cur) => (await (await overlay(new Request(BASE + '/api/overlay?since=' + encodeURIComponent(cur)))).json()).events;
 const cursor = async () => (await (await overlay(new Request(BASE + '/api/overlay'))).json()).cursor;
