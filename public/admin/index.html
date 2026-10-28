@@ -6,67 +6,9 @@
 <meta name="robots" content="noindex">
 <title>Check-in Admin</title>
 <link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/admin/admin.css">
 <script src="/chime.js"></script>
-<style>
-  * { box-sizing: border-box; }
-  html { overflow-x: hidden; }
-  body { margin:0; color:var(--ink); font:16px/1.45 var(--font); overflow-x: clip; }
-  main { max-width: 940px; margin: 0 auto; padding: 78px 16px 56px; display: grid; gap: 26px; }
-
-  header.plaque { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:20px 34px 22px; }
-  header .titles { padding-left: 38px; }
-  header .titles small { display:block; font:700 14px var(--wordmark); letter-spacing:2px; color:#7a4a22; }
-  header h1 { margin:0; font-size:32px; font-weight:700; line-height:1.1; text-shadow:0 1px 0 rgba(255,236,200,.55); }
-  header .lantern { position:absolute; top:-72px; } header .lantern.l { left:-12px; } header .lantern.r { right:-12px; animation-delay:-1.4s; }
-  header .mascot { height:78px; margin:-14px 0; filter:drop-shadow(0 3px 3px rgba(10,5,2,.4)); }
-
-  section { padding: 26px 30px 28px; }
-  h2 { font-size: 22px; font-weight: 600; margin: 0 0 14px; padding-bottom: 9px; border-bottom: 2px solid rgba(138, 90, 40, .3); }
-  label { display:block; font-size:14px; font-weight:500; color:var(--ink-soft); margin: 12px 0 5px; }
-  input, textarea, select { width:100%; background:#fffaf0; color:var(--ink); border:2px solid #b8935f; border-radius:10px; padding:9px 12px; font:inherit; box-shadow: inset 0 2px 4px rgba(90, 56, 24, .16); }
-  textarea { min-height: 72px; resize: vertical; }
-  input:focus, textarea:focus { outline: none; border-color: var(--orange); box-shadow: inset 0 2px 4px rgba(90, 56, 24, .16), 0 0 0 3px rgba(240, 138, 36, .28); }
-  button:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
-  input[type=checkbox] { width:22px; height:22px; accent-color: #b8741c; box-shadow:none; }
-
-  button, .btn { background:linear-gradient(#ffd96a, #f0a428); color:var(--ink); border:2px solid #5a3410; border-radius:11px; padding:8px 18px; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block;
-    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -3px 0 rgba(150, 80, 10, .3), 0 3px 0 #5a3410, 0 6px 8px rgba(40, 20, 6, .25); }
-  button:hover, .btn:hover { filter: brightness(1.06); }
-  button:active, .btn:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .5), inset 0 -2px 0 rgba(150, 80, 10, .3), 0 1px 0 #5a3410; }
-  button.ghost, .btn.ghost { background:linear-gradient(#fff6e0, #ecd5a6); }
-  button.danger { background:linear-gradient(#ea6a54, #c23a28); color:#fff6e6; border-color:#5a1a10; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -3px 0 rgba(90, 20, 10, .35), 0 3px 0 #5a1a10, 0 6px 8px rgba(40, 20, 6, .25); }
-  button:disabled { opacity:.55; cursor: default; transform:none; }
-
-  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; } .row > * { flex:1 1 160px; } .row > button, .row > .btn { flex:0 0 auto; margin-bottom:4px; }
-  .grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px; }
-  .check { display:flex; gap:12px; align-items:center; padding:6px 0; }
-  .dot { width:16px; height:16px; border-radius:50%; flex:none; background:radial-gradient(circle at 35% 30%, #fff 0, var(--ink-soft) 70%); box-shadow:0 0 0 2px var(--ink), 0 1px 2px rgba(0,0,0,.3); }
-  .dot.ok { background:radial-gradient(circle at 35% 30%, #d9f7c8 0, var(--ok) 65%); } .dot.warn { background:radial-gradient(circle at 35% 30%, #ffe6c2 0, var(--warn) 65%); } .dot.bad { background:radial-gradient(circle at 35% 30%, #ffd2c8 0, var(--bad) 65%); }
-  .muted { color:var(--ink-soft); font-size:14px; } code { background:rgba(58,33,18,.1); border-radius:5px; padding:1px 6px; word-break:break-all; font-family: ui-monospace, Consolas, monospace; font-size:13px; }
-  .stats { display:flex; gap:30px; flex-wrap:wrap; } .stat b { font-size:36px; font-weight:700; display:block; line-height:1.1; }
-  table { width:100%; border-collapse: collapse; } th, td { text-align:left; padding:10px 8px; border-bottom:1px solid rgba(138, 90, 40, .25); } th { color:var(--ink-soft); font-weight:500; font-size:14px; }
-  tr.user { cursor:pointer; } tr.user:hover { background:rgba(214, 168, 90, .22); }
-  .days { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
-  .chip { background:var(--cream-deep); border:2px solid #b8935f; border-radius:999px; padding:1px 4px 1px 12px; font-size:14px; display:inline-flex; gap:6px; align-items:center; }
-  .chip button { background:none; border:0; box-shadow:none; padding:0 6px; color:var(--ink-soft); font-size:20px; line-height:1; border-radius:50%; }
-  .chip button:hover { color:var(--bad); filter:none; } .chip button:active { transform:none; box-shadow:none; }
-  .preview { background:rgba(255, 250, 240, .8); border:2px dashed #b8935f; border-radius:10px; padding:9px 12px; margin-top:8px; font-size:15px; }
-  details summary { cursor:pointer; }
-
-  /* Dunkles Panel wie im Streamplan: Overlay-Bereich */
-  section.navy { color:var(--cream); border:2px solid #150e26; border-radius:14px;
-    background: var(--paper), linear-gradient(to bottom, #35294f, #241b38);
-    box-shadow: inset 0 0 0 2px rgba(150, 130, 210, .22), inset 0 -10px 18px rgba(0, 0, 0, .28), 0 8px 18px rgba(10, 5, 2, .5); }
-  section.navy h2 { color:var(--teal); border-bottom-color: rgba(150, 130, 210, .3); }
-  section.navy label, section.navy .muted { color:#c9bfe6; }
-  section.navy code { background:rgba(255,255,255,.12); }
-
-  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--cream); border:2px solid #4a2c17; border-radius:12px; box-shadow:0 6px 16px rgba(10,5,2,.45); padding:11px 20px; opacity:0; pointer-events:none; max-width: 90vw; z-index:10; font-weight:500; }
-  #toast.show { opacity:1; } #toast.err { background:#ffd9cf; border-color:var(--bad); }
-  @media (max-width: 640px) { header .titles { padding-left: 34px; } header.plaque { padding: 20px 20px 22px; } header h1 { font-size: 26px; } section { padding: 24px 20px 26px; } header .mascot { display: none; } }
-  .hidden { display:none !important; }
-  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
-</style>
+<script type="module" src="/admin/js/main.js"></script>
 </head>
 <body class="wood">
 <main>
@@ -75,10 +17,10 @@
     <div class="titles"><small>EhrlichVerwirrt</small><h1>Check-in Admin</h1></div>
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <button id="logout" class="ghost hidden">Abmelden</button>
-      </header>
+  </header>
 
-  <!-- Login -->
-  <section id="login" class="px-box hidden">
+  <!-- Anmeldung -->
+  <section id="login" class="px-box card hidden">
     <h2>Anmelden</h2>
     <form id="loginForm" class="row">
       <div><label for="pw">Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password" required></div>
@@ -88,576 +30,173 @@
   </section>
 
   <div id="app" class="hidden" style="display:grid; gap:22px;">
-    <section class="px-box">
-      <h2>Status</h2>
-      <div id="checks"></div>
-      <div class="row" style="margin-top:12px">
-        <a class="btn ghost" href="/api/auth/login">Mit Twitch verbinden</a>
-        <button id="setup">Reward &amp; Webhook einrichten</button>
-      </div>
-      <p class="muted">Nach Änderung von Rewardname oder -preis in den Einstellungen: erneut „einrichten“ klicken.</p>
-      <details><summary class="muted">Technische Angaben</summary>
-        <p class="muted">Twitch OAuth Redirect URL: <code id="uRedirect"></code></p>
-        <p class="muted">Webhook: <code id="uWebhook"></code></p>
-      </details>
-    </section>
+    <nav id="tabs" class="tabs" role="tablist" aria-label="Bereiche">
+      <button data-tab="start" role="tab">Start</button>
+      <button data-tab="checkin" role="tab">Check-in &amp; Streak</button>
+      <button data-tab="alerts" role="tab">Alerts</button>
+      <button data-tab="raids" role="tab">Raids</button>
+      <button data-tab="soundboard" role="tab">Soundboard</button>
+      <button data-tab="medien" role="tab">Medien</button>
+      <button data-tab="besucher" role="tab">Besucher</button>
+      <button data-tab="tests" role="tab">Tests</button>
+      <button data-tab="allgemein" role="tab">Allgemein</button>
+    </nav>
 
-    <section class="navy">
-      <h2>OBS-Overlay</h2>
-      <p>Browser-Quelle in OBS mit dieser URL (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
-      <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
-      <div class="row" style="margin-top:12px">
-        <div><label for="testUser">Name für den Test</label><input id="testUser" value="TestUser"></div>
-        <div><label for="testCount">Besuch Nr.</label><input id="testCount" type="number" min="1" value="7"></div>
-        <button id="testOverlay" class="ghost">Overlay testen</button>
-        <button id="testChat" class="ghost">Chat testen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="testCheckout" class="ghost">Check-out im Overlay testen</button>
-        <button id="testCheckoutChat" class="ghost">Check-out im Chat testen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="testMilestone" class="ghost">Meilenstein im Overlay testen</button>
-        <button id="testMilestoneChat" class="ghost">Meilenstein im Chat testen</button>
-        <button id="testRescue" class="ghost">Streak-Rettung testen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="testAlertFollow" class="ghost">Follow testen</button>
-        <button id="testAlertSub" class="ghost">Sub testen</button>
-        <button id="testAlertResub" class="ghost">Resub testen</button>
-        <button id="testAlertGift" class="ghost">Gift-Subs testen</button>
-        <button id="testAlertCheer" class="ghost">Bits testen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <div><label for="testRaider">Raid-Test: Kanalname des Raiders</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
-        <button id="testRaid" class="ghost">Raid im Overlay testen</button>
-        <button id="testRaidChat" class="ghost">Raid im Chat testen</button>
-      </div>
-      <p class="muted">Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung.</p>
+    <div id="syncHint" class="banner hidden">
+      <span>⚠️ Die Änderungen betreffen Rewards oder Webhooks. Damit sie bei Twitch ankommen, jetzt abgleichen.</span>
+      <button class="js-sync">Jetzt abgleichen</button>
+    </div>
 
-      <h2 style="margin-top:26px">Töne</h2>
-      <p class="muted">Jeder Alert kann einen eigenen Ton haben (MP3, WAV oder OGG, höchstens 1,5 MB). Ohne eigene Datei spielt das Overlay einen eingebauten Klang, der je Alert anders klingt. Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton.</p>
-      <div id="soundRows"></div>
-      <h2 style="margin-top:26px">Bilder &amp; GIFs</h2>
-      <p class="muted">Ein großes Bild oder GIF schaut über dem Alert-Schild hervor (GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch mit transparentem Hintergrund, etwa 320 × 320). Ohne Bild sitzt das Lama auf dem Schild. Resub nimmt ohne eigenes Bild das Sub-Bild.</p>
-      <div id="imageRows"></div>
-      <p class="muted">Ein neuer Ton gilt im Overlay nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig. Die Lautstärke stellst du unter „Einstellungen“ ein.</p>
-    </section>
-
-    <section class="px-box">
-      <h2>Kanalpunkte-Soundboard</h2>
-      <p>Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit einer Sounddatei. Löst ein Zuschauer ihn ein, spielt das Overlay den Sound und zeigt kurz ein kleines Schild mit Name und Sound. Die Abklingzeit erzwingt Twitch selbst. Ein Eintrag ohne Sounddatei oder ohne Haken bei „Aktiv“ wird in Twitch ausgeschaltet.</p>
-      <div id="boardRows"></div>
-      <div class="row" style="margin-top:16px;align-items:end">
-        <div><label for="newBoardTitle">Neuer Eintrag: Name des Rewards</label><input id="newBoardTitle" maxlength="45" placeholder="z. B. Airhorn"></div>
-        <div style="flex:0 1 140px"><label for="newBoardCost">Preis (Kanalpunkte)</label><input id="newBoardCost" type="number" min="1" value="200"></div>
-        <button id="addBoard">Eintrag anlegen</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="syncBoard">Rewards mit Twitch abgleichen</button>
-      </div>
-      <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ auf „Rewards mit Twitch abgleichen“ klicken (das ist dasselbe wie „Reward &amp; Webhook einrichten“ oben). Höchstens 20 Einträge, Sounds bis 1,5 MB. Ein Ton wird nach spätestens 20 Sekunden beendet.</p>
-    </section>
-
-    <section class="px-box">
-      <h2>Einstellungen</h2>
-      <form id="settingsForm">
-        <label for="chatTemplate">Chatnachricht beim Check-in</label>
-        <textarea id="chatTemplate" maxlength="400"></textarea>
-        <div class="preview" id="preview1"></div>
-        <label for="duplicateTemplate">Nachricht, wenn schon eingecheckt (Punkte werden erstattet)</label>
-        <textarea id="duplicateTemplate" maxlength="400"></textarea>
-        <p class="muted">Platzhalter: <code>{user}</code> Name, <code>{count}</code> Anzahl der Besuche</p>
-
-        <h2 style="margin-top:22px">Check-out</h2>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="checkoutEnabled" type="checkbox"> Check-out aktivieren (zweiter Reward, speichert die Zeit im Stream)</label>
-        <div class="grid2">
-          <div><label for="checkoutRewardTitle">Reward-Name</label><input id="checkoutRewardTitle" maxlength="45"></div>
-          <div><label for="checkoutRewardCost">Preis (Kanalpunkte)</label><input id="checkoutRewardCost" type="number" min="1"></div>
+    <!-- Start -->
+    <div class="tab-panel" data-panel="start">
+      <section class="px-box card">
+        <h2>Status</h2>
+        <div id="checks"></div>
+        <div class="row" style="margin-top:12px">
+          <a class="btn ghost" href="/api/auth/login">Mit Twitch verbinden</a>
+          <button class="js-sync">Rewards &amp; Webhooks abgleichen</button>
         </div>
-        <label for="checkoutTemplate">Chatnachricht beim Check-out</label>
-        <textarea id="checkoutTemplate" maxlength="400"></textarea>
-        <div class="preview" id="preview2"></div>
-        <label for="checkoutDuplicateTemplate">Nachricht, wenn schon ausgecheckt (Punkte werden erstattet)</label>
-        <textarea id="checkoutDuplicateTemplate" maxlength="400"></textarea>
-        <label for="noCheckinTemplate">Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)</label>
-        <textarea id="noCheckinTemplate" maxlength="400"></textarea>
-        <p class="muted">Zusätzlicher Platzhalter: <code>{duration}</code> Dauer, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+        <p class="muted">Nach Änderungen an Reward-Namen, Preisen oder den Schaltern für Raids und Alerts die Rewards abgleichen. Die Seite weist dich darauf hin.</p>
+        <details><summary class="muted">Technische Angaben</summary>
+          <p class="muted">Twitch OAuth Redirect URL: <code id="uRedirect"></code></p>
+          <p class="muted">Webhook: <code id="uWebhook"></code></p>
+        </details>
+      </section>
+      <section class="px-box card">
+        <h2>Überblick</h2>
+        <div class="stats" id="startStats"></div>
+      </section>
+      <section class="px-box card">
+        <h2>OBS-Overlay</h2>
+        <p>Browser-Quelle in OBS mit dieser Adresse (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
+        <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
+        <p class="muted">Das Overlay lädt sich nach einem Update selbst neu, sobald gerade kein Alert läuft. Töne und Bilder gelten nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig.</p>
+      </section>
+    </div>
 
-        <h2 style="margin-top:22px">Meilensteine &amp; Streak</h2>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="milestoneEnabled" type="checkbox"> Meilensteine feiern (Sonder-Feuerwerk, eigene Karte und Chattext)</label>
-        <label for="milestoneLevels">Bei diesen Gesamtbesuchen (mit Komma getrennt)</label>
-        <input id="milestoneLevels" placeholder="10,25,50,100,250,500,1000">
-        <label for="milestoneTemplate">Chatnachricht beim Meilenstein</label>
-        <textarea id="milestoneTemplate" maxlength="400"></textarea>
-        <div class="grid2">
-          <div><label for="streakGrace">Schonfrist: so viele Streams darf man verpassen</label><input id="streakGrace" type="number" min="0" max="5"></div>
-        </div>
-        <p class="muted">Meilensteine zählen die <b>Gesamtbesuche</b> und gehen nie verloren. Die <b>Streak</b> zählt Stream-Tage in Folge (ein Stream-Tag ist ein Tag mit mindestens einem Check-in), der Rekord bleibt erhalten. Platzhalter überall: <code>{streak}</code> aktuelle Streak, <code>{record}</code> Rekord, im Check-in-Text nutzbar, z. B. „… Streak: {streak} 🔥“.</p>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="streakRescueEnabled" type="checkbox"> Streak-Retter aktivieren (dritter Kanalpunkte-Reward)</label>
-        <div class="grid2">
-          <div><label for="streakRewardTitle">Reward-Name</label><input id="streakRewardTitle" maxlength="45"></div>
-          <div><label for="streakRewardCost">Preis (Kanalpunkte)</label><input id="streakRewardCost" type="number" min="1"></div>
-          <div><label for="rescueMaxDays">Rettet höchstens so viele verpasste Streams</label><input id="rescueMaxDays" type="number" min="1" max="14"></div>
-        </div>
-        <label for="rescueTemplate">Chatnachricht bei erfolgreicher Rettung</label>
-        <textarea id="rescueTemplate" maxlength="400"></textarea>
-        <label for="rescueNotNeededTemplate">Nachricht, wenn die Streak nicht in Gefahr ist (Punkte werden erstattet)</label>
-        <textarea id="rescueNotNeededTemplate" maxlength="400"></textarea>
-        <label for="rescueTooLongTemplate">Nachricht, wenn die Lücke zu lang oder zu alt ist (Punkte werden erstattet)</label>
-        <textarea id="rescueTooLongTemplate" maxlength="400"></textarea>
-        <p class="muted">Platzhalter: <code>{user}</code> <code>{streak}</code> <code>{days}</code> Anzahl überbrückter Streams. Der Retter schließt nur die jüngste Lücke der letzten 7 Stream-Tage. Nach Änderungen an Name oder Preis oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+    <!-- Check-in & Streak -->
+    <div class="tab-panel hidden" data-panel="checkin">
+      <div class="banner"><span>Nach Änderungen an Reward-Namen oder Preisen die Rewards mit Twitch abgleichen.</span><button class="ghost js-sync">Rewards abgleichen</button></div>
+      <div data-schema="checkin" style="display:grid; gap:22px;"></div>
+    </div>
 
-        <h2 style="margin-top:22px">Raids</h2>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidEnabled" type="checkbox"> Auf eingehende Raids reagieren</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidShoutout" type="checkbox"> Offiziellen Twitch-Shoutout auslösen</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="raidClip" type="checkbox"> Zufälligen Clip des Raiders im Overlay abspielen</label>
-        <div class="grid2">
-          <div><label for="raidMinViewers">Ab wie vielen Raidern reagieren</label><input id="raidMinViewers" type="number" min="0"></div>
-          <div><label for="raidClipMaxSeconds">Clip höchstens (Sekunden)</label><input id="raidClipMaxSeconds" type="number" min="5" max="60"></div>
-        </div>
-        <label for="raidTemplate">Chatnachricht beim Raid</label>
-        <textarea id="raidTemplate" maxlength="400"></textarea>
-        <div class="preview" id="preview3"></div>
-        <p class="muted">Platzhalter: <code>{raider}</code> Name, <code>{viewers}</code> Zuschauer, <code>{game}</code> zuletzt gespieltes Spiel, <code>{url}</code> Kanallink, <code>{raids}</code> Anzahl der Raids dieses Kanals bei dir, <code>{visit}</code> fertiger Satzteil („zum ersten Mal bei uns“ / „schon zum 3. Mal bei uns“). Gezählt wird ab dem ersten empfangenen Raid, frühere lassen sich unten nachtragen. Nach dem Aktivieren oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken. Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleibt dann nur der Chattext und die Overlay-Karte.</p>
+    <!-- Alerts -->
+    <div class="tab-panel hidden" data-panel="alerts">
+      <div data-schema="alerts" style="display:grid; gap:22px;"></div>
+    </div>
 
-        <label for="raidSeedLogin">Frühere Raids nachtragen (Kanalname, bisherige Anzahl)</label>
+    <!-- Raids -->
+    <div class="tab-panel hidden" data-panel="raids">
+      <div data-schema="raids" style="display:grid; gap:22px;"></div>
+      <section class="px-box card">
+        <h2>Frühere Raids nachtragen</h2>
+        <p class="muted">Twitch liefert keinen Raid-Verlauf, der Bot zählt ab dem ersten empfangenen Raid. Hier trägst du den Stand früherer Raids ein, damit „schon zum 3. Mal bei uns“ stimmt.</p>
         <div class="row">
-          <input id="raidSeedLogin" placeholder="kanalname" style="max-width:220px"><input id="raidSeedCount" type="number" min="0" value="1" style="max-width:100px">
-          <button type="button" id="raidSeed" class="ghost">Eintragen</button>
+          <div><label for="raidSeedLogin">Kanalname</label><input id="raidSeedLogin" placeholder="kanalname"></div>
+          <div style="flex:0 1 160px"><label for="raidSeedCount">Bisherige Raids</label><input id="raidSeedCount" type="number" min="0" value="1"></div>
+          <button id="raidSeed" class="ghost">Eintragen</button>
         </div>
+      </section>
+    </div>
 
-        <h2 style="margin-top:22px">Alerts</h2>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertsEnabled" type="checkbox"> Alerts aktiv (Follow, Sub, Gift-Sub, Bits) – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertFollow" type="checkbox"> Follow</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertSub" type="checkbox"> Sub, Resub und Prime (Prime meldet Twitch als Stufe 1)</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertGift" type="checkbox"> Gift-Subs (ein Alert pro Paket)</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertCheer" type="checkbox"> Bits</label>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="alertChat" type="checkbox"> Zusätzlich Dankes-Nachricht im Chat</label>
-        <div class="grid2"><div><label for="alertCheerMin">Bits-Alert ab (Bits)</label><input id="alertCheerMin" type="number" min="1"></div></div>
-        <label for="followTemplate">Chat-Text Follow</label><textarea id="followTemplate" maxlength="400"></textarea>
-        <label for="subTemplate">Chat-Text Sub/Resub</label><textarea id="subTemplate" maxlength="400"></textarea>
-        <label for="giftTemplate">Chat-Text Gift-Sub</label><textarea id="giftTemplate" maxlength="400"></textarea>
-        <label for="cheerTemplate">Chat-Text Bits</label><textarea id="cheerTemplate" maxlength="400"></textarea>
-        <p class="muted">Platzhalter: <code>{user}</code> <code>{tier}</code> <code>{months}</code> <code>{total}</code> <code>{bits}</code>. Nach dem Ein- oder Ausschalten oben auf „Reward &amp; Webhook einrichten“ klicken.</p>
+    <!-- Soundboard -->
+    <div class="tab-panel hidden" data-panel="soundboard">
+      <section class="px-box card">
+        <h2>Kanalpunkte-Soundboard</h2>
+        <p>Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit einer Sounddatei. Löst ein Zuschauer ihn ein, spielt das Overlay den Sound und zeigt kurz ein kleines Schild mit Name und Sound. Die Abklingzeit erzwingt Twitch selbst. Ein Eintrag ohne Sounddatei oder ohne Haken bei „Aktiv“ wird in Twitch ausgeschaltet.</p>
+        <div id="boardRows"></div>
+        <div class="row" style="margin-top:18px">
+          <div><label for="newBoardTitle">Neuer Eintrag: Name des Rewards</label><input id="newBoardTitle" maxlength="45" placeholder="z. B. Airhorn"></div>
+          <div style="flex:0 1 160px"><label for="newBoardCost">Preis (Kanalpunkte)</label><input id="newBoardCost" type="number" min="1" value="200"></div>
+          <button id="addBoard">Eintrag anlegen</button>
+        </div>
+        <div class="row" style="margin-top:12px"><button class="js-sync">Rewards mit Twitch abgleichen</button></div>
+        <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ die Rewards abgleichen. Höchstens 20 Einträge, Sounds bis 1,5 MB, ein Ton endet nach spätestens 20 Sekunden.</p>
+      </section>
+      <div data-schema="soundboard" style="display:grid; gap:22px;"></div>
+    </div>
 
-        <h2 style="margin-top:22px">Soundboard</h2>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="soundboardChat" type="checkbox"> Bei einer Einlösung eine Nachricht im Chat schreiben</label>
-        <label for="soundboardTemplate">Chatnachricht</label>
-        <input id="soundboardTemplate" maxlength="200">
-        <p class="muted">Platzhalter: <code>{user}</code> Name, <code>{title}</code> Name des Eintrags.</p>
+    <!-- Medien -->
+    <div class="tab-panel hidden" data-panel="medien">
+      <section class="px-box card">
+        <h2>Töne</h2>
+        <p class="muted">Jeder Alert kann einen eigenen Ton haben (MP3, WAV oder OGG, höchstens 1,5 MB). Ohne eigene Datei spielt das Overlay einen eingebauten Klang, der je Alert anders klingt. Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Die Lautstärke stellst du unter „Allgemein“ ein.</p>
+        <div id="soundRows"></div>
+      </section>
+      <section class="px-box card">
+        <h2>Bilder und GIFs</h2>
+        <p class="muted">Ein großes Bild oder GIF schaut über dem Alert-Schild hervor (GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch mit transparentem Hintergrund, etwa 320 × 320). Ohne Bild sitzt das Lama auf dem Schild. Resub nimmt ohne eigenes Bild das Sub-Bild.</p>
+        <div id="imageRows"></div>
+      </section>
+    </div>
 
-        <h2 style="margin-top:22px">Alert-Schilder im Overlay</h2>
-        <p class="muted">So sehen die Schilder aus: oben ein Bild oder GIF (siehe „Bilder“ unten), darunter Titel, Name und Nachricht. Platzhalter: <code>{user}</code> <code>{tier}</code> (1 bis 3) <code>{months}</code> <code>{total}</code> <code>{bits}</code> <code>{viewers}</code> <code>{raids}</code> <code>{game}</code> <code>{streak}</code> <code>{days}</code>. Die Nachricht darf leer sein.</p>
+    <!-- Besucher -->
+    <div class="tab-panel hidden" data-panel="besucher">
+      <section class="px-box card">
+        <h2>Besucher</h2>
+        <div class="stats" id="stats"></div>
+        <div class="row" style="margin-top:12px">
+          <div><label for="search">Suchen</label><input id="search" type="search" placeholder="Name…"></div>
+          <div style="flex:0 1 190px"><label for="sort">Sortieren nach</label>
+            <select id="sort"><option value="count">Besuche</option><option value="total">Gesamtzeit</option><option value="avg">Ø Dauer</option><option value="name">Name</option></select></div>
+          <a class="btn ghost" href="/api/admin/export.csv">CSV-Export</a>
+        </div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Name</th><th>Besuche</th><th>Streak (Rekord)</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
+          <tbody id="users"></tbody>
+        </table></div>
+        <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
+          <h2 id="dName"></h2>
+          <div class="days" id="dDays"></div>
+          <div class="row">
+            <div><label for="addDay">Besuch nachtragen</label><input id="addDay" type="date"></div>
+            <button id="addDayBtn" class="ghost">Hinzufügen</button>
+            <button id="delUser" class="danger">Nutzer löschen</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Tests -->
+    <div class="tab-panel hidden" data-panel="tests">
+      <section class="px-box card">
+        <h2>Tests</h2>
+        <p class="muted">Schickt Beispiel-Ereignisse ans Overlay oder in den Chat. Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung. Soundboard-Einträge testest du im Reiter „Soundboard“.</p>
         <div class="grid2">
-          <div><label for="followTitle">Follow: Titel</label><input id="followTitle" maxlength="60"></div>
-          <div><label for="followMessage">Follow: Nachricht unter dem Namen</label><input id="followMessage" maxlength="120"></div>
-          <div><label for="subTitle">Sub / Prime: Titel</label><input id="subTitle" maxlength="60"></div>
-          <div><label for="subMessage">Sub / Prime: Nachricht unter dem Namen</label><input id="subMessage" maxlength="120"></div>
-          <div><label for="resubTitle">Resub: Titel</label><input id="resubTitle" maxlength="60"></div>
-          <div><label for="resubMessage">Resub: Nachricht unter dem Namen</label><input id="resubMessage" maxlength="120"></div>
-          <div><label for="giftTitle">Gift-Subs: Titel</label><input id="giftTitle" maxlength="60"></div>
-          <div><label for="giftMessage">Gift-Subs: Nachricht unter dem Namen</label><input id="giftMessage" maxlength="120"></div>
-          <div><label for="cheerTitle">Bits: Titel</label><input id="cheerTitle" maxlength="60"></div>
-          <div><label for="cheerMessage">Bits: Nachricht unter dem Namen</label><input id="cheerMessage" maxlength="120"></div>
-          <div><label for="raidTitle">Raid: Titel</label><input id="raidTitle" maxlength="60"></div>
-          <div><label for="raidMessage">Raid: Nachricht unter dem Namen</label><input id="raidMessage" maxlength="120"></div>
-          <div><label for="rescueTitle">Streak-Rettung: Titel</label><input id="rescueTitle" maxlength="60"></div>
-          <div><label for="rescueMessage">Streak-Rettung: Nachricht unter dem Namen</label><input id="rescueMessage" maxlength="120"></div>
-          <div><label for="alertDuration">Anzeigedauer Alerts (ms)</label><input id="alertDuration" type="number" min="2000" max="30000" step="500"></div>
-          <div><label for="raidDuration">Anzeigedauer Raid (ms)</label><input id="raidDuration" type="number" min="2000" max="30000" step="500"></div>
+          <div><label for="testUser">Name für den Test</label><input id="testUser" value="TestUser"></div>
+          <div><label for="testCount">Zahl (Besuch Nr., Monate, Bits ÷ 10, Raider, Meilenstein)</label><input id="testCount" type="number" min="1" value="7"></div>
         </div>
-        <p class="muted">Ist ein hochgeladener Ton länger als die Anzeigedauer, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 Sekunden). Warten mehrere Ereignisse, gilt die Reihenfolge: Raid, Sub, Cheer, Follow, danach Meilenstein, Check-in und Check-out.</p>
+        <div class="testgroup"><h3>Check-in und Check-out</h3><div class="row">
+          <button class="ghost" data-test="overlay">Check-in im Overlay</button><button class="ghost" data-test="chat">Check-in im Chat</button>
+          <button class="ghost" data-test="checkout">Check-out im Overlay</button><button class="ghost" data-test="checkout-chat">Check-out im Chat</button>
+        </div></div>
+        <div class="testgroup"><h3>Meilenstein und Streak</h3><div class="row">
+          <button class="ghost" data-test="milestone">Meilenstein im Overlay</button><button class="ghost" data-test="milestone-chat">Meilenstein im Chat</button>
+          <button class="ghost" data-test="rescue">Streak-Rettung</button>
+        </div></div>
+        <div class="testgroup"><h3>Alerts</h3><div class="row">
+          <button class="ghost" data-test="alert-follow">Follow</button><button class="ghost" data-test="alert-sub">Sub</button><button class="ghost" data-test="alert-resub">Resub</button>
+          <button class="ghost" data-test="alert-gift">Gift-Subs</button><button class="ghost" data-test="alert-cheer">Bits</button>
+        </div></div>
+        <div class="testgroup"><h3>Raid</h3><div class="row">
+          <div><label for="testRaider">Kanalname des Raiders (leer = dein Kanal)</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
+          <button class="ghost" data-test="raid">Raid im Overlay</button><button class="ghost" data-test="raid-chat">Raid im Chat</button>
+        </div></div>
+      </section>
+    </div>
 
-        <h2 style="margin-top:22px">Allgemein</h2>
-        <div class="grid2">
-          <div><label for="rewardTitle">Reward-Name</label><input id="rewardTitle" maxlength="45"></div>
-          <div><label for="rewardCost">Preis (Kanalpunkte)</label><input id="rewardCost" type="number" min="1"></div>
-          <div><label for="volume">Lautstärke (0 bis 1)</label><input id="volume" type="number" min="0" max="1" step="0.1"></div>
-          <div><label for="duration">Anzeigedauer (ms)</label><input id="duration" type="number" min="2000" max="30000" step="500"></div>
-          <div><label for="timezone">Zeitzone</label><input id="timezone"></div>
-          <div><label for="dayRolloverHour">Neuer Stream-Tag ab (Uhr)</label><input id="dayRolloverHour" type="number" min="0" max="23"></div>
-        </div>
-        <label class="check" style="font-size:16px;color:var(--ink)"><input id="chatEnabled" type="checkbox"> Chatnachrichten senden</label>
-        <button style="margin-top:8px">Speichern</button>
-      </form>
-    </section>
-
-    <section class="px-box">
-      <h2>Besucher</h2>
-      <div class="stats" id="stats"></div>
-      <div class="row" style="margin-top:12px">
-        <div><label for="search">Suchen</label><input id="search" type="search" placeholder="Name…"></div>
-        <div style="flex:0 1 190px"><label for="sort">Sortieren nach</label>
-          <select id="sort"><option value="count">Besuche</option><option value="total">Gesamtzeit</option><option value="avg">Ø Dauer</option><option value="name">Name</option></select></div>
-        <a class="btn ghost" href="/api/admin/export.csv">CSV-Export</a>
-      </div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Name</th><th>Besuche</th><th>Streak (Rekord)</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
-        <tbody id="users"></tbody>
-      </table></div>
-      <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
-        <h2 id="dName"></h2>
-        <div class="days" id="dDays"></div>
-        <div class="row">
-          <div><label for="addDay">Besuch nachtragen</label><input id="addDay" type="date"></div>
-          <button id="addDayBtn" class="ghost">Hinzufügen</button>
-          <button id="delUser" class="danger">Nutzer löschen</button>
-        </div>
-      </div>
-    </section>
+    <!-- Allgemein -->
+    <div class="tab-panel hidden" data-panel="allgemein">
+      <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
+    </div>
   </div>
 </main>
+
+<div id="savebar" class="savebar hidden">
+  <span>Ungespeicherte Änderungen</span>
+  <button id="discard" class="ghost">Verwerfen</button>
+  <button id="save">Speichern</button>
+</div>
 <div id="toast"></div>
-
-<script>
-const $ = (id) => document.getElementById(id);
-let users = [], selected = null, settings = {};
-
-function toast(msg, err = false) {
-  const t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
-  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), 3500);
-}
-
-async function api(method, path, body) {
-  const res = await fetch('/api/admin/' + path, {
-    method, headers: body !== undefined ? { 'content-type': 'application/json' } : (method === 'GET' ? {} : { 'content-type': 'application/json' }),
-    body: body !== undefined ? JSON.stringify(body) : (method === 'GET' ? undefined : '{}'),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path !== 'login') { showLogin(data.adminEnabled === false); throw new Error('Nicht angemeldet'); }
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
-}
-const run = (fn) => async (...a) => { try { await fn(...a); } catch (e) { if (e.message !== 'Nicht angemeldet') toast(e.message, true); } };
-
-function showLogin(disabled) {
-  $('login').classList.remove('hidden'); $('app').classList.add('hidden'); $('logout').classList.add('hidden');
-  $('loginHint').textContent = disabled ? 'Die Umgebungsvariable ADMIN_PASSWORD ist in Netlify noch nicht gesetzt.' : '';
-}
-
-// ---- Status
-function check(cls, text) { return `<div class="check"><span class="dot ${cls}"></span><span>${text}</span></div>`; }
-async function loadState() {
-  const s = await api('GET', 'state');
-  $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  const envOk = s.env.TWITCH_CLIENT_ID && s.env.TWITCH_CLIENT_SECRET && s.env.EVENTSUB_SECRET;
-  const missing = Object.entries(s.env).filter(([, v]) => !v).map(([k]) => k).join(', ');
-  const sub = s.subscription;
-  $('checks').innerHTML =
-    check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${missing}</b>`) +
-    check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
-    (s.missingScopes.length ? check('warn', `Es fehlen Twitch-Berechtigungen (${esc(s.missingScopes.join(', '))}) – bitte „Mit Twitch verbinden“ erneut klicken`) : '') +
-    check(s.rewardId ? 'ok' : 'warn', s.rewardId ? 'Check-in-Reward angelegt' : 'Reward noch nicht angelegt') +
-    (s.streakRescueEnabled ? check(s.streakRewardId ? 'ok' : 'warn', s.streakRewardId ? 'Streak-Retter-Reward angelegt' : 'Streak-Retter-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Streak-Retter ist ausgeschaltet')) +
-    (s.checkoutEnabled ? check(s.checkoutRewardId ? 'ok' : 'warn', s.checkoutRewardId ? 'Check-out-Reward angelegt' : 'Check-out-Reward noch nicht angelegt (bitte „einrichten“ klicken)') : check('', 'Check-out ist ausgeschaltet')) +
-    check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
-      s.revoked ? `Webhook widerrufen (${esc(s.revoked)}), bitte neu einrichten`
-      : sub === 'enabled' ? 'Webhook aktiv – Check-ins werden empfangen'
-      : sub ? `Webhook-Status: ${esc(sub)}` + (sub.includes('pending') ? ' (Twitch prüft gerade, kurz neu laden)' : '')
-      : s.subscriptionError ? `Webhook nicht abfragbar: ${esc(s.subscriptionError)}` : 'Webhook noch nicht eingerichtet');
-  $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay;
-  totals = s.totals; today = s.today; renderStats();
-}
-let totals = null, today = '';
-function renderStats() {
-  if (!totals) return;
-  const known = users.flatMap((u) => timed(u).map((x) => x.minutes));
-  const items = [[totals.users, 'Besucher gesamt'], [totals.today, `Heute (${today})`], [totals.checkins, 'Check-ins gesamt'],
-    [known.length ? fmtDuration(known.reduce((a, b) => a + b, 0) / known.length) : '–', 'Ø Dauer'],
-    [`${known.length} von ${totals.checkins}`, 'Besuche mit Check-out']];
-  $('stats').innerHTML = items.map(([v, l]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
-}
-// 134 -> "2 Std 14 Min"
-function fmtDuration(minutes) {
-  const m = Math.max(0, Math.round(minutes));
-  if (m < 60) return `${m} Min`;
-  return m % 60 ? `${Math.floor(m / 60)} Std ${m % 60} Min` : `${Math.floor(m / 60)} Std`;
-}
-const timed = (u) => Object.values(u.sessions ?? {}).filter((x) => x.minutes != null);
-const stats = (u) => { const t = timed(u); const total = t.reduce((a, x) => a + x.minutes, 0); return { total, avg: t.length ? total / t.length : 0, n: t.length }; };
-function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-
-// ---- Einstellungen
-// ---- Töne (ein Platz je Alert)
-const SOUND_SLOTS = [
-  ['checkin', 'Check-in', 'eingebaut: aufsteigendes Glockenspiel'],
-  ['checkout', 'Check-out', 'sonst Check-in-Ton'],
-  ['milestone', 'Meilenstein', 'sonst Check-in-Ton'],
-  ['raid', 'Raid', 'eingebaut: Horn-Fanfare'],
-  ['follow', 'Follow', 'eingebaut: zwei sanfte Töne'],
-  ['sub', 'Sub / Prime', 'eingebaut: Dur-Akkord'],
-  ['resub', 'Resub', 'sonst Sub-Ton'],
-  ['gift', 'Gift-Subs', 'eingebaut: Glitzern'],
-  ['cheer', 'Bits', 'eingebaut: Münzklang'],
-  ['rescue', 'Streak-Rettung', 'eingebaut: heldenhafter Aufstieg'],
-];
-const soundMeta = (slot) => (slot === 'checkin' ? (settings.soundName ? { name: settings.soundName, version: settings.soundVersion } : null) : settings.sounds?.[slot] ?? null);
-function renderSound() {
-  $('soundRows').innerHTML = SOUND_SLOTS.map(([slot, label, hint]) => {
-    const m = soundMeta(slot);
-    return `<div class="row" style="margin-top:10px;align-items:end" data-slot="${slot}">
-      <div style="flex:0 0 150px"><b>${label}</b><br><span class="muted">${m ? esc(m.name) : esc(hint)}</span></div>
-      <div><input type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
-      <button data-act="up">Hochladen</button>
-      <button data-act="play" class="ghost">▶ Anhören</button>
-      <button data-act="reset" class="ghost" ${m ? '' : 'disabled'}>Zurücksetzen</button>
-    </div>`;
-  }).join('');
-}
-// ---- Bilder/GIFs (ein Platz je Alert)
-const IMAGE_SLOTS = [['follow', 'Follow'], ['sub', 'Sub / Prime'], ['resub', 'Resub (sonst Sub-Bild)'], ['gift', 'Gift-Subs'], ['cheer', 'Bits'], ['raid', 'Raid'], ['rescue', 'Streak-Rettung']];
-function renderImages() {
-  $('imageRows').innerHTML = IMAGE_SLOTS.map(([slot, label]) => {
-    const m = settings.images?.[slot];
-    return `<div class="row" style="margin-top:10px;align-items:end" data-slot="${slot}">
-      <div style="flex:0 0 150px"><b>${label}</b><br><span class="muted">${m ? esc(m.name) : 'Lama'}</span></div>
-      ${m ? `<img src="/api/image?slot=${slot}&v=${m.version}" alt="" style="height:56px;width:56px;object-fit:contain;flex:none">` : ''}
-      <div><input type="file" accept="image/gif,image/png,image/jpeg,image/webp,.gif,.png,.jpg,.jpeg,.webp"></div>
-      <button data-act="up">Hochladen</button>
-      <button data-act="reset" class="ghost" ${m ? '' : 'disabled'}>Zurücksetzen</button>
-    </div>`;
-  }).join('');
-}
-$('imageRows').addEventListener('click', run(async (e) => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const row = btn.closest('[data-slot]');
-  const slot = row.dataset.slot;
-  if (btn.dataset.act === 'up') {
-    const file = row.querySelector('input[type=file]').files[0];
-    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
-    if (file.size > 3_000_000) return toast('Die Datei ist zu groß (maximal 3 MB)', true);
-    btn.disabled = true;
-    try {
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1]);
-        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-        r.readAsDataURL(file);
-      });
-      settings = await api('POST', 'image', { slot, name: file.name, data });
-      renderImages(); toast('Bild hochgeladen ✓');
-    } finally { btn.disabled = false; }
-  } else if (btn.dataset.act === 'reset') {
-    if (!confirm('Eigenes Bild entfernen und wieder das Lama zeigen?')) return;
-    settings = await api('DELETE', 'image', { slot });
-    renderImages(); toast('Lama aktiv ✓');
-  }
-}));
-
-let preview = null;
-$('soundRows').addEventListener('click', run(async (e) => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const row = btn.closest('[data-slot]');
-  const slot = row.dataset.slot;
-  const m = soundMeta(slot);
-  if (btn.dataset.act === 'play') {
-    const vol = Math.min(1, Math.max(0, Number($('volume').value) || 0));
-    preview?.pause();
-    if (m) { preview = new Audio(`/api/sound?slot=${slot}&v=${m.version}`); preview.volume = vol; await preview.play(); }
-    else playChime(vol, slot);
-  } else if (btn.dataset.act === 'up') {
-    const file = row.querySelector('input[type=file]').files[0];
-    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
-    if (file.size > 1_500_000) return toast('Die Datei ist zu groß (maximal 1,5 MB)', true);
-    btn.disabled = true;
-    try {
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1]);
-        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-        r.readAsDataURL(file);
-      });
-      settings = await api('POST', 'sound', { slot, name: file.name, data });
-      renderSound();
-      toast('Ton hochgeladen ✓');
-    } finally { btn.disabled = false; }
-  } else if (btn.dataset.act === 'reset') {
-    if (!confirm('Eigenen Ton entfernen und wieder den eingebauten Klang verwenden?')) return;
-    settings = await api('DELETE', 'sound', { slot });
-    renderSound(); toast('Eingebauter Ton aktiv ✓');
-  }
-}));
-
-const FIELDS = ['soundboardTemplate', 'followTitle', 'followMessage', 'subTitle', 'subMessage', 'resubTitle', 'resubMessage', 'giftTitle', 'giftMessage', 'cheerTitle', 'cheerMessage', 'raidTitle', 'raidMessage', 'rescueTitle', 'rescueMessage', 'alertDuration', 'raidDuration', 'chatTemplate', 'duplicateTemplate', 'rewardTitle', 'rewardCost', 'checkoutRewardTitle', 'checkoutRewardCost', 'checkoutTemplate', 'checkoutDuplicateTemplate', 'noCheckinTemplate', 'milestoneLevels', 'milestoneTemplate', 'streakGrace', 'streakRewardTitle', 'streakRewardCost', 'rescueMaxDays', 'rescueTemplate', 'rescueNotNeededTemplate', 'rescueTooLongTemplate', 'raidTemplate', 'raidMinViewers', 'followTemplate', 'subTemplate', 'giftTemplate', 'cheerTemplate', 'alertCheerMin', 'raidClipMaxSeconds', 'volume', 'duration', 'timezone', 'dayRolloverHour'];
-const CHECKS = ['soundboardChat', 'chatEnabled', 'checkoutEnabled', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat'];
-async function loadSettings() {
-  settings = await api('GET', 'settings');
-  for (const f of FIELDS) $(f).value = settings[f];
-  for (const c of CHECKS) $(c).checked = settings[c];
-  updatePreview();
-  renderSound();
-  renderImages();
-}
-const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? `{${k}}`);
-function updatePreview() {
-  $('preview1').textContent = 'Vorschau: ' + fill($('chatTemplate').value, { user: 'Max', count: 7 });
-  $('preview3').textContent = 'Vorschau: ' + fill($('raidTemplate').value, { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka', raids: 3, visit: 'schon zum 3. Mal bei uns' });
-  $('preview2').textContent = 'Vorschau: ' + fill($('checkoutTemplate').value, { user: 'Max', count: 7, duration: '2 Std 14 Min' });
-}
-$('raidTemplate').addEventListener('input', updatePreview);
-$('chatTemplate').addEventListener('input', updatePreview);
-$('checkoutTemplate').addEventListener('input', updatePreview);
-
-$('settingsForm').addEventListener('submit', run(async (e) => {
-  e.preventDefault();
-  const body = Object.fromEntries(CHECKS.map((c) => [c, $(c).checked]));
-  for (const f of FIELDS) body[f] = $(f).value;
-  settings = await api('PUT', 'settings', body);
-  for (const f of FIELDS) $(f).value = settings[f];
-  updatePreview();
-  toast('Gespeichert ✓');
-}));
-
-// ---- Aktionen
-$('setup').addEventListener('click', run(async () => {
-  $('setup').disabled = true;
-  try { const r = await api('POST', 'setup', {}); toast(`Reward „${r.reward}“${r.checkout ? `, „${r.checkout}“` : ''}${r.streak ? `, „${r.streak}“` : ''}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhook eingerichtet ✓`); await loadState(); await loadBoardEntries(); }
-  finally { $('setup').disabled = false; }
-}));
-$('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
-const testBody = (target) => ({ target, user: $('testUser').value, count: $('testCount').value });
-$('testOverlay').addEventListener('click', run(async () => { await api('POST', 'test', testBody('overlay')); toast('Overlay-Test gesendet (dauert bis ca. 3 s)'); }));
-$('testChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('chat')); toast('Testnachricht im Chat gesendet ✓'); }));
-$('testCheckout').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout')); toast('Check-out-Test gesendet (dauert bis ca. 3 s)'); }));
-$('testCheckoutChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('checkout-chat')); toast('Check-out-Nachricht im Chat gesendet ✓'); }));
-for (const k of ['Follow', 'Sub', 'Resub', 'Gift', 'Cheer']) {
-  $('testAlert' + k).addEventListener('click', run(async () => { await api('POST', 'test', testBody('alert-' + k.toLowerCase())); toast('Alert-Test gesendet (dauert bis ca. 3 s)'); }));
-}
-$('raidSeed').addEventListener('click', run(async () => {
-  const r = await api('POST', 'raids', { login: $('raidSeedLogin').value, count: $('raidSeedCount').value });
-  toast(`${r.name}: ${r.count} bisherige Raids gespeichert ✓`);
-}));
-$('testMilestone').addEventListener('click', run(async () => { await api('POST', 'test', testBody('milestone')); toast('Meilenstein-Test gesendet (dauert bis ca. 3 s) – „Besuch Nr.“ bestimmt die Zahl'); }));
-$('testMilestoneChat').addEventListener('click', run(async () => { await api('POST', 'test', testBody('milestone-chat')); toast('Meilenstein-Nachricht im Chat gesendet ✓'); }));
-$('testRescue').addEventListener('click', run(async () => { await api('POST', 'test', testBody('rescue')); toast('Streak-Rettung gesendet (dauert bis ca. 3 s)'); }));
-const raidBody = (target) => ({ target, raider: $('testRaider').value, count: $('testCount').value });
-$('testRaid').addEventListener('click', run(async () => { const r = await api('POST', 'test', raidBody('raid')); toast(r.clip ? `Raid-Test gesendet mit Clip „${r.clip}“ (dauert bis ca. 3 s)` : 'Raid-Test gesendet – es wurde kein passender Clip gefunden'); }));
-$('testRaidChat').addEventListener('click', run(async () => { await api('POST', 'test', raidBody('raid-chat')); toast('Raid-Nachricht im Chat gesendet ✓'); }));
-$('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
-$('loginForm').addEventListener('submit', run(async (e) => {
-  e.preventDefault();
-  await api('POST', 'login', { password: $('pw').value }); $('pw').value = '';
-  await init();
-}));
-
-// ---- Besucher
-const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE') : '–';
-async function loadUsers() { users = await api('GET', 'users'); renderUsers(); renderDetail(); renderStats(); }
-function renderUsers() {
-  const q = $('search').value.trim().toLowerCase();
-  const by = $('sort').value;
-  const key = { count: (u) => -u.count, total: (u) => -stats(u).total, avg: (u) => -stats(u).avg, name: (u) => u.name.toLowerCase() }[by];
-  const list = users.filter((u) => u.name.toLowerCase().includes(q)).sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0)).slice(0, 200);
-  $('users').innerHTML = list.map((u) => { const st = stats(u);
-    return `<tr class="user" data-id="${esc(u.id)}"><td>${esc(u.name)}</td><td>${u.count}</td><td>${u.streak ?? 0} (${u.record ?? 0})</td><td>${st.n ? fmtDuration(st.total) : '–'}</td><td>${st.n ? fmtDuration(st.avg) : '–'}</td><td>${fmtDate(u.last)}</td></tr>`; }).join('')
-    || '<tr><td colspan="5" class="muted">Noch keine Besucher.</td></tr>';
-}
-$('sort').addEventListener('change', renderUsers);
-$('search').addEventListener('input', renderUsers);
-$('users').addEventListener('click', (e) => { const tr = e.target.closest('tr.user'); if (tr) { selected = tr.dataset.id; renderDetail(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } });
-
-function renderDetail() {
-  const u = users.find((x) => x.id === selected);
-  $('detail').classList.toggle('hidden', !u);
-  if (!u) return;
-  const st = stats(u);
-  $('dName').textContent = `${u.name} – ${u.count} Besuche, Streak ${u.streak ?? 0} (Rekord ${u.record ?? 0})` + (st.n ? `, ${fmtDuration(st.total)} gesamt (Ø ${fmtDuration(st.avg)})` : '');
-  const label = (d) => { const x = u.sessions?.[d]; return x ? (x.minutes != null ? ` · ${fmtDuration(x.minutes)}` : ' · ohne Check-out') : ''; };
-  $('dDays').innerHTML = [...u.days].reverse().map((d) => `<span class="chip">${esc(d)}${label(d)}<button data-day="${esc(d)}" title="Besuch entfernen">×</button></span>`).join('');
-}
-$('dDays').addEventListener('click', run(async (e) => {
-  const day = e.target.dataset.day; if (!day || !confirm(`Besuch am ${day} entfernen?`)) return;
-  await api('DELETE', `users/${selected}/days/${day}`); await loadUsers(); await loadState();
-}));
-$('addDayBtn').addEventListener('click', run(async () => {
-  if (!$('addDay').value) return toast('Bitte ein Datum wählen', true);
-  await api('POST', `users/${selected}/days`, { day: $('addDay').value }); await loadUsers(); await loadState(); toast('Besuch nachgetragen ✓');
-}));
-$('delUser').addEventListener('click', run(async () => {
-  const u = users.find((x) => x.id === selected);
-  if (!confirm(`${u.name} mit allen ${u.count} Besuchen endgültig löschen?`)) return;
-  await api('DELETE', `users/${selected}`); selected = null; await loadUsers(); await loadState();
-}));
-
-// ---- Soundboard
-let boardEntries = [];
-async function loadBoardEntries() { boardEntries = await api('GET', 'soundboard'); renderBoard(); }
-function renderBoard() {
-  $('boardRows').innerHTML = boardEntries.length ? boardEntries.map((e) => `
-    <div data-id="${esc(e.id)}" style="border-top:3px dotted var(--plaque);padding-top:10px;margin-top:12px">
-      <div class="grid2">
-        <div><label>Name des Rewards</label><input data-f="title" maxlength="45" value="${esc(e.title)}"></div>
-        <div><label>Preis (Kanalpunkte)</label><input data-f="cost" type="number" min="1" value="${e.cost}"></div>
-        <div><label>Abklingzeit (Sekunden, 0 = keine)</label><input data-f="cooldown" type="number" min="0" max="86400" value="${e.cooldown}"></div>
-        <div><label>Lautstärke (0,1 bis 1)</label><input data-f="volume" type="number" min="0.1" max="1" step="0.1" value="${e.volume}"></div>
-      </div>
-      <label class="check" style="font-size:16px;color:var(--ink)"><input data-f="enabled" type="checkbox" ${e.enabled ? 'checked' : ''}> Aktiv (als Reward in Twitch verfügbar)</label>
-      <p class="muted" style="margin:4px 0">Ton: <b>${e.soundVersion ? esc(e.soundName) : 'noch keiner'}</b> · Reward: ${e.rewardId ? 'angelegt' : 'noch nicht angelegt'}</p>
-      <div class="row" style="align-items:end">
-        <div><input data-f="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
-        <button data-act="upload">Ton hochladen</button>
-        <button data-act="save">Speichern</button>
-        <button data-act="play" class="ghost" ${e.soundVersion ? '' : 'disabled'}>▶ Anhören</button>
-        <button data-act="test" class="ghost" ${e.soundVersion ? '' : 'disabled'}>Im Overlay testen</button>
-        <button data-act="del" class="danger">Löschen</button>
-      </div>
-    </div>`).join('') : '<p class="muted">Noch keine Einträge.</p>';
-}
-const boardFields = (row) => ({
-  title: row.querySelector('[data-f=title]').value, cost: row.querySelector('[data-f=cost]').value, cooldown: row.querySelector('[data-f=cooldown]').value,
-  volume: row.querySelector('[data-f=volume]').value, enabled: row.querySelector('[data-f=enabled]').checked,
-});
-$('addBoard').addEventListener('click', run(async () => {
-  await api('POST', 'soundboard', { title: $('newBoardTitle').value, cost: $('newBoardCost').value });
-  $('newBoardTitle').value = '';
-  await loadBoardEntries(); toast('Eintrag angelegt ✓ – jetzt einen Ton hochladen');
-}));
-$('syncBoard').addEventListener('click', () => $('setup').click());
-let boardPreview = null;
-$('boardRows').addEventListener('click', run(async (e) => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const row = btn.closest('[data-id]');
-  const id = row.dataset.id;
-  const entry = boardEntries.find((x) => x.id === id);
-  if (btn.dataset.act === 'save') {
-    await api('PUT', `soundboard/${id}`, boardFields(row));
-    await loadBoardEntries(); toast('Gespeichert ✓ – zum Übernehmen in Twitch „Rewards mit Twitch abgleichen“ klicken');
-  } else if (btn.dataset.act === 'upload') {
-    const file = row.querySelector('[data-f=file]').files[0];
-    if (!file) return toast('Bitte zuerst eine Datei auswählen', true);
-    if (file.size > 1_500_000) return toast('Die Datei ist zu groß (maximal 1,5 MB)', true);
-    btn.disabled = true;
-    try {
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1]);
-        r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-        r.readAsDataURL(file);
-      });
-      await api('POST', `soundboard/${id}/sound`, { name: file.name, data });
-      await loadBoardEntries(); toast('Ton hochgeladen ✓ – jetzt „Rewards mit Twitch abgleichen“ klicken');
-    } finally { btn.disabled = false; }
-  } else if (btn.dataset.act === 'play') {
-    boardPreview?.pause();
-    boardPreview = new Audio(`/api/soundboard?id=${id}&v=${entry.soundVersion}`);
-    boardPreview.volume = Math.min(1, Math.max(0, Number($('volume').value) || 0)) * (entry.volume || 1);
-    await boardPreview.play();
-  } else if (btn.dataset.act === 'test') {
-    await api('POST', 'test', { target: 'soundboard', id, user: $('testUser').value });
-    toast('Test gesendet (dauert bis ca. 3 s)');
-  } else if (btn.dataset.act === 'del') {
-    if (!confirm(`„${entry.title}“ samt Reward in Twitch löschen?`)) return;
-    await api('DELETE', `soundboard/${id}`);
-    await loadBoardEntries(); toast('Gelöscht ✓');
-  }
-}));
-
-async function init() { await loadState(); await Promise.all([loadSettings(), loadUsers(), loadBoardEntries()]); if (new URLSearchParams(location.search).has('verbunden')) { toast('Mit Twitch verbunden ✓ – jetzt „Reward & Webhook einrichten“ klicken'); history.replaceState(null, '', '/admin/'); } }
-init().catch(() => {});
-</script>
 </body>
 </html>

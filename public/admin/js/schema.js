@@ -1,0 +1,92 @@
+// Alle Einstellungsfelder an einer Stelle. Daraus entstehen die Formulare, die Liste der Felder beim Speichern
+// und die Vorschauen. Ein neues Feld braucht hier einen Eintrag, serverseitig steht es in netlify/lib/settings.mjs.
+const t = (id, label, attrs = {}) => ({ id, type: 'text', label, attrs });
+const n = (id, label, attrs = {}) => ({ id, type: 'number', label, attrs });
+const a = (id, label, preview) => ({ id, type: 'area', label, preview, attrs: { maxlength: 400 } });
+const c = (id, label) => ({ id, type: 'check', label });
+const code = (...names) => names.map((x) => `<code>{${x}}</code>`).join(' ');
+
+const SIGN = (kind, label) => [t(`${kind}Title`, `${label}: Titel`, { maxlength: 60 }), t(`${kind}Message`, `${label}: Nachricht unter dem Namen`, { maxlength: 120 })];
+const SIGN_HELP = `Platzhalter: ${code('user', 'tier', 'months', 'total', 'bits', 'viewers', 'raids', 'game', 'streak', 'days')}. Die Nachricht darf leer sein. Das Bild oder GIF über dem Schild lädst du unter „Medien“ hoch.`;
+
+export const SCHEMA = {
+  checkin: [
+    { title: 'Check-in', hint: `Platzhalter: ${code('user')} Name, ${code('count')} Besuche, ${code('streak')} aktuelle Streak, ${code('record')} Rekord. Nach Änderungen an Name oder Preis die Rewards abgleichen.`, items: [
+      t('rewardTitle', 'Reward-Name', { maxlength: 45 }), n('rewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
+      a('chatTemplate', 'Chatnachricht beim Check-in', { user: 'Max', count: 7, streak: 5, record: 9 }),
+      a('duplicateTemplate', 'Nachricht, wenn schon eingecheckt (Punkte werden erstattet)'),
+    ] },
+    { title: 'Check-out', hint: `Zusätzlicher Platzhalter: ${code('duration')}, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer.`, items: [
+      c('checkoutEnabled', 'Check-out aktivieren (zweiter Reward, speichert die Zeit im Stream)'),
+      t('checkoutRewardTitle', 'Reward-Name', { maxlength: 45 }), n('checkoutRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
+      a('checkoutTemplate', 'Chatnachricht beim Check-out', { user: 'Max', count: 7, duration: '2 Std 14 Min' }),
+      a('checkoutDuplicateTemplate', 'Nachricht, wenn schon ausgecheckt (Punkte werden erstattet)'),
+      a('noCheckinTemplate', 'Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)'),
+    ] },
+    { title: 'Meilensteine', hint: 'Meilensteine zählen die <b>Gesamtbesuche</b> und gehen nie verloren.', items: [
+      c('milestoneEnabled', 'Meilensteine feiern (Sonder-Feuerwerk, eigene Karte und Chattext)'),
+      t('milestoneLevels', 'Bei diesen Gesamtbesuchen (mit Komma getrennt)', { placeholder: '10,25,50,100,250,500,1000' }),
+      a('milestoneTemplate', 'Chatnachricht beim Meilenstein', { user: 'Max', count: 100, streak: 12, record: 15 }),
+    ] },
+    { title: 'Streak und Streak-Retter', hint: `Die <b>Streak</b> zählt Stream-Tage in Folge (ein Stream-Tag ist ein Tag mit mindestens einem Check-in), der Rekord bleibt erhalten. Der Retter schließt nur die jüngste Lücke der letzten 7 Stream-Tage. Platzhalter: ${code('user')} ${code('streak')} ${code('days')} überbrückte Streams.`, items: [
+      n('streakGrace', 'Schonfrist: so viele Streams darf man verpassen', { min: 0, max: 5 }),
+      c('streakRescueEnabled', 'Streak-Retter aktivieren (dritter Kanalpunkte-Reward)'),
+      t('streakRewardTitle', 'Reward-Name', { maxlength: 45 }), n('streakRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
+      n('rescueMaxDays', 'Rettet höchstens so viele verpasste Streams', { min: 1, max: 14 }),
+      a('rescueTemplate', 'Chatnachricht bei erfolgreicher Rettung'),
+      a('rescueNotNeededTemplate', 'Nachricht, wenn die Streak nicht in Gefahr ist (Punkte werden erstattet)'),
+      a('rescueTooLongTemplate', 'Nachricht, wenn die Lücke zu lang oder zu alt ist (Punkte werden erstattet)'),
+      ...SIGN('rescue', 'Streak-Rettung (Schild im Overlay)'),
+    ] },
+  ],
+
+  alerts: [
+    { title: 'Alerts', hint: 'Prime-Subs meldet Twitch als Stufe 1. Nach dem Ein- oder Ausschalten die Webhooks abgleichen (Start → „Rewards &amp; Webhooks abgleichen“).', items: [
+      c('alertsEnabled', 'Alerts aktiv – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt'),
+      c('alertFollow', 'Follow'), c('alertSub', 'Sub, Resub und Prime'), c('alertGift', 'Gift-Subs (ein Alert pro Paket)'), c('alertCheer', 'Bits'),
+      n('alertCheerMin', 'Bits-Alert ab (Bits)', { min: 1 }),
+      c('alertChat', 'Zusätzlich eine Dankes-Nachricht im Chat'),
+    ] },
+    { title: 'Chat-Dank', hint: `Platzhalter: ${code('user')} ${code('tier')} ${code('months')} ${code('total')} ${code('bits')}`, items: [
+      a('followTemplate', 'Follow'), a('subTemplate', 'Sub und Resub'), a('giftTemplate', 'Gift-Subs'), a('cheerTemplate', 'Bits'),
+    ] },
+    { title: 'Schilder im Overlay', hint: `Ist ein hochgeladener Ton länger als die Anzeigedauer, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 Sekunden). Warten mehrere Ereignisse, gilt die Reihenfolge: Raid, Sub, Cheer, Follow, danach Meilenstein, Check-in und Check-out. ${SIGN_HELP}`, items: [
+      ...SIGN('follow', 'Follow'), ...SIGN('sub', 'Sub / Prime'), ...SIGN('resub', 'Resub'), ...SIGN('gift', 'Gift-Subs'), ...SIGN('cheer', 'Bits'),
+      n('alertDuration', 'Anzeigedauer der Alert-Schilder (ms)', { min: 2000, max: 30000, step: 500 }),
+    ] },
+  ],
+
+  raids: [
+    { title: 'Raid-Reaktion', hint: 'Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleiben dann nur Chattext und Overlay-Karte. Nach dem Aktivieren oder Ausschalten die Webhooks abgleichen.', items: [
+      c('raidEnabled', 'Auf eingehende Raids reagieren'), c('raidShoutout', 'Offiziellen Twitch-Shoutout auslösen'), c('raidClip', 'Zufälligen Clip des Raiders im Overlay abspielen'),
+      n('raidMinViewers', 'Ab wie vielen Raidern reagieren', { min: 0 }), n('raidClipMaxSeconds', 'Clip höchstens (Sekunden)', { min: 5, max: 60 }),
+    ] },
+    { title: 'Chat und Schild', hint: `Platzhalter: ${code('raider')} Name, ${code('viewers')} Zuschauer, ${code('game')} zuletzt gespieltes Spiel, ${code('url')} Kanallink, ${code('raids')} Anzahl der Raids dieses Kanals bei dir, ${code('visit')} fertiger Satzteil („zum ersten Mal bei uns“ / „schon zum 3. Mal bei uns“). Für das Schild gilt ${code('user')} für den Raider.`, items: [
+      a('raidTemplate', 'Chatnachricht beim Raid', { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka', raids: 3, visit: 'schon zum 3. Mal bei uns' }),
+      ...SIGN('raid', 'Raid'), n('raidDuration', 'Anzeigedauer des Raid-Schilds (ms)', { min: 2000, max: 30000, step: 500 }),
+    ] },
+  ],
+
+  soundboard: [
+    { title: 'Chat beim Soundboard', hint: `Platzhalter: ${code('user')} Name, ${code('title')} Name des Eintrags.`, items: [
+      c('soundboardChat', 'Bei einer Einlösung eine Nachricht im Chat schreiben'),
+      t('soundboardTemplate', 'Chatnachricht', { maxlength: 200 }),
+    ] },
+  ],
+
+  allgemein: [
+    { title: 'Allgemein', hint: 'Der Stream-Tag wechselt zur eingestellten Uhrzeit, damit Streams nach Mitternacht nicht doppelt zählen.', items: [
+      n('volume', 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
+      n('duration', 'Anzeigedauer Check-in, Check-out und Meilenstein (ms)', { min: 2000, max: 30000, step: 500 }),
+      t('timezone', 'Zeitzone'), n('dayRolloverHour', 'Neuer Stream-Tag ab (Uhr)', { min: 0, max: 23 }),
+      c('chatEnabled', 'Chatnachrichten senden (ausgeschaltet schreibt der Bot gar nichts)'),
+    ] },
+  ],
+};
+
+const all = Object.values(SCHEMA).flat().flatMap((g) => g.items);
+export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
+export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
+
+// Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled'];
