@@ -6,6 +6,7 @@ import { initMedia, renderMedia } from './media.js';
 import { initSoundboard, loadBoard } from './soundboard.js';
 import { initVisitors, loadUsers } from './visitors.js';
 import { initTests } from './tests.js';
+import { initBackup } from './backup.js';
 
 const TABS = ['start', 'checkin', 'alerts', 'raids', 'soundboard', 'medien', 'besucher', 'tests', 'allgemein'];
 
@@ -32,7 +33,7 @@ async function init() {
 }
 
 renderForms();
-initSettings(); initStatus(); initMedia(); initSoundboard(); initVisitors(); initTests();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initVisitors(); initTests(); initBackup();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
