@@ -1,6 +1,6 @@
-# Twitch Kanalpunkte Check-in (Netlify)
+# Stadtwache – Twitch-Bot für Check-in, Streaks und Raids (Netlify)
 
-Zuschauer lösen einen Kanalpunkte-Reward ein und werden damit für den Stream eingecheckt. Der Bot läuft komplett auf Netlify und wird über den Browser verwaltet (`/admin/`).
+Die Stadtwache ist der Chatbot für deinen Kanal. Zuschauer lösen einen Kanalpunkte-Reward ein und werden damit für den Stream eingecheckt. Der Bot läuft komplett auf Netlify und wird über den Browser verwaltet (`/admin/`).
 
 Pro Check-in passiert Folgendes:
 - **Chatnachricht**, z. B. `✅ Max ist eingecheckt – du warst jetzt schon 7x dabei! 🎉`
