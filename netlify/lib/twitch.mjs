@@ -1,6 +1,6 @@
 import { db } from './store.mjs';
 
-export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read'];
+export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat'];
 
 export const siteUrl = (req) =>
   (process.env.SITE_URL || process.env.URL || (req ? new URL(req.url).origin : '')).replace(/\/$/, '');
@@ -156,6 +156,7 @@ export async function deleteReward(rewardId) {
 
 export const EVENT_TYPE = 'channel.channel_points_custom_reward_redemption.add';
 export const RAID_TYPE = 'channel.raid';
+export const CHAT_TYPE = 'channel.chat.message';
 // Alert-Ereignisse: Typ, Version und Bedingung (Follow braucht zusätzlich den Moderator)
 export const ALERT_TYPES = ['channel.follow', 'channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift', 'channel.cheer'];
 const alertCondition = (type, userId) => (type === 'channel.follow' ? { broadcaster_user_id: userId, moderator_user_id: userId } : { broadcaster_user_id: userId });
@@ -168,7 +169,7 @@ export async function listSubscriptions(webhookUrl) {
 
 // Eine Subscription pro Reward (so löst nicht jede fremde Einlösung im Kanal einen Aufruf aus),
 // dazu optional eine für eingehende Raids.
-export async function subscribe(webhookUrl, rewardIds, { raids = false, alerts = false } = {}) {
+export async function subscribe(webhookUrl, rewardIds, { raids = false, alerts = false, chat = false } = {}) {
   const { user_id } = await userToken();
   for (const sub of await listSubscriptions(webhookUrl)) {
     await helix('DELETE', 'eventsub/subscriptions', { as: 'app', query: { id: sub.id } });
@@ -179,6 +180,7 @@ export async function subscribe(webhookUrl, rewardIds, { raids = false, alerts =
   });
   for (const rewardId of rewardIds) await create(EVENT_TYPE, { broadcaster_user_id: user_id, reward_id: rewardId });
   if (raids) await create(RAID_TYPE, { to_broadcaster_user_id: user_id });
+  if (chat) await create(CHAT_TYPE, { broadcaster_user_id: user_id, user_id });
   if (alerts) for (const type of ALERT_TYPES) await helix('POST', 'eventsub/subscriptions', {
     as: 'app',
     body: { type, version: type === 'channel.follow' ? '2' : '1', condition: alertCondition(type, user_id), transport: { method: 'webhook', callback: webhookUrl, secret: process.env.EVENTSUB_SECRET } },

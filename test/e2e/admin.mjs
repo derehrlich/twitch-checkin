@@ -38,6 +38,7 @@ const fn = {
   admin: (await import(root + '/netlify/functions/admin.mjs')).default, overlay: (await import(root + '/netlify/functions/overlay.mjs')).default,
   sound: (await import(root + '/netlify/functions/sound.mjs')).default, image: (await import(root + '/netlify/functions/image.mjs')).default,
   soundboard: (await import(root + '/netlify/functions/soundboard.mjs')).default,
+  credits: (await import(root + '/netlify/functions/credits.mjs')).default, leaderboard: (await import(root + '/netlify/functions/leaderboard.mjs')).default,
 };
 await db.set('config/tokens', { access_token: 'a', refresh_token: 'r', expires_at: Date.now() + 3_600_000, user_id: '999', login: 'streamerin', scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read'] });
 await db.set('user/1', { name: 'Stammgast', count: 2, first: '2030-01-01T10:00:00Z', last: '2030-01-02T10:00:00Z', days: ['2030-01-01', '2030-01-02'], sessions: { '2030-01-01': { in: 'x', out: 'y', minutes: 90 } } });
@@ -45,14 +46,14 @@ await db.set('user/1', { name: 'Stammgast', count: 2, first: '2030-01-01T10:00:0
 const types = { css: 'text/css', js: 'text/javascript', html: 'text/html', png: 'image/png', woff2: 'font/woff2' };
 const srv = http.createServer(async (q, r) => {
   const u = new URL(q.url, 'http://localhost:8092');
-  const route = { '/api/overlay': fn.overlay, '/api/sound': fn.sound, '/api/image': fn.image, '/api/soundboard': fn.soundboard };
+  const route = { '/api/overlay': fn.overlay, '/api/sound': fn.sound, '/api/image': fn.image, '/api/soundboard': fn.soundboard, '/api/credits': fn.credits, '/api/leaderboard': fn.leaderboard };
   const handler = u.pathname.startsWith('/api/admin/') ? fn.admin : route[u.pathname];
   if (handler) {
     const chunks = []; for await (const c of q) chunks.push(c);
     const res = await handler(new Request(u, { method: q.method, headers: q.headers, body: ['GET', 'HEAD'].includes(q.method) ? undefined : Buffer.concat(chunks) }));
     r.writeHead(res.status, Object.fromEntries(res.headers)); return r.end(Buffer.from(await res.arrayBuffer()));
   }
-  let p = u.pathname === '/' ? '/admin/' : u.pathname; if (p.endsWith('/')) p += 'index.html';
+  let p = u.pathname === '/' ? '/admin/' : ['/abspann', '/rangliste', '/overlay'].includes(u.pathname) ? u.pathname + '.html' : u.pathname; if (p.endsWith('/')) p += 'index.html'; // /abspann und Co. wie die Weiterleitungen in netlify.toml
   fs.readFile(path.join(root, 'public', p), (e, d) => { if (e) { r.statusCode = 404; return r.end(); } r.setHeader('content-type', types[p.split('.').pop()] ?? 'application/octet-stream'); r.end(d); });
 }).listen(8092);
 
@@ -70,7 +71,7 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button').count(), 9);
+assert.equal(await page.locator('.tabs button').count(), 10);
 const visiblePanels = async () => page.locator('.tab-panel:visible').evaluateAll((els) => els.map((e) => e.dataset.panel));
 assert.deepEqual(await visiblePanels(), ['start']);
 await page.waitForFunction(() => document.querySelectorAll('#checks .check').length >= 5);
@@ -157,6 +158,21 @@ await page.fill('#raidBulk', 'raiderin 4\nzweite 2'); await page.click('#raidBul
 await page.waitForFunction(() => document.getElementById('raidList').innerText.includes('Nachgetragen'));
 assert.match(await page.locator('#raidList').innerText(), /4/); assert.match(await page.locator('#raidBulkInfo').innerText(), /eingetragen/);
 await page.click('#raidList tr[data-name]'); assert.notEqual(await page.inputValue('#raidSeedLogin'), ''); ok('Raids: Übersicht und mehrere Kanäle auf einmal eintragen');
+
+// Chat & Abspann: Einstellungen speichern, Seiten laden
+await page.click('.tabs button[data-tab="abspann"]'); await page.waitForSelector('#streakCommand:visible');
+assert.equal(await page.inputValue('#streakCommand'), '!streak'); assert.equal(await page.locator('#creditsEnabled').isChecked(), true);
+await page.fill('#topCommand', '!bestenliste'); await page.fill('#creditsTitle', 'Bis bald!'); await page.click('#save');
+await page.waitForFunction(() => document.getElementById('toast').innerText.includes('Gespeichert'));
+assert.match(await page.locator('#boardUrl').innerText(), /\/rangliste$/);
+const abs = await b.newPage({ viewport: { width: 1280, height: 900 } }); const absErrs = []; abs.on('pageerror', (e) => absErrs.push(e.message));
+await abs.goto('http://localhost:8092/abspann?demo'); await abs.waitForSelector('#roll h1');
+assert.equal(await abs.locator('#roll h1').innerText(), 'Danke fürs Zuschauen!');
+await abs.goto('http://localhost:8092/abspann'); await abs.waitForSelector('#roll h1');
+assert.equal(await abs.locator('#roll h1').innerText(), 'Bis bald!', 'Überschrift kommt aus den Einstellungen');
+await abs.goto('http://localhost:8092/rangliste'); await abs.waitForSelector('#grid section');
+assert.equal(await abs.locator('#grid section').count(), 5); assert.deepEqual(absErrs, []);
+await abs.close(); ok('Chat & Abspann: Einstellungen, Abspann und Rangliste laden');
 
 // 9. Abmelden
 await page.click('#logout'); await page.waitForSelector('#login:visible'); ok('Abmelden zeigt wieder die Anmeldung');

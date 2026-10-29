@@ -105,6 +105,9 @@ await test('Admin: ohne Login 401, falsches Passwort 401, richtiges Passwort lie
   assert.equal((await admin(adminReq('GET', 'state', null, cookie.slice(0, -3) + 'xxx'))).status, 401, 'manipulierte Session muss abgelehnt werden');
 });
 
+// Abspann und Chat-Befehle haben eigene Tests weiter unten; die älteren Tests rechnen ohne ihre zusätzlichen Webhooks
+await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false, chatStats: false }, cookie));
+
 await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', async () => {
   assert.equal((await auth(new Request(BASE + '/api/auth/login'))).status, 401, 'ohne Admin-Session gesperrt');
   const login = await auth(new Request(BASE + '/api/auth/login', { headers: { cookie } }));
@@ -144,7 +147,7 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
   assert.ok((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes.includes('moderator:manage:shoutouts'), 'Tokens ohne scopes');
-  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read'] });
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat'] });
   assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
@@ -815,6 +818,150 @@ await test('Soundboard: ausgeschalteter Eintrag wird in Twitch deaktiviert, Einl
   assert.ok(calls.slice(before).some((c) => c.method === 'DELETE' && c.path.endsWith('/custom_rewards') && c.query.id === air.rewardId), 'Reward in Twitch gelöscht');
   assert.equal(await db.get(`soundboard/${air.id}`), null);
   assert.equal((await board(new Request(BASE + `/api/soundboard?id=${air.id}`))).status, 404);
+});
+
+// ---- Chat-Befehle, Abspann, Rangliste
+const credits = (await import('../netlify/functions/credits.mjs')).default;
+const leaderboard = (await import('../netlify/functions/leaderboard.mjs')).default;
+const day0 = streamDay(await getSettings());
+let chatN = 0;
+const chatMsg = async (text, id = 'c1', name = 'Chatty') => {
+  const before = chats().length;
+  const ev = { subscription: { type: 'channel.chat.message' }, event: { broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: 'msg-' + chatN, message: { text } } };
+  assert.equal((await webhook(signed('notification', ev, { id: 'chat-' + chatN++ }))).status, 204);
+  return chats().slice(before);
+};
+
+await test('Setup abonniert Chat, Follows, Subs, Bits und Raids auch bei ausgeschalteten Alerts, sobald Abspann oder Befehle laufen', async () => {
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: true, chatCommands: true, alertsEnabled: false, raidEnabled: false }, cookie));
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 200);
+  const created = calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions')).slice(-10);
+  assert.deepEqual(created.find((c) => c.body.type === 'channel.chat.message').body.condition, { broadcaster_user_id: '999', user_id: '999' });
+  for (const t of ['channel.follow', 'channel.subscribe', 'channel.subscription.gift', 'channel.cheer', 'channel.raid']) assert.ok(created.some((c) => c.body.type === t), t);
+  assert.equal(subs.length, 10);
+  await admin(adminReq('PUT', 'settings', { raidEnabled: true }, cookie));
+});
+
+await test('Chat: Chatter werden einmal pro Tag gemerkt, normale Nachrichten bleiben unbeantwortet', async () => {
+  assert.deepEqual(await chatMsg('Hallo zusammen'), []);
+  await chatMsg('noch eine');
+  await chatMsg('hi', 'c2', 'Zweiter');
+  assert.deepEqual((await db.list(`chatter/${day0}/`)).sort(), [`chatter/${day0}/c1`, `chatter/${day0}/c2`]);
+});
+
+await test('Chat: !streak antwortet mit Besuchen, Streak, Zeit und Platz; unbekannte Nutzer bekommen einen Hinweis', async () => {
+  await admin(adminReq('PUT', 'settings', { commandCooldown: 0 }, cookie));
+  assert.match((await chatMsg('!streak'))[0], /Chatty, ich habe noch keinen Check-in von dir|Chatty: /);
+  await db.set('user/c1', { name: 'Chatty', count: 3, first: 'x', last: 'x', days: [day0], sessions: { [day0]: { in: 'a', out: 'b', minutes: 134 } } });
+  const [reply] = await chatMsg('!STREAK');
+  assert.match(reply, /^📊 Chatty: 3 Besuche · 🔥 Streak \d+ \(Rekord \d+\) · 2 Std 14 Min im Stream · Platz \d+ von \d+$/);
+  assert.deepEqual(await chatMsg('!unbekannt'), []);
+});
+
+await test('Chat: !top listet die meisten Besuche, Abklingzeit und Doppelzustellung verhindern Spam', async () => {
+  await db.set('user/c9', { name: 'Spitze', count: 999, first: 'x', last: 'x', days: [] });
+  const [top] = await chatMsg('!top');
+  assert.match(top, /^🏆 Top 5 Stammgäste: 1\. Spitze \(999\) · 2\./);
+  await admin(adminReq('PUT', 'settings', { commandCooldown: 60 }, cookie));
+  await db.delete('cooldown/!top');
+  assert.equal((await chatMsg('!top')).length, 1);
+  assert.equal((await chatMsg('!top')).length, 0, 'innerhalb der Abklingzeit keine zweite Antwort');
+  const dup = { subscription: { type: 'channel.chat.message' }, event: { chatter_user_id: 'c1', chatter_user_name: 'Chatty', message_id: 'doppelt', message: { text: '!streak' } } };
+  await webhook(signed('notification', dup, { id: 'dup-1' }));
+  const before = chats().length;
+  await webhook(signed('notification', dup, { id: 'dup-2' }));
+  assert.equal(chats().length, before, 'dieselbe Nachricht wird nur einmal beantwortet');
+  await admin(adminReq('PUT', 'settings', { commandCooldown: 0, chatEnabled: false }, cookie));
+  assert.deepEqual(await chatMsg('!top'), [], 'bei ausgeschaltetem Chat schweigt der Bot');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, commandCooldown: 10 }, cookie));
+});
+
+await test('Abspann: sammelt Follows, Subs, Gifts, Bits und Raids auch ohne Alerts, ignoriert Bots und Anonyme', async () => {
+  const cur = await cursor();
+  const send = async (type, event) => assert.equal((await webhook(signed('notification', alertEvent(type, event), { id: 'cr-' + chatN++ }))).status, 204);
+  await send('channel.follow', { user_name: 'Anna' });
+  await send('channel.follow', { user_name: 'Bernd' });
+  await send('channel.subscribe', { user_name: 'Cora', tier: '1000', is_gift: false });
+  await send('channel.subscription.message', { user_name: 'Dirk', tier: '1000', cumulative_months: 12 });
+  await send('channel.subscription.gift', { user_name: 'Emil', total: 5, tier: '1000' });
+  await send('channel.subscription.gift', { user_name: null, is_anonymous: true, total: 10, tier: '1000' });
+  await send('channel.cheer', { user_name: 'Fritz', bits: 100 });
+  await send('channel.cheer', { user_name: 'Fritz', bits: 250 });
+  await webhook(signed('notification', { subscription: { type: 'channel.raid' }, event: { from_broadcaster_user_id: '55', from_broadcaster_user_name: 'Gerda', viewers: 42 } }, { id: 'cr-raid' }));
+  await chatMsg('moin', 'bot1', 'Nightbot');
+  assert.deepEqual((await eventsSince(cur)).filter((e) => e.type === 'alert'), [], 'Alerts sind aus, es erscheint nichts im Overlay');
+
+  const res = await credits(new Request(BASE + '/api/credits'));
+  const data = await res.json();
+  const sec = Object.fromEntries(data.sections.map((x) => [x.key, x.lines]));
+  assert.equal(data.day, day0);
+  assert.deepEqual(sec.chatters, ['Chatty', 'Zweiter'], 'Nightbot steht nicht im Abspann');
+  assert.deepEqual(sec.follows, ['Anna', 'Bernd']);
+  assert.deepEqual(sec.subs, ['Cora', 'Dirk (12 Monate)']);
+  assert.deepEqual(sec.gifts, ['Emil (5)'], 'anonyme Geschenke werden nicht genannt');
+  assert.deepEqual(sec.bits, ['Fritz (350)']);
+  assert.deepEqual(sec.raids, ['Gerda (42)']);
+
+  await admin(adminReq('PUT', 'settings', { creditsBits: false, creditsRaids: false }, cookie));
+  const slim = Object.fromEntries((await (await credits(new Request(BASE + '/api/credits'))).json()).sections.map((x) => [x.key, 1]));
+  assert.ok(!slim.bits && !slim.raids && slim.follows, 'abgeschaltete Abschnitte fehlen');
+  assert.deepEqual((await (await credits(new Request(BASE + '/api/credits?day=2001-01-01'))).json()).sections, [], 'anderer Tag ist leer');
+  await admin(adminReq('PUT', 'settings', { creditsBits: true, creditsRaids: true }, cookie));
+});
+
+await test('Abspann: ohne Einschalten wird nichts gesammelt', async () => {
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: false }, cookie)); // chatStats ist hier noch aus
+  const before = (await db.list(`log/${day0}/`)).length;
+  await webhook(signed('notification', alertEvent('channel.follow', { user_name: 'Heimlich' }), { id: 'cr-off' }));
+  await chatMsg('hallo', 'c3', 'Nochjemand');
+  assert.equal((await db.list(`log/${day0}/`)).length, before);
+  assert.equal(await db.get(`chatter/${day0}/c3`), null);
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: true }, cookie));
+});
+
+await test('Chat-Zähler: Nachrichten und Chat-Tage je Person, ohne Bots und Kanalinhaber, nur wenn eingeschaltet', async () => {
+  await chatMsg('vorher', 'c7', 'Vorher');
+  assert.equal(await db.get('chatuser/c7'), null, 'ausgeschaltet zählt nichts');
+  await admin(adminReq('PUT', 'settings', { chatStats: true }, cookie));
+  await chatMsg('eins', 'c7', 'Vielschreiber'); await chatMsg('zwei', 'c7', 'Vielschreiber'); await chatMsg('drei', 'c7', 'Vielschreiber');
+  await chatMsg('hi', 'c8', 'Wenigschreiber');
+  await chatMsg('bot', 'bot1', 'Nightbot');
+  await chatMsg('ich selbst', '999', 'Streamerin');
+  assert.deepEqual(await db.get('chatuser/c7'), { name: 'Vielschreiber', messages: 3, days: 1, lastDay: day0 }, 'drei Nachrichten, aber nur ein Chat-Tag');
+  assert.deepEqual(await db.get('chatuser/c8'), { name: 'Wenigschreiber', messages: 1, days: 1, lastDay: day0 });
+  assert.equal(await db.get('chatuser/bot1'), null, 'Bots zählen nicht');
+  assert.equal(await db.get('chatuser/999'), null, 'der Kanalinhaber zählt nicht');
+  // Chat-Webhook wird auch dann abonniert, wenn nur die Zählung läuft
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false }, cookie));
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.ok(subs.some((x) => x.condition.user_id === '999' && x.condition.broadcaster_user_id === '999'), 'channel.chat.message abonniert');
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: true, chatCommands: true }, cookie));
+});
+
+await test('Rangliste: öffentlich nur mit Namen und Zahlen, abschaltbar', async () => {
+  const res = await leaderboard(new Request(BASE + '/api/leaderboard'));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.visits[0].name, 'Spitze'); assert.equal(data.visits[0].value, 999);
+  assert.ok(data.visits.length <= 10 && data.streaks.every((x) => x.value > 0));
+  assert.deepEqual(Object.keys(data.visits[0]).sort(), ['name', 'value'], 'keine IDs oder Tage nach außen');
+  assert.deepEqual(data.chatters, [{ name: 'Vielschreiber', value: 3 }, { name: 'Wenigschreiber', value: 1 }], 'Chatter nach Nachrichten');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*', 'die Panel-Extension darf die Zahlen laden');
+  await admin(adminReq('PUT', 'settings', { leaderboardPublic: false }, cookie));
+  assert.equal((await leaderboard(new Request(BASE + '/api/leaderboard'))).status, 404);
+  await admin(adminReq('PUT', 'settings', { leaderboardPublic: true }, cookie));
+  await db.delete('user/c9'); await db.delete('user/c1');
+});
+
+await test('Panel-Extension: Zip enthält Seite, Skript mit eingesetzter Adresse und die Schrift', async () => {
+  const { buildExtension } = await import('../scripts/build-extension.mjs');
+  const zip = buildExtension('https://meine-seite.de/');
+  assert.equal(zip.readUInt32LE(0), 0x04034b50, 'beginnt mit einem Zip-Header');
+  for (const name of ['panel.html', 'panel.css', 'panel.js', 'fonts/fredoka-latin-400-normal.woff2', 'fonts/OFL-Fredoka.txt']) assert.ok(zip.includes(Buffer.from(name)), name);
+  assert.throws(() => buildExtension('http://unsicher.de'), /https/);
+  assert.throws(() => buildExtension('https://seite.de/pfad'), /https/);
+  const js = fs.readFileSync(new URL('../extension/panel.js', import.meta.url), 'utf8');
+  assert.ok(js.includes("'__SITE_URL__/api/leaderboard'"), 'Platzhalter im Quelltext');
 });
 
 await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und lehnt Fremddateien ab', async () => {

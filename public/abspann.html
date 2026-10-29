@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Abspann</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Abspann als eigene OBS-Szene (1920×1080): Holz-Hintergrund wie die Alert-Schilder, die Namen laufen von unten nach oben durch.
+     ?transparent  ohne Hintergrund (z. B. über dem Spielbild)   ?speed=70 (Pixel pro Sekunde)   ?day=2026-10-29   ?demo  Beispieldaten */
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font); color: #fff3da; }
+  body { background-color: #724C31; background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px), repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px); }
+  body.transparent { background: transparent; }
+  #viewport { position: fixed; inset: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%); }
+  #roll { position: absolute; left: 50%; top: 0; width: min(900px, 92vw); transform: translate(-50%, 100vh); text-align: center; will-change: transform; padding-bottom: 0; }
+  .head img { height: 170px; filter: drop-shadow(0 6px 6px rgba(10, 5, 2, .55)); }
+  h1 { margin: 10px 0 0; font: 700 64px/1.1 var(--wordmark); letter-spacing: 3px; color: #ffd45e; text-shadow: 3px 3px 0 rgba(0, 0, 0, .5); }
+  .day { margin-top: 8px; font-size: 24px; letter-spacing: 3px; text-transform: uppercase; color: #ecd9b6; opacity: .85; }
+  section { margin-top: 110px; }
+  h2 { margin: 0 0 26px; font: 700 40px/1.1 var(--wordmark); letter-spacing: 3px; text-transform: uppercase; color: #ffd45e; text-shadow: 2px 2px 0 rgba(0, 0, 0, .5); }
+  h2 small { display: block; margin-top: 6px; font: 500 20px var(--font); letter-spacing: 2px; color: #ecd9b6; }
+  .names { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 40px; }
+  .names span { font-size: 34px; font-weight: 600; text-shadow: 2px 2px 0 rgba(0, 0, 0, .5); }
+  .names.big span { display: block; flex: 0 0 100%; font-size: 40px; font-weight: 700; }
+  .outro { margin-top: 150px; font: 700 54px/1.2 var(--wordmark); color: #fff3da; text-shadow: 3px 3px 0 rgba(0, 0, 0, .5); }
+  .empty { margin-top: 90px; font-size: 32px; font-weight: 500; color: #ecd9b6; }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="roll"></div></div>
+<script>
+const params = new URLSearchParams(location.search);
+if (params.has('transparent')) document.body.classList.add('transparent');
+const roll = document.getElementById('roll');
+
+const DEMO = {
+  day: new Date().toISOString().slice(0, 10), title: 'Danke fürs Zuschauen!', outro: 'Bis zum nächsten Mal! 💜', speed: 70,
+  sections: [
+    { key: 'chatters', title: 'Chatter', lines: ['Anna', 'Bernd', 'Cora', 'Dirk', 'Emil', 'Fritz', 'Gerda', 'Hanna', 'Ingo', 'Jule', 'Kai', 'Lena'] },
+    { key: 'follows', title: 'Neue Follower', lines: ['Mia', 'Noah', 'Olga'] },
+    { key: 'subs', title: 'Abonnenten', lines: ['Cora', 'Dirk (12 Monate)'] },
+    { key: 'gifts', title: 'Sub-Geschenke', lines: ['Emil (5)'] },
+    { key: 'bits', title: 'Bits', lines: ['Fritz (350)'] },
+    { key: 'raids', title: 'Raids', lines: ['Gerda (42)'] },
+  ],
+};
+const BIG = new Set(['gifts', 'bits', 'raids', 'subs']); // eine Zeile pro Eintrag, weil Zahlen dabeistehen
+
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function build(data) {
+  roll.replaceChildren();
+  const head = el('div', 'head');
+  const lama = el('img'); lama.src = '/img/lama.png'; lama.alt = ''; lama.onerror = () => lama.remove();
+  head.append(lama, el('h1', '', data.title), el('div', 'day', new Date(data.day + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })));
+  roll.append(head);
+  if (!data.sections.length) roll.append(el('div', 'empty', 'Heute gibt es noch keine Einträge.'));
+  for (const s of data.sections) {
+    const sec = el('section');
+    const h = el('h2', '', s.title);
+    if (s.key === 'chatters') h.append(el('small', '', `${s.lines.length} ${s.lines.length === 1 ? 'Person' : 'Leute'}`));
+    const names = el('div', BIG.has(s.key) ? 'names big' : 'names');
+    for (const line of s.lines) names.append(el('span', '', line));
+    sec.append(h, names);
+    roll.append(sec);
+  }
+  const outro = el('div', 'outro', data.outro);
+  roll.append(outro);
+  return outro;
+}
+
+function play(data) {
+  const outro = build(data);
+  const speed = Math.max(20, Number(params.get('speed')) || data.speed || 70);
+  const vh = innerHeight;
+  // Start: Titel unterhalb des Bildes. Ende: die Schlusszeile steht in der Bildmitte.
+  const endY = vh / 2 - (outro.offsetTop + outro.offsetHeight / 2);
+  const startY = vh;
+  let y = startY, last = null;
+  const step = (t) => {
+    last ??= t;
+    y = Math.max(endY, y - ((t - last) / 1000) * speed); last = t;
+    roll.style.transform = `translate(-50%, ${y}px)`;
+    if (y > endY) requestAnimationFrame(step);
+  };
+  roll.style.transform = `translate(-50%, ${startY}px)`;
+  requestAnimationFrame(step);
+}
+
+(async () => {
+  try {
+    if (params.has('demo')) return play(DEMO);
+    const res = await fetch('/api/credits' + (params.get('day') ? `?day=${encodeURIComponent(params.get('day'))}` : ''), { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    await document.fonts.ready;
+    play(await res.json());
+  } catch (e) {
+    roll.textContent = 'Der Abspann konnte nicht geladen werden.';
+    roll.style.transform = 'translate(-50%, 45vh)';
+  }
+})();
+</script>
+</body>
+</html>

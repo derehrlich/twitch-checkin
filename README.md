@@ -109,6 +109,7 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Check-in & Streak** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter mit Namen, Preisen und Chattexten |
 | **Alerts** | Follow, Sub, Gift-Subs, Bits: Schalter, Chat-Dank, Schilder (Titel, Nachricht, Dauer) |
 | **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, Übersicht erfasster Raids, früher erhaltene Raids nachtragen (auch mehrere auf einmal) |
+| **Chat & Abspann** | Chat-Befehle `!streak` und `!top`, Abspann-Einstellungen, Rangliste, Links zu Abspann und Rangliste |
 | **Soundboard** | Einträge mit Reward, Abklingzeit, Lautstärke und Ton; Chat-Nachricht |
 | **Medien** | Töne und Bilder/GIFs je Alert |
 | **Besucher** | Suche, Sortierung, Besuchstage mit Dauer, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export |
@@ -123,13 +124,26 @@ Im Admin unter *Allgemein → Backup & Wiederherstellen* lädst du eine Sicherun
 
 Vorbereitende Infos für CasaOS (Erreichbarkeit für Twitch, Umzug, offene Punkte) stehen in [`docs/casaos.md`](docs/casaos.md).
 
+## Chat-Befehle, Abspann und Rangliste
+
+Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch verbinden** (neue Berechtigung `user:read:chat`) und danach **Rewards & Webhooks abgleichen**, damit der Chat-Webhook (`channel.chat.message`) angelegt wird.
+
+- **`!streak`** antwortet dem Zuschauer mit Besuchen, Streak (Rekord), Gesamtzeit im Stream und Platz in der Rangliste. **`!top`** nennt die Besten nach Besuchen. Befehle, Texte, Anzahl der Plätze und die Abklingzeit (gilt je Befehl für den ganzen Chat, Standard 10 s) sind einstellbar. Bei ausgeschaltetem Chat (*Allgemein*) schweigt der Bot.
+- **Abspann** (`/abspann`): Der Bot merkt sich pro Stream-Tag, wer geschrieben (**Chatter**), gefolgt, abonniert (inkl. Resub-Monate), Subs verschenkt, Bits geschickt oder geraidet hat – **auch bei ausgeschalteten Alerts**. Die Namen laufen als Scrolltext durch, am Ende bleibt die Schlusszeile stehen. In OBS legst du dafür eine eigene Szene „Stream-Ende“ an (Browserquelle 1920×1080 auf `https://DEINE-SEITE.netlify.app/abspann`, „Browser aktualisieren, wenn Szene aktiv wird“ einschalten). Bots (Nightbot & Co.) und dein eigener Name werden ausgelassen, die Liste lässt sich ändern. Ohne Hintergrund: `?transparent`, anderes Tempo: `?speed=100`, früherer Stream-Tag: `?day=2026-10-28`, Vorschau mit Beispieldaten: `?demo`.
+  Der Abspann läuft bewusst als Szene und nicht als Alert: Twitch meldet „Stream beendet“ erst, wenn dein Encoder schon aus ist, die Zuschauer sähen die Karte dann nicht mehr.
+- **Rangliste** (`/rangliste`): öffentliche Seite mit **Anwesenden** (Besuche), **Chattern** (Nachrichten), aktueller Streak, Streak-Rekord und Zeit im Stream (nur Namen und Zahlen, einmal pro Minute zwischengespeichert, abschaltbar). Die Chat-Zählung beginnt beim Einschalten von *Chat-Nachrichten zählen*, dein Name und Bots zählen nicht. Als OBS-Browserquelle geht `/rangliste?overlay` (transparent, ohne Kopf).
+- **Twitch-Panel:** Normale Panels zeigen nur ein festes Bild mit Link. Sofort geht ein Panel mit **Link** auf `/rangliste`. Live im Panel zeigt die **Panel-Extension** (`extension/`, fertiges Zip unter `/stadtwache-panel.zip`) die Plätze in drei Reitern (Anwesende, Chatter, Streaks). Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Anleitung: [`docs/twitch-panel.md`](docs/twitch-panel.md). Bei eigener Adresse: `npm run build:extension -- https://deine-adresse.de`.
+- **Kosten:** Jede Chatnachricht ist ein Function-Aufruf auf Netlify. Bei sehr aktivem Chat steigt der Verbrauch deutlich. Wer das nicht möchte, schaltet *Chat-Befehle*, *Abspann* und *Chat-Nachrichten zählen* aus und gleicht die Webhooks ab, dann wird der Chat-Webhook wieder entfernt.
+
 ## Projektaufbau
 
 ```
-netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, twitch-webhook
-netlify/lib/         Logik: checkin, streak, raid, alerts, soundboard, settings, twitch, store, http …
+netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, credits, leaderboard, twitch-webhook
+netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, settings, twitch, store, http …
 netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
+public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste
+extension/           Twitch-Panel-Extension (Quelltext), scripts/build-extension.mjs baut daraus public/stadtwache-panel.zip
 public/admin/        Admin-Oberfläche: index.html (Gerüst), admin.css, js/ (ein Skript je Bereich)
 test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)
 test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optional, braucht Playwright)

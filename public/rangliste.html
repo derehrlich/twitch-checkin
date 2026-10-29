@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stadtwache Rangliste</title>
+<meta name="description" content="Die treuesten Zuschauer: Besuche, Streaks und Zeit im Stream.">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Öffentliche Rangliste, z. B. als Link in einem Twitch-Panel. ?overlay  transparent und ohne Kopf (für eine OBS-Browserquelle) */
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; color: var(--ink); font: 16px/1.4 var(--font);
+    background-color: #724C31; background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px), repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px); }
+  body.overlay { background: transparent; overflow: hidden; }
+  main { max-width: 1000px; margin: 0 auto; padding: 70px 16px 40px; display: grid; gap: 22px; }
+  body.overlay main { padding: 16px; max-width: none; }
+  header.plaque { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 32px 20px; }
+  header .titles { padding-left: 34px; }
+  header small { display: block; font: 700 14px var(--wordmark); letter-spacing: 2px; color: #7a4a22; }
+  header h1 { margin: 0; font-size: 32px; line-height: 1.1; text-shadow: 0 1px 0 rgba(255, 236, 200, .55); }
+  header .lantern { position: absolute; top: -72px; } header .lantern.l { left: -12px; } header .lantern.r { right: -12px; animation-delay: -1.4s; }
+  header img.mascot { height: 76px; margin: -14px 0; filter: drop-shadow(0 3px 3px rgba(10, 5, 2, .4)); }
+  body.overlay header { display: none; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 22px; }
+  @media (max-width: 440px) { .grid { grid-template-columns: 1fr; } }
+  section.card { padding: 22px 26px 24px; }
+  h2 { margin: 0 0 10px; font-size: 21px; font-weight: 600; padding-bottom: 8px; border-bottom: 2px solid rgba(138, 90, 40, .3); }
+  ol { list-style: none; margin: 0; padding: 0; counter-reset: r; }
+  li { counter-increment: r; display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(138, 90, 40, .2); }
+  li::before { content: counter(r); width: 26px; flex: none; text-align: right; font-weight: 700; color: var(--ink-soft); }
+  li:nth-child(1)::before { content: '🥇'; } li:nth-child(2)::before { content: '🥈'; } li:nth-child(3)::before { content: '🥉'; }
+  li b { margin-left: auto; font-weight: 700; white-space: nowrap; }
+  li span { overflow-wrap: anywhere; }
+  .muted { color: var(--ink-soft); font-size: 14px; }
+  .foot { text-align: center; color: #ecd9b6; font-size: 14px; text-shadow: 1px 1px 0 rgba(0, 0, 0, .4); }
+  body.overlay .foot { display: none; }
+  @media (max-width: 640px) { header h1 { font-size: 26px; } header img.mascot { display: none; } section.card { padding: 18px 18px 20px; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="plaque">
+    <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
+    <div class="titles"><small>EhrlichVerwirrt</small><h1>Stadtwache Rangliste</h1></div>
+    <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
+  </header>
+  <div class="grid" id="grid"></div>
+  <p class="foot" id="foot"></p>
+</main>
+<script>
+if (new URLSearchParams(location.search).has('overlay')) document.body.classList.add('overlay');
+const fmtMin = (m) => { m = Math.round(m); return m < 60 ? `${m} Min` : m % 60 ? `${Math.floor(m / 60)} Std ${m % 60} Min` : `${Math.floor(m / 60)} Std`; };
+const BOARDS = [
+  ['visits', 'Anwesende – meiste Besuche', (v) => `${v}x`],
+  ['chatters', 'Aktivste Chatter', (v) => `${v} Nachrichten`],
+  ['streaks', 'Aktuelle Streak 🔥', (v) => `${v} Streams`],
+  ['records', 'Streak-Rekord', (v) => `${v} Streams`],
+  ['minutes', 'Meiste Zeit im Stream', fmtMin],
+];
+const grid = document.getElementById('grid');
+async function load() {
+  try {
+    const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 404 ? 'Die Rangliste ist gerade nicht öffentlich.' : 'Die Rangliste konnte nicht geladen werden.');
+    const data = await res.json();
+    grid.replaceChildren();
+    for (const [key, title, fmt] of BOARDS) {
+      const sec = document.createElement('section'); sec.className = 'px-box card';
+      const h = document.createElement('h2'); h.textContent = title; sec.append(h);
+      const ol = document.createElement('ol');
+      for (const row of data[key]) {
+        const li = document.createElement('li');
+        const name = document.createElement('span'); name.textContent = row.name;
+        const val = document.createElement('b'); val.textContent = fmt(row.value);
+        li.append(name, val); ol.append(li);
+      }
+      if (!data[key].length) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Noch keine Einträge.'; sec.append(p); } else sec.append(ol);
+      grid.append(sec);
+    }
+    document.getElementById('foot').textContent = `${data.visitors} Besucher insgesamt · aktualisiert ${new Date(data.updated).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+  } catch (e) {
+    grid.replaceChildren(); const p = document.createElement('p'); p.className = 'foot'; p.textContent = e.message; grid.append(p);
+  }
+}
+load(); setInterval(load, 60_000);
+</script>
+</body>
+</html>

@@ -35,6 +35,7 @@
       <button data-tab="checkin" role="tab">Check-in &amp; Streak</button>
       <button data-tab="alerts" role="tab">Alerts</button>
       <button data-tab="raids" role="tab">Raids</button>
+      <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="besucher" role="tab">Besucher</button>
@@ -111,6 +112,29 @@
         <div class="row"><button id="raidBulkBtn" class="ghost">Alle eintragen</button></div>
         <p class="muted" id="raidBulkInfo"></p>
       </section>
+    </div>
+
+    <!-- Chat & Abspann -->
+    <div class="tab-panel hidden" data-panel="abspann">
+      <section class="px-box card">
+        <h2>Abspann und Rangliste ansehen</h2>
+        <p class="muted"><b>Abspann:</b> In OBS eine eigene Szene „Stream-Ende“ mit einer Browserquelle (1920×1080) auf <code id="creditsUrl"></code> anlegen und „Browser aktualisieren, wenn Szene aktiv wird“ einschalten. Beim Wechsel in die Szene laufen die Namen des heutigen Streams durch.<br>
+        <b>Rangliste:</b> Die Seite <code id="boardUrl"></code> zeigt die Bestenlisten. Für ein Twitch-Panel legst du unter deinem Kanal im Bereich „Info“ ein Panel an (Bild + Link) und trägst diese Adresse als Link ein. Als OBS-Quelle geht <code id="boardOverlayUrl"></code>.</p>
+        <div class="row">
+          <a class="btn" href="/abspann?demo" target="_blank" rel="noopener">Abspann mit Beispieldaten</a>
+          <a class="btn ghost" href="/abspann" target="_blank" rel="noopener">Abspann von heute</a>
+          <a class="btn ghost" href="/rangliste" target="_blank" rel="noopener">Rangliste öffnen</a>
+        </div>
+      </section>
+      <section class="px-box card">
+        <h2>Twitch-Panel mit Rangliste</h2>
+        <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://twitch-checkin.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
+        <div class="row">
+          <a class="btn" href="/stadtwache-panel.zip" download>Extension-Zip herunterladen</a>
+          <a class="btn ghost" href="https://dev.twitch.tv/console/extensions" target="_blank" rel="noopener">Twitch-Entwicklerkonsole</a>
+        </div>
+      </section>
+      <div data-schema="abspann" style="display:grid; gap:22px;"></div>
     </div>
 
     <!-- Soundboard -->
