@@ -149,7 +149,7 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
   assert.ok((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes.includes('moderator:manage:shoutouts'), 'Tokens ohne scopes');
-  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat'] });
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'] });
   assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
@@ -851,7 +851,12 @@ await test('Setup: fehlt eine Berechtigung oder lehnt Twitch ein Zusatz-Abo ab, 
   let r = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
   assert.equal(r.ok, true);
   assert.equal(r.warnings.length, 1);
-  assert.match(r.warnings[0], /Chat.*user:read:chat fehlt.*Mit Twitch verbinden/);
+  assert.match(r.warnings[0], /Chat.*Berechtigung user:read:chat fehlt.*Mit Twitch verbinden/);
+  // Auch user:bot und channel:bot sind für den Chat-Webhook nötig (Twitch verlangt sie bei App-Token)
+  await db.set('config/tokens', { ...tokens, scopes: tokens.scopes.filter((sc) => !['user:bot', 'channel:bot'].includes(sc)) });
+  const bot = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.match(bot.warnings[0], /user:bot, channel:bot fehlt/);
+  await db.set('config/tokens', { ...tokens, scopes: tokens.scopes.filter((sc) => sc !== 'user:read:chat') });
   const created = () => calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
   assert.ok(!created().slice(-9).some((c) => c.body.type === 'channel.chat.message'), 'kein Chat-Abo ohne Berechtigung');
   assert.ok(created().slice(-9).some((c) => c.body.type === 'channel.cheer'), 'Alerts-Abos wurden trotzdem angelegt');

@@ -126,7 +126,7 @@ Vorbereitende Infos für CasaOS (Erreichbarkeit für Twitch, Umzug, offene Punkt
 
 ## Chat-Befehle, Abspann und Rangliste
 
-Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch verbinden** (neue Berechtigung `user:read:chat`) und danach **Rewards & Webhooks abgleichen**, damit der Chat-Webhook (`channel.chat.message`) angelegt wird.
+Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch verbinden** (neue Berechtigungen `user:read:chat`, `user:bot` und `channel:bot`, die Twitch für Chat-Webhooks verlangt) und danach **Rewards & Webhooks abgleichen**, damit der Chat-Webhook (`channel.chat.message`) angelegt wird.
 
 - **`!streak`** antwortet dem Zuschauer mit Besuchen, Streak (Rekord), Gesamtzeit im Stream und Platz in der Rangliste. **`!top`** nennt die Besten nach Besuchen. Befehle, Texte, Anzahl der Plätze und die Abklingzeit (gilt je Befehl für den ganzen Chat, Standard 10 s) sind einstellbar. Bei ausgeschaltetem Chat (*Allgemein*) schweigt der Bot.
 - **Abspann** (`/abspann`): Der Bot merkt sich pro Stream-Tag, wer geschrieben (**Chatter**), gefolgt, abonniert (inkl. Resub-Monate), Subs verschenkt, Bits geschickt oder geraidet hat – **auch bei ausgeschalteten Alerts**. Die Namen laufen als Scrolltext durch, am Ende bleibt die Schlusszeile stehen. In OBS legst du dafür eine eigene Szene „Stream-Ende“ an (Browserquelle 1920×1080 auf `https://DEINE-SEITE.netlify.app/abspann`, „Browser aktualisieren, wenn Szene aktiv wird“ einschalten). Bots (Nightbot & Co.) und dein eigener Name werden ausgelassen, die Liste lässt sich ändern. Ohne Hintergrund: `?transparent`, anderes Tempo: `?speed=100`, früherer Stream-Tag: `?day=2026-10-28`, Vorschau mit Beispieldaten: `?demo`.
