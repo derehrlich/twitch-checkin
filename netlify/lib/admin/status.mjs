@@ -1,6 +1,6 @@
 // GET /api/admin/state: Zustand von Umgebungsvariablen, Twitch-Verbindung, Rewards und Webhooks.
 import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
+import { getSettings, needsChat } from '../settings.mjs';
 import { streamDay } from '../checkin.mjs';
 import { getBoard, isActive } from '../soundboard.mjs';
 import { json } from '../http.mjs';
@@ -19,7 +19,7 @@ export async function status({ req, route, method }) {
     try {
       const subs = await listSubscriptions(webhookUrl);
       const rewards = 1 + (state.checkoutRewardId ? 1 : 0) + (state.streakRewardId ? 1 : 0) + (await getBoard()).filter((e) => isActive(e) && e.rewardId).length;
-      const expected = rewards + (settings.raidEnabled || settings.creditsEnabled ? 1 : 0) + (settings.alertsEnabled || settings.creditsEnabled ? 5 : 0) + (settings.chatCommands || settings.creditsEnabled ? 1 : 0);
+      const expected = rewards + (settings.raidEnabled || settings.creditsEnabled ? 1 : 0) + (settings.alertsEnabled || settings.creditsEnabled ? 5 : 0) + (needsChat(settings) ? 1 : 0);
       const notReady = subs.find((x) => x.status !== 'enabled');
       subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
     } catch (e) { subscriptionError = e.message; }

@@ -88,10 +88,11 @@ export const SCHEMA = {
       t('creditsTitle', 'Überschrift', { maxlength: 80 }), t('creditsOutro', 'Schlusszeile', { maxlength: 80 }),
       n('creditsSpeed', 'Lauftempo (Pixel pro Sekunde)', { min: 20, max: 300 }),
       c('creditsChatters', 'Chatter nennen'), c('creditsFollows', 'Neue Follower nennen'), c('creditsSubs', 'Abonnenten und Sub-Geschenke nennen'), c('creditsBits', 'Bits nennen'), c('creditsRaids', 'Raids nennen'),
-      t('creditsIgnore', 'Diese Namen nicht nennen (Bots, mit Komma getrennt)', { maxlength: 400 }),
+      t('creditsIgnore', 'Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen (mit Komma getrennt)', { maxlength: 400 }),
     ] },
-    { title: 'Rangliste', hint: 'Die öffentliche Seite zeigt nur Namen und Zahlen (Besuche, Streaks, Zeit im Stream). Sie ist ohne Anmeldung erreichbar.', items: [
-      c('leaderboardPublic', 'Rangliste öffentlich anzeigen'), n('leaderboardSize', 'Plätze je Liste', { min: 3, max: 25 }),
+    { title: 'Rangliste', hint: 'Die Rangliste (Seite und Twitch-Panel) zeigt nur Namen und Zahlen: Besuche, Chat-Nachrichten, Streaks und Zeit im Stream. Sie ist ohne Anmeldung erreichbar. Die Chat-Zählung beginnt beim Einschalten, Twitch liefert keinen Verlauf. Dein eigener Name und die Bots oben werden nicht gezählt.', items: [
+      c('leaderboardPublic', 'Rangliste öffentlich anzeigen'), c('chatStats', 'Chat-Nachrichten zählen (für die Chatter-Rangliste, braucht den Chat-Webhook)'),
+      n('leaderboardSize', 'Plätze je Liste', { min: 3, max: 25 }),
     ] },
   ],
 
@@ -110,4 +111,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];

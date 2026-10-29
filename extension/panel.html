@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stadtwache Rangliste</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header>
+  <div class="brand">Stadtwache</div>
+  <nav id="tabs" role="tablist" aria-label="Ranglisten">
+    <button role="tab" data-board="visits" aria-selected="true">Anwesende</button>
+    <button role="tab" data-board="chatters">Chatter</button>
+    <button role="tab" data-board="streaks">Streaks</button>
+  </nav>
+</header>
+<main id="list" aria-live="polite"></main>
+<footer id="foot"></footer>
+<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

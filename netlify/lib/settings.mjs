@@ -90,7 +90,9 @@ export const DEFAULTS = {
   creditsSpeed: 70, // Pixel pro Sekunde
   creditsChatters: true, creditsFollows: true, creditsSubs: true, creditsBits: true, creditsRaids: true,
   creditsIgnore: 'nightbot, streamelements, moobot, streamlabs, fossabot', // Namen, die nicht im Abspann stehen (Bots)
-  // Öffentliche Rangliste (/rangliste), z. B. als Link in einem Twitch-Panel
+  // Chat-Aktivität zählen (Nachrichten und Chat-Tage je Person) für die Chatter-Rangliste. Zählt ab dem Einschalten, Twitch liefert keinen Verlauf.
+  chatStats: true,
+  // Öffentliche Rangliste (/rangliste und Twitch-Panel-Extension)
   leaderboardPublic: true,
   leaderboardSize: 10,
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
@@ -98,6 +100,9 @@ export const DEFAULTS = {
   soundVersion: null,
   sounds: {}, // weitere Töne je Platz: { follow: { name, version }, ... }
 };
+
+// Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -149,7 +154,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

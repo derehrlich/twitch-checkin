@@ -3,7 +3,7 @@ import { db } from './store.mjs';
 import { fill, fmtDuration, streamDay } from './checkin.mjs';
 import { computeStreak, getStreamDays } from './streak.mjs';
 import { sendChat } from './twitch.mjs';
-import { recordChatter } from './credits.mjs';
+import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -41,7 +41,13 @@ async function cooling(cmd, seconds) {
 export async function handleChat(e, settings) {
   const id = e.chatter_user_id, name = e.chatter_user_name;
   if (!id) return { ok: false };
-  if (settings.creditsEnabled) await recordChatter(streamDay(settings), id, name);
+  const ignore = String(settings.creditsIgnore ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean);
+  const counted = id !== e.broadcaster_user_id && !ignore.includes(String(name).toLowerCase()); // Bots und der Kanalinhaber zählen nicht
+  if (counted && (settings.creditsEnabled || settings.chatStats)) {
+    const day = streamDay(settings);
+    await recordChatter(day, id, name);
+    if (settings.chatStats) await countChat(id, name, day);
+  }
 
   const text = String(e.message?.text ?? '').trim();
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };

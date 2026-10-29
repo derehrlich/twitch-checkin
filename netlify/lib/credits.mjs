@@ -6,12 +6,20 @@ import { streamDay } from './checkin.mjs';
 
 const seenChatters = new Set(); // spart Schreibzugriffe, solange die Function-Instanz läuft
 
+/** Merkt sich die Person für den Abspann des Tages. */
 export async function recordChatter(day, userId, name) {
   const k = `${day}/${userId}`;
-  if (seenChatters.has(k)) return;
-  await db.setIfNew(`chatter/${k}`, name);
+  if (seenChatters.has(k)) return false;
+  const fresh = await db.setIfNew(`chatter/${k}`, name);
   seenChatters.add(k);
   if (seenChatters.size > 5000) seenChatters.clear();
+  return fresh;
+}
+
+/** Zählt Nachrichten und Chat-Tage je Person (chatuser/<id>). Gleichzeitige Nachrichten können einzelne Zählungen verschlucken, das ist für eine Rangliste in Ordnung. */
+export async function countChat(userId, name, day) {
+  const rec = (await db.get(`chatuser/${userId}`)) ?? { name, messages: 0, days: 0, lastDay: null };
+  await db.set(`chatuser/${userId}`, { name, messages: rec.messages + 1, days: rec.days + (rec.lastDay === day ? 0 : 1), lastDay: day });
 }
 
 // EventSub-Ereignis -> Eintrag für den Abspann (null = nichts zu merken)

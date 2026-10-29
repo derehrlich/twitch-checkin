@@ -171,7 +171,7 @@ assert.equal(await abs.locator('#roll h1').innerText(), 'Danke fürs Zuschauen!'
 await abs.goto('http://localhost:8092/abspann'); await abs.waitForSelector('#roll h1');
 assert.equal(await abs.locator('#roll h1').innerText(), 'Bis bald!', 'Überschrift kommt aus den Einstellungen');
 await abs.goto('http://localhost:8092/rangliste'); await abs.waitForSelector('#grid section');
-assert.equal(await abs.locator('#grid section').count(), 4); assert.deepEqual(absErrs, []);
+assert.equal(await abs.locator('#grid section').count(), 5); assert.deepEqual(absErrs, []);
 await abs.close(); ok('Chat & Abspann: Einstellungen, Abspann und Rangliste laden');
 
 // 9. Abmelden

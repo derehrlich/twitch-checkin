@@ -106,7 +106,7 @@ await test('Admin: ohne Login 401, falsches Passwort 401, richtiges Passwort lie
 });
 
 // Abspann und Chat-Befehle haben eigene Tests weiter unten; die älteren Tests rechnen ohne ihre zusätzlichen Webhooks
-await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false }, cookie));
+await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false, chatStats: false }, cookie));
 
 await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', async () => {
   assert.equal((await auth(new Request(BASE + '/api/auth/login'))).status, 401, 'ohne Admin-Session gesperrt');
@@ -827,7 +827,7 @@ const day0 = streamDay(await getSettings());
 let chatN = 0;
 const chatMsg = async (text, id = 'c1', name = 'Chatty') => {
   const before = chats().length;
-  const ev = { subscription: { type: 'channel.chat.message' }, event: { chatter_user_id: id, chatter_user_name: name, message_id: 'msg-' + chatN, message: { text } } };
+  const ev = { subscription: { type: 'channel.chat.message' }, event: { broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: 'msg-' + chatN, message: { text } } };
   assert.equal((await webhook(signed('notification', ev, { id: 'chat-' + chatN++ }))).status, 204);
   return chats().slice(before);
 };
@@ -910,13 +910,32 @@ await test('Abspann: sammelt Follows, Subs, Gifts, Bits und Raids auch ohne Aler
 });
 
 await test('Abspann: ohne Einschalten wird nichts gesammelt', async () => {
-  await admin(adminReq('PUT', 'settings', { creditsEnabled: false }, cookie));
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: false }, cookie)); // chatStats ist hier noch aus
   const before = (await db.list(`log/${day0}/`)).length;
   await webhook(signed('notification', alertEvent('channel.follow', { user_name: 'Heimlich' }), { id: 'cr-off' }));
   await chatMsg('hallo', 'c3', 'Nochjemand');
   assert.equal((await db.list(`log/${day0}/`)).length, before);
   assert.equal(await db.get(`chatter/${day0}/c3`), null);
   await admin(adminReq('PUT', 'settings', { creditsEnabled: true }, cookie));
+});
+
+await test('Chat-Zähler: Nachrichten und Chat-Tage je Person, ohne Bots und Kanalinhaber, nur wenn eingeschaltet', async () => {
+  await chatMsg('vorher', 'c7', 'Vorher');
+  assert.equal(await db.get('chatuser/c7'), null, 'ausgeschaltet zählt nichts');
+  await admin(adminReq('PUT', 'settings', { chatStats: true }, cookie));
+  await chatMsg('eins', 'c7', 'Vielschreiber'); await chatMsg('zwei', 'c7', 'Vielschreiber'); await chatMsg('drei', 'c7', 'Vielschreiber');
+  await chatMsg('hi', 'c8', 'Wenigschreiber');
+  await chatMsg('bot', 'bot1', 'Nightbot');
+  await chatMsg('ich selbst', '999', 'Streamerin');
+  assert.deepEqual(await db.get('chatuser/c7'), { name: 'Vielschreiber', messages: 3, days: 1, lastDay: day0 }, 'drei Nachrichten, aber nur ein Chat-Tag');
+  assert.deepEqual(await db.get('chatuser/c8'), { name: 'Wenigschreiber', messages: 1, days: 1, lastDay: day0 });
+  assert.equal(await db.get('chatuser/bot1'), null, 'Bots zählen nicht');
+  assert.equal(await db.get('chatuser/999'), null, 'der Kanalinhaber zählt nicht');
+  // Chat-Webhook wird auch dann abonniert, wenn nur die Zählung läuft
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false }, cookie));
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.ok(subs.some((x) => x.condition.user_id === '999' && x.condition.broadcaster_user_id === '999'), 'channel.chat.message abonniert');
+  await admin(adminReq('PUT', 'settings', { creditsEnabled: true, chatCommands: true }, cookie));
 });
 
 await test('Rangliste: öffentlich nur mit Namen und Zahlen, abschaltbar', async () => {
@@ -926,10 +945,23 @@ await test('Rangliste: öffentlich nur mit Namen und Zahlen, abschaltbar', async
   assert.equal(data.visits[0].name, 'Spitze'); assert.equal(data.visits[0].value, 999);
   assert.ok(data.visits.length <= 10 && data.streaks.every((x) => x.value > 0));
   assert.deepEqual(Object.keys(data.visits[0]).sort(), ['name', 'value'], 'keine IDs oder Tage nach außen');
+  assert.deepEqual(data.chatters, [{ name: 'Vielschreiber', value: 3 }, { name: 'Wenigschreiber', value: 1 }], 'Chatter nach Nachrichten');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*', 'die Panel-Extension darf die Zahlen laden');
   await admin(adminReq('PUT', 'settings', { leaderboardPublic: false }, cookie));
   assert.equal((await leaderboard(new Request(BASE + '/api/leaderboard'))).status, 404);
   await admin(adminReq('PUT', 'settings', { leaderboardPublic: true }, cookie));
   await db.delete('user/c9'); await db.delete('user/c1');
+});
+
+await test('Panel-Extension: Zip enthält Seite, Skript mit eingesetzter Adresse und die Schrift', async () => {
+  const { buildExtension } = await import('../scripts/build-extension.mjs');
+  const zip = buildExtension('https://meine-seite.de/');
+  assert.equal(zip.readUInt32LE(0), 0x04034b50, 'beginnt mit einem Zip-Header');
+  for (const name of ['panel.html', 'panel.css', 'panel.js', 'fonts/fredoka-latin-400-normal.woff2', 'fonts/OFL-Fredoka.txt']) assert.ok(zip.includes(Buffer.from(name)), name);
+  assert.throws(() => buildExtension('http://unsicher.de'), /https/);
+  assert.throws(() => buildExtension('https://seite.de/pfad'), /https/);
+  const js = fs.readFileSync(new URL('../extension/panel.js', import.meta.url), 'utf8');
+  assert.ok(js.includes("'__SITE_URL__/api/leaderboard'"), 'Platzhalter im Quelltext');
 });
 
 await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und lehnt Fremddateien ab', async () => {

@@ -1,0 +1,25 @@
+/* Panel-Extension für die Kanalseite (318 Pixel breit, Höhe in der Twitch-Konsole einstellbar). Holz und Pergament wie Overlay und Admin. */
+@font-face { font-family: 'Fredoka'; font-weight: 400; src: url('fonts/fredoka-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fredoka'; font-weight: 600; src: url('fonts/fredoka-latin-600-normal.woff2') format('woff2'); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; color: #3a2112; font: 400 15px/1.35 'Fredoka', system-ui, sans-serif;
+  background-color: #724C31; background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px), repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px); }
+header { padding: 10px 10px 6px; text-align: center; }
+.brand { font-weight: 600; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #ffd45e; text-shadow: 1px 1px 0 rgba(0, 0, 0, .5); margin-bottom: 6px; }
+nav { display: flex; gap: 6px; justify-content: center; }
+nav button { flex: 1 1 0; min-width: 0; font: inherit; font-weight: 600; font-size: 13px; padding: 6px 4px; cursor: pointer; color: #3a2112;
+  background: linear-gradient(#fff6e0, #ecd5a6); border: 2px solid #5a3410; border-radius: 9px; box-shadow: 0 2px 0 #5a3410; }
+nav button[aria-selected=true] { background: linear-gradient(#ffd96a, #f0a428); }
+nav button:focus-visible { outline: 3px solid #f08a24; outline-offset: 1px; }
+main { flex: 1 1 auto; overflow-y: auto; margin: 4px 10px 0; padding: 4px 12px 10px; border: 3px solid #4a2c17; border-radius: 12px; scrollbar-width: thin;
+  background: linear-gradient(to bottom, #fbefd6, #f0daae); box-shadow: inset 0 0 0 2px rgba(214, 168, 90, .85); }
+h2 { margin: 10px 0 2px; font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7a5a40; }
+ol { list-style: none; margin: 0; padding: 0; counter-reset: r; }
+li { counter-increment: r; display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(138, 90, 40, .25); }
+li::before { content: counter(r); width: 22px; flex: none; text-align: right; font-weight: 600; color: #7a5a40; }
+li:nth-child(1)::before { content: '🥇'; } li:nth-child(2)::before { content: '🥈'; } li:nth-child(3)::before { content: '🥉'; }
+li span { min-width: 0; overflow-wrap: anywhere; }
+li b { margin-left: auto; font-weight: 600; white-space: nowrap; padding-left: 6px; }
+.empty { margin: 14px 0; color: #7a5a40; text-align: center; }
+footer { padding: 5px 10px 7px; text-align: center; font-size: 11px; color: #ecd9b6; text-shadow: 1px 1px 0 rgba(0, 0, 0, .4); }
