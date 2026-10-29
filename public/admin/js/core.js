@@ -14,10 +14,10 @@ export function fmtDuration(minutes) {
   return m % 60 ? `${Math.floor(m / 60)} Std ${m % 60} Min` : `${Math.floor(m / 60)} Std`;
 }
 
-export function toast(msg, err = false) {
+export function toast(msg, err = false, ms = 3800) {
   const t = $('toast');
   t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
-  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), 3800);
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), ms);
 }
 
 /** Aufruf der Admin-API. Bei 401 meldet es das per Ereignis, damit die Anmeldung erscheint. */

@@ -22,6 +22,7 @@ let clips = [
   { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
 ];
 let subs = []; // aktive Webhook-Subscriptions
+const failSubTypes = new Set(); // Typen, deren Abo der simulierte Twitch mit 403 ablehnt
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
   const entry = { method: init.method || 'GET', path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body && !String(init.body).includes('=') ? JSON.parse(init.body) : init.body };
@@ -55,6 +56,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.pathname.endsWith('/eventsub/subscriptions')) {
     if (entry.method === 'GET') return ok({ data: subs });
     if (entry.method === 'DELETE') { subs = subs.filter((x) => x.id !== entry.query.id); return ok({}); }
+    if (failSubTypes.has(entry.body.type)) return ok({ error: 'Forbidden', status: 403, message: 'subscription missing proper authorization' }, 403);
     const sub = { id: 's' + (subs.length + 1) + calls.length, status: 'webhook_callback_verification_pending', condition: entry.body.condition, transport: entry.body.transport };
     subs.push(sub);
     return ok({ data: [sub] });
@@ -840,6 +842,31 @@ await test('Setup abonniert Chat, Follows, Subs, Bits und Raids auch bei ausgesc
   for (const t of ['channel.follow', 'channel.subscribe', 'channel.subscription.gift', 'channel.cheer', 'channel.raid']) assert.ok(created.some((c) => c.body.type === t), t);
   assert.equal(subs.length, 10);
   await admin(adminReq('PUT', 'settings', { raidEnabled: true }, cookie));
+});
+
+await test('Setup: fehlt eine Berechtigung oder lehnt Twitch ein Zusatz-Abo ab, laufen die übrigen Webhooks trotzdem und die Meldung nennt den Grund', async () => {
+  const tokens = await db.get('config/tokens');
+  // 1) Token ohne Chat-Berechtigung (Verbindung stammt aus der Zeit vor dem Update)
+  await db.set('config/tokens', { ...tokens, scopes: tokens.scopes.filter((sc) => sc !== 'user:read:chat') });
+  let r = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(r.ok, true);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /Chat.*user:read:chat fehlt.*Mit Twitch verbinden/);
+  const created = () => calls.filter((c) => c.method === 'POST' && c.path.endsWith('/eventsub/subscriptions'));
+  assert.ok(!created().slice(-9).some((c) => c.body.type === 'channel.chat.message'), 'kein Chat-Abo ohne Berechtigung');
+  assert.ok(created().slice(-9).some((c) => c.body.type === 'channel.cheer'), 'Alerts-Abos wurden trotzdem angelegt');
+  // 2) Twitch lehnt ein einzelnes Abo mit 403 ab
+  await db.set('config/tokens', tokens);
+  failSubTypes.add('channel.follow');
+  r = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  failSubTypes.clear();
+  assert.equal(r.ok, true);
+  assert.match(r.warnings.join(' '), /Follows: Twitch hat das Abo abgelehnt \(403\) – vermutlich fehlt moderator:read:followers/);
+  assert.ok(created().slice(-10).some((c) => c.body.type === 'channel.chat.message'), 'Chat-Abo trotzdem angelegt');
+  // 3) alles in Ordnung: keine Meldungen
+  r = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(r.warnings, undefined);
+  assert.equal(subs.length, 10);
 });
 
 await test('Chat: Chatter werden einmal pro Tag gemerkt, normale Nachrichten bleiben unbeantwortet', async () => {
