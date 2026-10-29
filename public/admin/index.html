@@ -89,13 +89,27 @@
     <div class="tab-panel hidden" data-panel="raids">
       <div data-schema="raids" style="display:grid; gap:22px;"></div>
       <section class="px-box card">
+        <h2>Erfasste Raids</h2>
+        <p class="muted">Alle Kanäle, für die der Bot einen Raid-Stand kennt. <b>Live</b> heißt: der Raid kam beim Bot an. <b>Nachgetragen</b> heißt: du hast den Stand von Hand eingetragen. Ein Klick auf eine Zeile übernimmt den Kanal ins Formular unten, um den Stand zu ändern.</p>
+        <div class="stats" id="raidStats"></div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Kanal</th><th>Raids</th><th>Zuschauer gesamt</th><th>Zuletzt live</th><th>Quelle</th></tr></thead>
+          <tbody id="raidList"></tbody>
+        </table></div>
+      </section>
+      <section class="px-box card">
         <h2>Frühere Raids nachtragen</h2>
-        <p class="muted">Twitch liefert keinen Raid-Verlauf, der Bot zählt ab dem ersten empfangenen Raid. Hier trägst du den Stand früherer Raids ein, damit „schon zum 3. Mal bei uns“ stimmt.</p>
+        <p class="muted">Twitch liefert keinen Raid-Verlauf, der Bot zählt ab dem ersten empfangenen Raid. Hier trägst du den Stand früherer Raids ein, damit „schon zum 3. Mal bei uns“ stimmt. Tipp: Deine früheren Raids findest du in Twitch unter <i>Creator-Dashboard → Aktivitäts-Feed</i> oder in den Stream-Zusammenfassungen.</p>
         <div class="row">
           <div><label for="raidSeedLogin">Kanalname</label><input id="raidSeedLogin" placeholder="kanalname"></div>
           <div style="flex:0 1 160px"><label for="raidSeedCount">Bisherige Raids</label><input id="raidSeedCount" type="number" min="0" value="1"></div>
           <button id="raidSeed" class="ghost">Eintragen</button>
         </div>
+        <h3>Mehrere auf einmal</h3>
+        <label for="raidBulk">Eine Zeile pro Kanal: <code>kanalname 3</code> (ohne Zahl zählt 1). Der Stand wird <b>gesetzt</b>, nicht addiert.</label>
+        <textarea id="raidBulk" rows="6" placeholder="akinasuka 3&#10;streamerin&#10;anderer_kanal 2"></textarea>
+        <div class="row"><button id="raidBulkBtn" class="ghost">Alle eintragen</button></div>
+        <p class="muted" id="raidBulkInfo"></p>
       </section>
     </div>
 

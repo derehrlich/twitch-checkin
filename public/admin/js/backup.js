@@ -4,6 +4,7 @@ import { loadSettings } from './settings.js';
 import { loadStatus } from './status.js';
 import { loadUsers } from './visitors.js';
 import { loadBoard } from './soundboard.js';
+import { loadRaids } from './raids.js';
 
 export function initBackup() {
   $('restoreFile').addEventListener('change', () => {
@@ -20,7 +21,7 @@ export function initBackup() {
     if (!confirm(`Backup vom ${day} mit ${n} Einträgen einspielen?\n\nDer aktuelle Stand (Besucher, Einstellungen, Soundboard) wird dabei ersetzt.`)) return;
     const r = await api('POST', 'backup', { backup, confirm: true });
     $('restoreFile').value = ''; $('restoreInfo').textContent = '';
-    await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadStatus()]);
+    await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadRaids(), loadStatus()]);
     toast(`Wiederhergestellt: ${r.restored} Einträge. Bitte jetzt mit Twitch verbinden und Rewards abgleichen.`);
   }));
 }

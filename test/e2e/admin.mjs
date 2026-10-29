@@ -29,6 +29,7 @@ globalThis.fetch = async (url, init = {}) => {
     const s = { id: 's' + ++n, status: 'enabled', condition: body.condition, transport: body.transport }; subs.push(s); return ok({ data: [s] });
   }
   if (u.pathname.endsWith('/chat/messages')) return ok({ data: [{ is_sent: true }] });
+  if (u.pathname.endsWith('/helix/users')) { const login = u.searchParams.get('login'); return ok({ data: login === 'zweite' ? [{ id: '202', login, display_name: 'Zweite' }] : login ? [{ id: '201', login, display_name: 'RaiderIn' }] : [] }); }
   return ok({ data: [] });
 };
 
@@ -149,6 +150,13 @@ assert.match(await page.locator('#users').innerText(), /Stammgast/); await page.
 await page.waitForSelector('#detail:visible'); assert.match(await page.locator('#dName').innerText(), /Stammgast – 2 Besuche/); ok('Besucher: Liste und Detail');
 await page.fill('#addDay', '2030-01-05'); await page.click('#addDayBtn'); await page.waitForFunction(() => document.getElementById('dName').innerText.includes('3 Besuche'));
 await page.click('#dDays button[data-day="2030-01-05"]', { trial: true }).catch(() => {}); ok('Besucher: Besuch nachtragen');
+
+// Raids: Übersicht und Mehrfach-Eintrag
+await page.click('.tabs button[data-tab="raids"]'); await page.waitForSelector('#raidList');
+await page.fill('#raidBulk', 'raiderin 4\nzweite 2'); await page.click('#raidBulkBtn');
+await page.waitForFunction(() => document.getElementById('raidList').innerText.includes('Nachgetragen'));
+assert.match(await page.locator('#raidList').innerText(), /4/); assert.match(await page.locator('#raidBulkInfo').innerText(), /eingetragen/);
+await page.click('#raidList tr[data-name]'); assert.notEqual(await page.inputValue('#raidSeedLogin'), ''); ok('Raids: Übersicht und mehrere Kanäle auf einmal eintragen');
 
 // 9. Abmelden
 await page.click('#logout'); await page.waitForSelector('#login:visible'); ok('Abmelden zeigt wieder die Anmeldung');

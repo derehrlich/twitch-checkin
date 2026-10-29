@@ -6,6 +6,7 @@ import { initMedia, renderMedia } from './media.js';
 import { initSoundboard, loadBoard } from './soundboard.js';
 import { initVisitors, loadUsers } from './visitors.js';
 import { initTests } from './tests.js';
+import { initRaids, loadRaids } from './raids.js';
 import { initBackup } from './backup.js';
 
 const TABS = ['start', 'checkin', 'alerts', 'raids', 'soundboard', 'medien', 'besucher', 'tests', 'allgemein'];
@@ -25,7 +26,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadRaids()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -33,7 +34,7 @@ async function init() {
 }
 
 renderForms();
-initSettings(); initStatus(); initMedia(); initSoundboard(); initVisitors(); initTests(); initBackup();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initVisitors(); initTests(); initRaids(); initBackup();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
