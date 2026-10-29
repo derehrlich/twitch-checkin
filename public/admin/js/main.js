@@ -9,7 +9,7 @@ import { initTests } from './tests.js';
 import { initRaids, loadRaids } from './raids.js';
 import { initBackup } from './backup.js';
 
-const TABS = ['start', 'checkin', 'alerts', 'raids', 'soundboard', 'medien', 'besucher', 'tests', 'allgemein'];
+const TABS = ['start', 'checkin', 'alerts', 'raids', 'abspann', 'soundboard', 'medien', 'besucher', 'tests', 'allgemein'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'start';

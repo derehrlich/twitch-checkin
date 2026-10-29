@@ -74,6 +74,27 @@ export const SCHEMA = {
     ] },
   ],
 
+  abspann: [
+    { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
+      c('chatCommands', 'Chat-Befehle aktivieren'),
+      t('streakCommand', 'Befehl für die eigenen Zahlen', { maxlength: 26, placeholder: '!streak' }), t('topCommand', 'Befehl für die Bestenliste', { maxlength: 26, placeholder: '!top' }),
+      n('commandCooldown', 'Abklingzeit (Sekunden)', { min: 0, max: 600 }), n('topSize', 'Plätze in der Bestenliste', { min: 1, max: 10 }),
+      a('streakCmdTemplate', 'Antwort auf !streak', { user: 'Max', count: 24, streak: 5, record: 9, time: '18 Std 40 Min', rank: 3, total: 120 }),
+      a('streakCmdNone', 'Antwort, wenn noch kein Check-in vorhanden ist', { user: 'Max' }),
+      a('topTemplate', 'Antwort auf !top', { n: 5, list: '1. Anna (42) · 2. Max (37) · 3. Kai (30)' }),
+    ] },
+    { title: 'Abspann', hint: 'Der Abspann sammelt pro Stream-Tag automatisch, wer geschrieben, gefolgt, abonniert, Bits geschickt oder geraidet hat – auch wenn die Alerts ausgeschaltet sind. Nach dem Einschalten die Webhooks abgleichen, sonst werden keine Ereignisse empfangen. Bots stehen nicht im Abspann.', items: [
+      c('creditsEnabled', 'Abspann-Daten sammeln'),
+      t('creditsTitle', 'Überschrift', { maxlength: 80 }), t('creditsOutro', 'Schlusszeile', { maxlength: 80 }),
+      n('creditsSpeed', 'Lauftempo (Pixel pro Sekunde)', { min: 20, max: 300 }),
+      c('creditsChatters', 'Chatter nennen'), c('creditsFollows', 'Neue Follower nennen'), c('creditsSubs', 'Abonnenten und Sub-Geschenke nennen'), c('creditsBits', 'Bits nennen'), c('creditsRaids', 'Raids nennen'),
+      t('creditsIgnore', 'Diese Namen nicht nennen (Bots, mit Komma getrennt)', { maxlength: 400 }),
+    ] },
+    { title: 'Rangliste', hint: 'Die öffentliche Seite zeigt nur Namen und Zahlen (Besuche, Streaks, Zeit im Stream). Sie ist ohne Anmeldung erreichbar.', items: [
+      c('leaderboardPublic', 'Rangliste öffentlich anzeigen'), n('leaderboardSize', 'Plätze je Liste', { min: 3, max: 25 }),
+    ] },
+  ],
+
   allgemein: [
     { title: 'Allgemein', hint: 'Der Stream-Tag wechselt zur eingestellten Uhrzeit, damit Streams nach Mitternacht nicht doppelt zählen.', items: [
       n('volume', 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
@@ -89,4 +110,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands'];

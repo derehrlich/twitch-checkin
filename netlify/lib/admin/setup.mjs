@@ -16,7 +16,7 @@ export async function setup({ req, method }) {
   const synced = await syncSoundboardRewards(board);
   await saveBoard(synced);
   const boardIds = synced.filter((e) => isActive(e) && e.rewardId).map((e) => e.rewardId);
-  await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : []), ...boardIds], { raids: settings.raidEnabled, alerts: settings.alertsEnabled });
+  await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : []), ...boardIds], { raids: settings.raidEnabled || settings.creditsEnabled, alerts: settings.alertsEnabled || settings.creditsEnabled, chat: settings.chatCommands || settings.creditsEnabled });
   await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
   return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null, streak: streak?.title ?? null, soundboard: boardIds.length });
 }
