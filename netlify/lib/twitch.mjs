@@ -1,6 +1,6 @@
 import { db } from './store.mjs';
 
-export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat'];
+export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'];
 
 export const siteUrl = (req) =>
   (process.env.SITE_URL || process.env.URL || (req ? new URL(req.url).origin : '')).replace(/\/$/, '');
@@ -170,12 +170,13 @@ export async function listSubscriptions(webhookUrl) {
 // Welche Twitch-Berechtigung ein Webhook braucht und wie er in Meldungen heißt
 const NEEDS = {
   [RAID_TYPE]: { label: 'Raids' },
-  [CHAT_TYPE]: { label: 'Chat (Befehle, Abspann, Chatter-Rangliste)', scope: 'user:read:chat' },
-  'channel.follow': { label: 'Follows', scope: 'moderator:read:followers' },
-  'channel.subscribe': { label: 'Subs', scope: 'channel:read:subscriptions' },
-  'channel.subscription.message': { label: 'Resubs', scope: 'channel:read:subscriptions' },
-  'channel.subscription.gift': { label: 'Gift-Subs', scope: 'channel:read:subscriptions' },
-  'channel.cheer': { label: 'Bits', scope: 'bits:read' },
+  // Chat per Webhook (App-Token) verlangt von Twitch zusätzlich user:bot und channel:bot; Chatter und Kanal sind hier dieselbe Person
+  [CHAT_TYPE]: { label: 'Chat (Befehle, Abspann, Chatter-Rangliste)', scopes: ['user:read:chat', 'user:bot', 'channel:bot'] },
+  'channel.follow': { label: 'Follows', scopes: ['moderator:read:followers'] },
+  'channel.subscribe': { label: 'Subs', scopes: ['channel:read:subscriptions'] },
+  'channel.subscription.message': { label: 'Resubs', scopes: ['channel:read:subscriptions'] },
+  'channel.subscription.gift': { label: 'Gift-Subs', scopes: ['channel:read:subscriptions'] },
+  'channel.cheer': { label: 'Bits', scopes: ['bits:read'] },
 };
 const RECONNECT = 'bitte oben auf „Mit Twitch verbinden“ klicken und danach erneut abgleichen';
 
@@ -197,11 +198,12 @@ export async function subscribe(webhookUrl, rewardIds, { raids = false, alerts =
 
   const warnings = [];
   const optional = async (type, condition, version) => {
-    const { label, scope } = NEEDS[type];
-    if (scope && Array.isArray(granted) && !granted.includes(scope)) { warnings.push(`${label}: Berechtigung ${scope} fehlt – ${RECONNECT}`); return; }
+    const { label, scopes = [] } = NEEDS[type];
+    const missing = Array.isArray(granted) ? scopes.filter((sc) => !granted.includes(sc)) : [];
+    if (missing.length) { warnings.push(`${label}: Berechtigung ${missing.join(', ')} fehlt – ${RECONNECT}`); return; }
     try { await create(type, condition, version); } catch (e) {
       const status = /-> (\d{3})/.exec(e.message)?.[1];
-      warnings.push(`${label}: Twitch hat das Abo abgelehnt${status ? ` (${status})` : ''}${status === '403' && scope ? ` – vermutlich fehlt ${scope}, ${RECONNECT}` : ''}`);
+      warnings.push(`${label}: Twitch hat das Abo abgelehnt${status ? ` (${status})` : ''}${status === '403' && scopes.length ? ` – vermutlich fehlt ${scopes.join(', ')}, ${RECONNECT}` : ''}`);
       console.warn(`Abo ${type} fehlgeschlagen:`, e.message);
     }
   };

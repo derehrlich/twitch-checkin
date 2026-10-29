@@ -40,7 +40,7 @@ const fn = {
   soundboard: (await import(root + '/netlify/functions/soundboard.mjs')).default,
   credits: (await import(root + '/netlify/functions/credits.mjs')).default, leaderboard: (await import(root + '/netlify/functions/leaderboard.mjs')).default,
 };
-await db.set('config/tokens', { access_token: 'a', refresh_token: 'r', expires_at: Date.now() + 3_600_000, user_id: '999', login: 'streamerin', scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat'] });
+await db.set('config/tokens', { access_token: 'a', refresh_token: 'r', expires_at: Date.now() + 3_600_000, user_id: '999', login: 'streamerin', scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'] });
 await db.set('user/1', { name: 'Stammgast', count: 2, first: '2030-01-01T10:00:00Z', last: '2030-01-02T10:00:00Z', days: ['2030-01-01', '2030-01-02'], sessions: { '2030-01-01': { in: 'x', out: 'y', minutes: 90 } } });
 
 const types = { css: 'text/css', js: 'text/javascript', html: 'text/html', png: 'image/png', woff2: 'font/woff2' };
