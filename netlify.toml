@@ -14,3 +14,13 @@
   from = "/overlay"
   to = "/overlay.html"
   status = 200
+
+[[redirects]]
+  from = "/abspann"
+  to = "/abspann.html"
+  status = 200
+
+[[redirects]]
+  from = "/rangliste"
+  to = "/rangliste.html"
+  status = 200

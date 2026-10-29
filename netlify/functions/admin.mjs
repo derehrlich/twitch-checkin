@@ -8,6 +8,7 @@ import { raids } from '../lib/admin/raids.mjs';
 import { sounds, images } from '../lib/admin/media.mjs';
 import { soundboard } from '../lib/admin/soundboard.mjs';
 import { users, exportCsv } from '../lib/admin/users.mjs';
+import { backup } from '../lib/admin/backup.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -23,6 +24,7 @@ const ROUTES = {
   soundboard,
   users,
   'export.csv': exportCsv,
+  backup,
 };
 
 export default async (req) => {

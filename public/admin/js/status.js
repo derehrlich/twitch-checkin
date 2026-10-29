@@ -20,6 +20,7 @@ export async function loadStatus() {
       : sub ? `Webhook-Status: ${esc(sub)}` + (sub.includes('pending') ? ' (Twitch prüft gerade, kurz neu laden)' : '')
       : s.subscriptionError ? `Webhook nicht abfragbar: ${esc(s.subscriptionError)}` : 'Webhooks noch nicht eingerichtet');
   $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay;
+  $('boardUrl2').textContent = s.urls.site + '/rangliste'; $('creditsUrl').textContent = s.urls.site + '/abspann'; $('boardUrl').textContent = s.urls.site + '/rangliste'; $('boardOverlayUrl').textContent = s.urls.site + '/rangliste?overlay';
   $('startStats').innerHTML = [[s.totals.users, 'Besucher gesamt'], [s.totals.today, `Heute (${esc(s.today)})`], [s.totals.checkins, 'Check-ins gesamt']]
     .map(([v, l]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
   document.dispatchEvent(new CustomEvent('admin:status', { detail: s }));
@@ -32,7 +33,8 @@ async function syncRewards() {
   try {
     const r = await api('POST', 'setup', {});
     const names = [r.reward, r.checkout, r.streak].filter(Boolean).map((x) => `„${x}“`).join(', ');
-    toast(`Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓`);
+    if (r.warnings?.length) toast(`Abgleich nur teilweise geglückt: ${r.warnings.join(' · ')}`, true, 20000);
+    else toast(`Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓`);
     $('syncHint').classList.add('hidden');
     await loadStatus();
     document.dispatchEvent(new Event('admin:synced'));

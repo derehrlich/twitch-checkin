@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "netlify dev",
     "test": "node test/run.mjs",
-    "test:e2e": "node test/e2e/admin.mjs"
+    "test:e2e": "node test/e2e/admin.mjs",
+    "build:extension": "node scripts/build-extension.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^11.1.7"

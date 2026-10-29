@@ -1,6 +1,6 @@
-# Twitch Kanalpunkte Check-in (Netlify)
+# Stadtwache – Twitch-Bot für Check-in, Streaks und Raids (Netlify)
 
-Zuschauer lösen einen Kanalpunkte-Reward ein und werden damit für den Stream eingecheckt. Der Bot läuft komplett auf Netlify und wird über den Browser verwaltet (`/admin/`).
+Die Stadtwache ist der Chatbot für deinen Kanal. Zuschauer lösen einen Kanalpunkte-Reward ein und werden damit für den Stream eingecheckt. Der Bot läuft komplett auf Netlify und wird über den Browser verwaltet (`/admin/`).
 
 Pro Check-in passiert Folgendes:
 - **Chatnachricht**, z. B. `✅ Max ist eingecheckt – du warst jetzt schon 7x dabei! 🎉`
@@ -58,7 +58,7 @@ Wenn jemand in deinen Kanal raidet, passiert automatisch:
 - **Offizieller Twitch-Shoutout** (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten; klappt er nicht, läuft der Rest trotzdem
 - **Overlay-Karte** mit Name und Zuschauerzahl, danach spielt ein **zufälliger Clip aus den beliebtesten Clips des Raiders** (einstellbare Höchstlänge, Standard 30 s)
 
-**Raid-Zähler:** Der Bot merkt sich, wie oft ein Kanal schon bei dir geraidet hat, und sagt es im Chat und auf der Overlay-Karte („schon zum 3. Mal bei uns“, Platzhalter `{raids}` und `{visit}`). Twitch liefert keinen Raid-Verlauf, gezählt wird deshalb ab dem ersten empfangenen Raid. Frühere Raids trägst du im Admin unter *Raids → Frühere Raids nachtragen* ein. Der Zähler läuft auch bei ausgeschalteter Raid-Reaktion weiter. Wer den Raid-Text im Admin schon gespeichert hat, muss `{visit}` selbst einfügen, der neue Standardtext gilt nur für ungespeicherte Einstellungen.
+**Raid-Zähler:** Der Bot merkt sich, wie oft ein Kanal schon bei dir geraidet hat, und sagt es im Chat und auf der Overlay-Karte („schon zum 3. Mal bei uns“, Platzhalter `{raids}` und `{visit}`). Twitch liefert keinen Raid-Verlauf, gezählt wird deshalb ab dem ersten empfangenen Raid. Frühere Raids trägst du im Admin unter *Raids → Frühere Raids nachtragen* ein, einzeln oder mehrere auf einmal (eine Zeile pro Kanal, z. B. `kanalname 3`). Die Tabelle *Erfasste Raids* darüber zeigt alle bekannten Kanäle mit Raid-Anzahl, Zuschauern und Quelle (live oder nachgetragen); ein Klick auf eine Zeile übernimmt den Kanal zum Ändern. Der Zähler läuft auch bei ausgeschalteter Raid-Reaktion weiter. Wer den Raid-Text im Admin schon gespeichert hat, muss `{visit}` selbst einfügen, der neue Standardtext gilt nur für ungespeicherte Einstellungen.
 
 Alles ist im Admin unter *Raids* ein- und ausschaltbar, dazu eine Mindestzahl an Raidern. Unter *Tests* gibt es Raid-Tests mit echten Kanaldaten (Shoutouts werden im Test nie ausgelöst).
 
@@ -108,20 +108,42 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adresse |
 | **Check-in & Streak** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter mit Namen, Preisen und Chattexten |
 | **Alerts** | Follow, Sub, Gift-Subs, Bits: Schalter, Chat-Dank, Schilder (Titel, Nachricht, Dauer) |
-| **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, früher erhaltene Raids nachtragen |
+| **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, Übersicht erfasster Raids, früher erhaltene Raids nachtragen (auch mehrere auf einmal) |
+| **Chat & Abspann** | Chat-Befehle `!streak` und `!top`, Abspann-Einstellungen, Rangliste, Links zu Abspann und Rangliste |
 | **Soundboard** | Einträge mit Reward, Abklingzeit, Lautstärke und Ton; Chat-Nachricht |
 | **Medien** | Töne und Bilder/GIFs je Alert |
 | **Besucher** | Suche, Sortierung, Besuchstage mit Dauer, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export |
 | **Tests** | Beispiel-Ereignisse ans Overlay oder in den Chat, ohne Zähler zu verändern |
-| **Allgemein** | Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus |
+| **Allgemein** | Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, Backup & Wiederherstellen |
+
+## Backup & Wiederherstellen
+
+Im Admin unter *Allgemein → Backup & Wiederherstellen* lädst du eine Sicherung als JSON herunter und spielst sie bei Bedarf wieder ein. Sie enthält Besucher (mit Streaks und Dauer), Einstellungen, Soundboard, Raid-Zähler und Reward-IDs. Töne und Bilder sind nur mit „Backup mit Tönen & Bildern“ dabei (bei Netlify begrenzt auf ca. 6 MB je Anfrage). **Die Twitch-Verbindung ist nicht enthalten:** Nach dem Wiederherstellen einmal *Mit Twitch verbinden* und *Rewards & Webhooks abgleichen* klicken. Beim Einspielen wird der aktuelle Stand ersetzt.
+
+## Betrieb auf dem eigenen Server
+
+Vorbereitende Infos für CasaOS (Erreichbarkeit für Twitch, Umzug, offene Punkte) stehen in [`docs/casaos.md`](docs/casaos.md).
+
+## Chat-Befehle, Abspann und Rangliste
+
+Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch verbinden** (neue Berechtigungen `user:read:chat`, `user:bot` und `channel:bot`, die Twitch für Chat-Webhooks verlangt) und danach **Rewards & Webhooks abgleichen**, damit der Chat-Webhook (`channel.chat.message`) angelegt wird.
+
+- **`!streak`** antwortet dem Zuschauer mit Besuchen, Streak (Rekord), Gesamtzeit im Stream und Platz in der Rangliste. **`!top`** nennt die Besten nach Besuchen. Befehle, Texte, Anzahl der Plätze und die Abklingzeit (gilt je Befehl für den ganzen Chat, Standard 10 s) sind einstellbar. Bei ausgeschaltetem Chat (*Allgemein*) schweigt der Bot.
+- **Abspann** (`/abspann`): Der Bot merkt sich pro Stream-Tag, wer geschrieben (**Chatter**), gefolgt, abonniert (inkl. Resub-Monate), Subs verschenkt, Bits geschickt oder geraidet hat – **auch bei ausgeschalteten Alerts**. Die Namen laufen als Scrolltext durch, am Ende bleibt die Schlusszeile stehen. In OBS legst du dafür eine eigene Szene „Stream-Ende“ an (Browserquelle 1920×1080 auf `https://DEINE-SEITE.netlify.app/abspann`, „Browser aktualisieren, wenn Szene aktiv wird“ einschalten). Bots (Nightbot & Co.) und dein eigener Name werden ausgelassen, die Liste lässt sich ändern. Ohne Hintergrund: `?transparent`, anderes Tempo: `?speed=100`, früherer Stream-Tag: `?day=2026-10-28`, Vorschau mit Beispieldaten: `?demo`.
+  Der Abspann läuft bewusst als Szene und nicht als Alert: Twitch meldet „Stream beendet“ erst, wenn dein Encoder schon aus ist, die Zuschauer sähen die Karte dann nicht mehr.
+- **Rangliste** (`/rangliste`): öffentliche Seite mit **Anwesenden** (Besuche), **Chattern** (Nachrichten), aktueller Streak, Streak-Rekord und Zeit im Stream (nur Namen und Zahlen, einmal pro Minute zwischengespeichert, abschaltbar). Die Chat-Zählung beginnt beim Einschalten von *Chat-Nachrichten zählen*, dein Name und Bots zählen nicht. Als OBS-Browserquelle geht `/rangliste?overlay` (transparent, ohne Kopf).
+- **Twitch-Panel:** Normale Panels zeigen nur ein festes Bild mit Link. Sofort geht ein Panel mit **Link** auf `/rangliste`. Live im Panel zeigt die **Panel-Extension** (`extension/`, fertiges Zip unter `/stadtwache-panel.zip`) die Plätze in drei Reitern (Anwesende, Chatter, Streaks). Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Anleitung: [`docs/twitch-panel.md`](docs/twitch-panel.md). Bei eigener Adresse: `npm run build:extension -- https://deine-adresse.de`.
+- **Kosten:** Jede Chatnachricht ist ein Function-Aufruf auf Netlify. Bei sehr aktivem Chat steigt der Verbrauch deutlich. Wer das nicht möchte, schaltet *Chat-Befehle*, *Abspann* und *Chat-Nachrichten zählen* aus und gleicht die Webhooks ab, dann wird der Chat-Webhook wieder entfernt.
 
 ## Projektaufbau
 
 ```
-netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, twitch-webhook
-netlify/lib/         Logik: checkin, streak, raid, alerts, soundboard, settings, twitch, store, http …
-netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users
+netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, credits, leaderboard, twitch-webhook
+netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, settings, twitch, store, http …
+netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
+public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste
+extension/           Twitch-Panel-Extension (Quelltext), scripts/build-extension.mjs baut daraus public/stadtwache-panel.zip
 public/admin/        Admin-Oberfläche: index.html (Gerüst), admin.css, js/ (ein Skript je Bereich)
 test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)
 test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optional, braucht Playwright)
@@ -133,7 +155,7 @@ test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optiona
 
 ## Look
 
-Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`: Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
+Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`; der Admin-Hintergrund entspricht dem Holz der Alert-Schilder (Raster und Streifen auf `#724C31`, `body.wood` in `admin.css`): Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
 
 - **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
 - **Töne pro Alert**: Im Admin unter *Medien → Töne* hat jeder Alert (Check-in, Check-out, Meilenstein, Raid, Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) einen eigenen Platz für eine Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB). Sie gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Fehlt eine eigene Datei, spielt das Overlay einen eingebauten Klang, der je Alert anders klingt (Horn beim Raid, Münze bei Bits, Glitzern bei Gift-Subs …). Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Beim Check-in gilt die Reihenfolge: hochgeladener Ton, `public/checkin.mp3` (falls vorhanden), eingebauter Klang. Bereits hochgeladene Check-in-Töne bleiben erhalten.
