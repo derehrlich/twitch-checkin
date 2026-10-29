@@ -721,6 +721,33 @@ await test('Alerts: Chat-Dank nur wenn eingeschaltet; Admin-Test erzeugt Karten'
   assert.deepEqual([card.kind, card.user, card.bits], ['cheer', 'Tester', 70]);
 });
 
+// ---- Blobs-Token
+await test('Speicher: Blobs-Client entsteht bei jedem Zugriff neu, ein abgelaufenes Token einer alten Umgebung schadet nicht', async () => {
+  const { createBlobStore } = await import('../netlify/lib/store.mjs');
+  // Simuliert die Plattform: jeder neu angelegte Client bekommt das gerade gültige Token, ein früher angelegter läuft ab
+  let currentToken = 'token-1'; let opened = 0; const data = new Map();
+  const fakeOpen = () => {
+    opened++; const token = currentToken;
+    const check = () => { if (token !== currentToken) { const e = new Error('Netlify Blobs has generated an internal error (Failed to decode token: Token expired)'); e.status = 401; throw e; } };
+    return {
+      async get(k) { check(); return data.get(k) ?? null; },
+      async setJSON(k, v, o = {}) { check(); if (o.onlyIfNew && data.has(k)) return { modified: false }; data.set(k, v); return { modified: true }; },
+      async delete(k) { check(); data.delete(k); },
+      list() { check(); const blobs = [...data.keys()].map((key) => ({ key })); return (async function* () { yield { blobs }; })(); },
+    };
+  };
+  const store = createBlobStore('x', fakeOpen);
+  await store.set('a/1', { n: 1 });
+  currentToken = 'token-2'; // das Token der Umgebung läuft ab und wird erneuert
+  assert.deepEqual(await store.get('a/1'), { n: 1 }, 'lesen mit neuem Token');
+  assert.equal(await store.setIfNew('a/2', 1), true);
+  currentToken = 'token-3';
+  assert.deepEqual(await store.list('a/'), ['a/1', 'a/2']);
+  await store.delete('a/1');
+  assert.equal(await store.get('a/1'), null);
+  assert.ok(opened >= 6, 'je Zugriff ein neuer Client: ' + opened);
+});
+
 // ---- Kanalpunkte-Soundboard
 await test('Soundboard: Einträge anlegen, bereinigen und begrenzen, Namen müssen eindeutig sein', async () => {
   const add = (b) => admin(adminReq('POST', 'soundboard', b, cookie));

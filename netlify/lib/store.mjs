@@ -25,19 +25,23 @@ function fileStore(name) {
   };
 }
 
-function blobStore(name) {
-  const s = getStore({ name, consistency: 'strong' });
+// Der Blobs-Client merkt sich beim Anlegen das Zugriffstoken der aktuellen Function-Umgebung, und das läuft nach einigen
+// Stunden ab. Eine dauernd warme Function (das Overlay fragt alle 3 Sekunden nach) würde sonst mit einem abgelaufenen
+// Token weiterarbeiten und nur noch Fehler liefern. Deshalb entsteht der Client bei jedem Zugriff neu und liest so
+// immer das aktuelle Token. Das Anlegen ist billig, es passiert dabei kein Netzwerkzugriff.
+export function createBlobStore(name, openStore = getStore) {
+  const store = () => openStore({ name, consistency: 'strong' });
   return {
-    get: (k) => s.get(k, { type: 'json' }),
-    set: (k, v) => s.setJSON(k, v),
-    async setIfNew(k, v) { return (await s.setJSON(k, v, { onlyIfNew: true })).modified; },
-    delete: (k) => s.delete(k),
+    get: (k) => store().get(k, { type: 'json' }),
+    set: (k, v) => store().setJSON(k, v),
+    async setIfNew(k, v) { return (await store().setJSON(k, v, { onlyIfNew: true })).modified; },
+    delete: (k) => store().delete(k),
     async list(prefix = '') {
       const keys = [];
-      for await (const page of s.list({ prefix, paginate: true })) keys.push(...page.blobs.map((b) => b.key));
+      for await (const page of store().list({ prefix, paginate: true })) keys.push(...page.blobs.map((b) => b.key));
       return keys.sort();
     },
   };
 }
 
-export const db = process.env.LOCAL_STORE_DIR ? fileStore('checkin') : blobStore('checkin');
+export const db = process.env.LOCAL_STORE_DIR ? fileStore('checkin') : createBlobStore('checkin');
