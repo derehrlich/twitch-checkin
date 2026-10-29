@@ -188,6 +188,22 @@
     <!-- Allgemein -->
     <div class="tab-panel hidden" data-panel="allgemein">
       <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
+
+      <section class="px-box card" id="backupCard">
+        <h2>Backup &amp; Wiederherstellen</h2>
+        <p class="muted">Die Sicherung enthält Besucher mit Streaks und Dauer, alle Einstellungen, das Soundboard, Raid-Zähler und Reward-IDs. Die Twitch-Verbindung ist bewusst nicht dabei, nach dem Wiederherstellen einmal „Mit Twitch verbinden“ und „Rewards &amp; Webhooks abgleichen“ klicken. Praktisch auch für den Umzug auf einen anderen Server.</p>
+        <div class="row">
+          <a class="btn" href="/api/admin/backup" download>Backup herunterladen</a>
+          <a class="btn ghost" href="/api/admin/backup?media=1" download>Backup mit Tönen &amp; Bildern</a>
+        </div>
+        <p class="muted">Die Variante mit Medien kann bei vielen oder großen Dateien an die Grenze von Netlify (ca. 6 MB) stoßen. Dann lieber ohne Medien sichern und die Dateien selbst aufheben.</p>
+        <h3>Wiederherstellen</h3>
+        <div class="row">
+          <div><label for="restoreFile">Backup-Datei (.json)</label><input id="restoreFile" type="file" accept="application/json,.json"></div>
+          <button id="restoreBtn" class="danger">Wiederherstellen</button>
+        </div>
+        <p class="muted" id="restoreInfo"></p>
+      </section>
     </div>
   </div>
 </main>

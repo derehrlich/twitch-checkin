@@ -113,14 +113,22 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Medien** | Töne und Bilder/GIFs je Alert |
 | **Besucher** | Suche, Sortierung, Besuchstage mit Dauer, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export |
 | **Tests** | Beispiel-Ereignisse ans Overlay oder in den Chat, ohne Zähler zu verändern |
-| **Allgemein** | Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus |
+| **Allgemein** | Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, Backup & Wiederherstellen |
+
+## Backup & Wiederherstellen
+
+Im Admin unter *Allgemein → Backup & Wiederherstellen* lädst du eine Sicherung als JSON herunter und spielst sie bei Bedarf wieder ein. Sie enthält Besucher (mit Streaks und Dauer), Einstellungen, Soundboard, Raid-Zähler und Reward-IDs. Töne und Bilder sind nur mit „Backup mit Tönen & Bildern“ dabei (bei Netlify begrenzt auf ca. 6 MB je Anfrage). **Die Twitch-Verbindung ist nicht enthalten:** Nach dem Wiederherstellen einmal *Mit Twitch verbinden* und *Rewards & Webhooks abgleichen* klicken. Beim Einspielen wird der aktuelle Stand ersetzt.
+
+## Betrieb auf dem eigenen Server
+
+Vorbereitende Infos für CasaOS (Erreichbarkeit für Twitch, Umzug, offene Punkte) stehen in [`docs/casaos.md`](docs/casaos.md).
 
 ## Projektaufbau
 
 ```
 netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, twitch-webhook
 netlify/lib/         Logik: checkin, streak, raid, alerts, soundboard, settings, twitch, store, http …
-netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users
+netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
 public/admin/        Admin-Oberfläche: index.html (Gerüst), admin.css, js/ (ein Skript je Bereich)
 test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)
@@ -133,7 +141,7 @@ test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optiona
 
 ## Look
 
-Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`: Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
+Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`; der Admin-Hintergrund entspricht dem Holz der Alert-Schilder (Raster und Streifen auf `#724C31`, `body.wood` in `admin.css`): Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
 
 - **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
 - **Töne pro Alert**: Im Admin unter *Medien → Töne* hat jeder Alert (Check-in, Check-out, Meilenstein, Raid, Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) einen eigenen Platz für eine Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB). Sie gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Fehlt eine eigene Datei, spielt das Overlay einen eingebauten Klang, der je Alert anders klingt (Horn beim Raid, Münze bei Bits, Glitzern bei Gift-Subs …). Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Beim Check-in gilt die Reihenfolge: hochgeladener Ton, `public/checkin.mp3` (falls vorhanden), eingebauter Klang. Bereits hochgeladene Check-in-Töne bleiben erhalten.

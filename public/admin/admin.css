@@ -1,4 +1,10 @@
 * { box-sizing: border-box; }
+/* Gleicher Holz-Hintergrund wie die Alert-Schilder im Overlay: Raster und Streifen auf #724C31 */
+body.wood {
+  background-color: #724C31;
+  background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px), repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0, 0, 0, .1) 8px, rgba(0, 0, 0, .1) 10px);
+  background-size: auto;
+}
 html { overflow-x: hidden; }
 body { margin: 0; color: var(--ink); font: 16px/1.45 var(--font); overflow-x: clip; }
 main { max-width: 980px; margin: 0 auto; padding: 78px 16px 120px; display: grid; gap: 22px; }

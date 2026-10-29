@@ -817,5 +817,40 @@ await test('Soundboard: ausgeschalteter Eintrag wird in Twitch deaktiviert, Einl
   assert.equal((await board(new Request(BASE + `/api/soundboard?id=${air.id}`))).status, 404);
 });
 
+await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und lehnt Fremddateien ab', async () => {
+  const res = await admin(adminReq('GET', 'backup', null, cookie));
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-disposition'), /stadtwache-backup-\d{4}-\d{2}-\d{2}\.json/);
+  const file = await res.json();
+  const keys = Object.keys(file.entries);
+  assert.ok(keys.some((k) => k.startsWith('user/')) && keys.includes('config/settings'), 'Besucher und Einstellungen enthalten');
+  assert.ok(!keys.includes('config/tokens') && !keys.some((k) => k.startsWith('event/') || k.startsWith('seen/')), 'keine Tokens und kein Kurzlebiges');
+  assert.ok(!keys.some((k) => k.startsWith('sound/') || k.startsWith('image/') || k.startsWith('soundboard/')), 'ohne ?media=1 keine Medien');
+
+  const userKey = keys.find((k) => k.startsWith('user/'));
+  const before = await db.get(userKey);
+  await db.delete(userKey);
+  await db.set('user/fremd', { name: 'Neu', count: 1, days: ['2020-01-01'] });
+  const tokens = await db.get('config/tokens');
+
+  assert.equal((await admin(adminReq('POST', 'backup', { backup: { format: 'anderes' }, confirm: true }, cookie))).status, 400, 'Fremddatei');
+  assert.equal((await admin(adminReq('POST', 'backup', { backup: file }, cookie))).status, 400, 'ohne Bestätigung');
+  const r = await (await admin(adminReq('POST', 'backup', { backup: file, confirm: true }, cookie))).json();
+  assert.equal(r.ok, true);
+  assert.deepEqual(await db.get(userKey), before, 'gelöschter Nutzer ist zurück');
+  assert.equal(await db.get('user/fremd'), null, 'Neueres wird durch den gesicherten Stand ersetzt');
+  assert.deepEqual(await db.get('config/tokens'), tokens, 'Twitch-Verbindung bleibt unberührt');
+
+  await db.set('sound/raid', { type: 'audio/wav', data: 'UklGRg==' });
+  const withMedia = await (await admin(adminReq('GET', 'backup?media=1', null, cookie))).json();
+  assert.equal(withMedia.media, true);
+  assert.ok(withMedia.entries['sound/raid'], 'Medien enthalten');
+  // Verweise auf fehlende Dateien werden beim Einspielen entfernt (hier: Ton-Hinweis ohne Datei)
+  await db.set('config/settings', { ...(await db.get('config/settings')), sounds: { follow: { name: 'weg.wav', version: 1 } } });
+  const plain = await (await admin(adminReq('GET', 'backup', null, cookie))).json();
+  await admin(adminReq('POST', 'backup', { backup: plain, confirm: true }, cookie));
+  assert.equal((await db.get('config/settings')).sounds?.follow, undefined, 'Verweis ohne Datei bereinigt');
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);
