@@ -58,7 +58,7 @@ Wenn jemand in deinen Kanal raidet, passiert automatisch:
 - **Offizieller Twitch-Shoutout** (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten; klappt er nicht, läuft der Rest trotzdem
 - **Overlay-Karte** mit Name und Zuschauerzahl, danach spielt ein **zufälliger Clip aus den beliebtesten Clips des Raiders** (einstellbare Höchstlänge, Standard 30 s)
 
-**Raid-Zähler:** Der Bot merkt sich, wie oft ein Kanal schon bei dir geraidet hat, und sagt es im Chat und auf der Overlay-Karte („schon zum 3. Mal bei uns“, Platzhalter `{raids}` und `{visit}`). Twitch liefert keinen Raid-Verlauf, gezählt wird deshalb ab dem ersten empfangenen Raid. Frühere Raids trägst du im Admin unter *Raids → Frühere Raids nachtragen* ein. Der Zähler läuft auch bei ausgeschalteter Raid-Reaktion weiter. Wer den Raid-Text im Admin schon gespeichert hat, muss `{visit}` selbst einfügen, der neue Standardtext gilt nur für ungespeicherte Einstellungen.
+**Raid-Zähler:** Der Bot merkt sich, wie oft ein Kanal schon bei dir geraidet hat, und sagt es im Chat und auf der Overlay-Karte („schon zum 3. Mal bei uns“, Platzhalter `{raids}` und `{visit}`). Twitch liefert keinen Raid-Verlauf, gezählt wird deshalb ab dem ersten empfangenen Raid. Frühere Raids trägst du im Admin unter *Raids → Frühere Raids nachtragen* ein, einzeln oder mehrere auf einmal (eine Zeile pro Kanal, z. B. `kanalname 3`). Die Tabelle *Erfasste Raids* darüber zeigt alle bekannten Kanäle mit Raid-Anzahl, Zuschauern und Quelle (live oder nachgetragen); ein Klick auf eine Zeile übernimmt den Kanal zum Ändern. Der Zähler läuft auch bei ausgeschalteter Raid-Reaktion weiter. Wer den Raid-Text im Admin schon gespeichert hat, muss `{visit}` selbst einfügen, der neue Standardtext gilt nur für ungespeicherte Einstellungen.
 
 Alles ist im Admin unter *Raids* ein- und ausschaltbar, dazu eine Mindestzahl an Raidern. Unter *Tests* gibt es Raid-Tests mit echten Kanaldaten (Shoutouts werden im Test nie ausgelöst).
 
@@ -108,7 +108,7 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adresse |
 | **Check-in & Streak** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter mit Namen, Preisen und Chattexten |
 | **Alerts** | Follow, Sub, Gift-Subs, Bits: Schalter, Chat-Dank, Schilder (Titel, Nachricht, Dauer) |
-| **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, früher erhaltene Raids nachtragen |
+| **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, Übersicht erfasster Raids, früher erhaltene Raids nachtragen (auch mehrere auf einmal) |
 | **Soundboard** | Einträge mit Reward, Abklingzeit, Lautstärke und Ton; Chat-Nachricht |
 | **Medien** | Töne und Bilder/GIFs je Alert |
 | **Besucher** | Suche, Sortierung, Besuchstage mit Dauer, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export |

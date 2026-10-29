@@ -20,7 +20,7 @@ Twitch schickt Check-ins, Raids, Follows usw. als Webhook (EventSub) an deinen B
 - Dieselbe öffentliche Adresse brauchst du als **OAuth Redirect URL** in der Twitch-App (`https://DEINE-ADRESSE/api/auth/callback`). Twitch erlaubt `http` nur für `localhost`.
 - Sie muss in der Umgebungsvariable `SITE_URL` stehen.
 
-Drei übliche Wege, ohne Ports am Router zu öffnen oder mit:
+Drei übliche Wege:
 
 1. **Cloudflare Tunnel** (empfohlen): kostenlos, kein Portfreigabe, eigene Domain nötig. `cloudflared` gibt es als CasaOS-App oder als Container. Der Tunnel zeigt auf den Port des Bots.
 2. **Tailscale Funnel**: kostenlos, kein eigener Domainname nötig (`*.ts.net`), ebenfalls ohne Portfreigabe.
