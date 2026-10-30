@@ -6,7 +6,7 @@ import { sendChat } from './twitch.mjs';
 import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkReply } from './community.mjs';
-import { activeGiveaway, recordGiveawayChat } from './giveaway.mjs';
+import { activeGiveaway, recordGiveawayChat, upcomingGiveaway } from './giveaway.mjs';
 import { pointsReply, rulesText } from './gwstats.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -68,7 +68,7 @@ export async function handleChat(e, settings, now = new Date()) {
 
   if (cmd === settings.communityCommand) { const reply = linkReply(settings, name); await sendChat(reply); return { ok: true, reply }; }
   if (gwCmd) {
-    const g = cmd === settings.giveawayCommand ? await activeGiveaway(settings, now) : null;
+    const g = cmd === settings.giveawayCommand ? ((await activeGiveaway(settings, now)) ?? (await upcomingGiveaway(settings, now))) : null; // auch ein geplantes Gewinnspiel wird angekündigt
     const reply = cmd === settings.giveawayPointsCommand ? await pointsReply(settings, id, name, now) : g ? rulesText(settings, g) : fill(settings.giveawayNoneTemplate, { user: name });
     await sendChat(reply);
     return { ok: true, reply };

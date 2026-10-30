@@ -153,6 +153,12 @@ export const costPer = (cost, delta) => (delta != null && delta > 0 && cost > 0 
 
 // ---- Texte
 
+/** Ziehungstermin als Text für Chat und Ankündigung, leer ohne Termin. */
+export function drawText(g) {
+  if (!g.drawDate) return '';
+  return `Ziehung am ${fmtDate(g.drawDate)}${g.drawTime ? ` um ${g.drawTime} Uhr` : ''} live im Stream`;
+}
+
 export const prizeText = (g, place) => g.prizes[place - 1]?.title ?? '';
 export const totalCost = (g) => Math.round(g.prizes.reduce((s, p) => s + (Number(p.cost) || 0), 0) * 100) / 100;
 
@@ -163,6 +169,7 @@ export function defaultAnnouncement(g) {
     + `So geht’s: Check-in per Kanalpunkte = 1 Punkt pro Stream. Wer im Chat aktiv ist (mindestens ${g.chatMinMsgs} Nachrichten über mindestens ${g.chatMinSpanMin} Minuten), bekommt +${g.chatPts}, ab ${g.chatHighMsgs} Nachrichten noch +${g.highPts}. `
     + `Wer in einer Woche bei allen festen Streams (${fixed}) dabei ist, bekommt +${g.streakBonus}. `
     + `Teilnehmen darf, wer an mindestens ${g.minStreams} Streams in mindestens ${g.minWeeks} verschiedenen Wochen eingecheckt war. Jeder Punkt ist ein Los. `
+    + (g.drawDate ? `${drawText(g)}. ` : '')
     + `Die Teilnahme ist kostenlos. Abos und Bits haben keinen Einfluss auf die Gewinnchance. Lurken ist ausdrücklich okay! 💛`;
 }
 
@@ -199,6 +206,9 @@ export function sanitizeGiveaway(input, base = {}) {
   if (typeof input.chatNeedsCheckin === 'boolean') g.chatNeedsCheckin = input.chatNeedsCheckin;
   for (const k of ['compareFrom', 'compareTo']) { if (input[k] === '' || input[k] === null) delete g[k]; else if (input[k] !== undefined) { if (!isDay(input[k])) return { error: 'Vergleichszeitraum: bitte Daten eintragen' }; g[k] = input[k]; } }
   if (g.compareFrom && g.compareTo && g.compareFrom > g.compareTo) return { error: 'Vergleichszeitraum: Ende liegt vor dem Beginn' };
+  if (input.drawDate !== undefined) { if (input.drawDate === '' || input.drawDate === null) delete g.drawDate; else if (isDay(input.drawDate)) g.drawDate = input.drawDate; else return { error: 'Ziehungsdatum: bitte ein Datum eintragen' }; }
+  if (input.drawTime !== undefined) { if (!input.drawTime) delete g.drawTime; else if (/^([01]\d|2[0-3]):[0-5]\d$/.test(input.drawTime)) g.drawTime = input.drawTime; else return { error: 'Ziehungszeit: bitte als HH:MM eintragen' }; }
+  if (!g.drawDate) delete g.drawTime;
   if (input.announcement !== undefined) g.announcement = cleanText(input.announcement, 1500);
   return { g };
 }
@@ -212,6 +222,12 @@ export const getGiveaway = (id) => db.get(gKey(id));
 export const saveGiveaway = (g) => db.set(gKey(g.id), g);
 export const newGiveawayId = () => `g${Date.now().toString(36)}${crypto.randomBytes(2).toString('hex')}`;
 export const deleteGiveaway = (id) => db.delete(gKey(id));
+
+/** Nächstes geplantes Gewinnspiel, das noch nicht begonnen hat. */
+export async function upcomingGiveaway(settings, now = new Date()) {
+  const today = streamDay(settings, now);
+  return (await listGiveaways()).filter((g) => g.start > today).sort((a, b) => a.start.localeCompare(b.start))[0] ?? null;
+}
 
 /** Laufendes Gewinnspiel (Heute liegt im Zeitraum); mehrere: das zuletzt begonnene. */
 export async function activeGiveaway(settings, now = new Date()) {

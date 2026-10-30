@@ -4,7 +4,7 @@ import { db } from './store.mjs';
 import { fill, streamDay } from './checkin.mjs';
 import { getSettings } from './settings.mjs';
 import { helix, sendChat, userToken } from './twitch.mjs';
-import { activeGiveaway, fmtDate, loadGiveaway } from './giveaway.mjs';
+import { activeGiveaway, drawText, fmtDate, loadGiveaway } from './giveaway.mjs';
 
 const HOUR = 3_600_000;
 
@@ -51,9 +51,13 @@ export async function remind(settings, now = new Date()) {
   return true;
 }
 
-export const rulesText = (settings, g) => fill(settings.giveawayRulesTemplate, {
-  name: g.name, start: fmtDate(g.start), end: fmtDate(g.end), minStreams: g.minStreams, minWeeks: g.minWeeks, prize: g.prizes[0]?.title ?? '',
-});
+export function rulesText(settings, g) {
+  const tpl = settings.giveawayRulesTemplate;
+  const draw = drawText(g);
+  const text = fill(tpl, { name: g.name, start: fmtDate(g.start), end: fmtDate(g.end), minStreams: g.minStreams, minWeeks: g.minWeeks, prize: g.prizes[0]?.title ?? '', draw });
+  // Ältere gespeicherte Vorlagen kennen {draw} nicht: der Termin kommt dann ans Ende, damit er nie fehlt
+  return draw && !tpl.includes('{draw}') ? `${text} ${draw}.` : text;
+}
 
 /** Antwort auf den Punkte-Befehl für eine Person. */
 export async function pointsReply(settings, userId, userName, now = new Date()) {

@@ -1637,6 +1637,31 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.ok(g);
   });
 
+
+  await test('Ziehungstermin und geplante Gewinnspiele: Termin im Chat, Ankündigung, Validierung, Vorankündigung', async () => {
+    const mk = (extra) => admin(adminReq('POST', 'giveaway', { name: 'Zukunft', start: '2099-03-01', end: '2099-03-31', prizes: [{ title: 'Preis', cost: 0 }], ...extra }, cookie));
+    assert.equal((await mk({ drawDate: '31.03.2099' })).status, 400);
+    assert.equal((await mk({ drawDate: '2099-03-31', drawTime: '25:00' })).status, 400);
+    const id = (await (await mk({ drawDate: '2099-03-31', drawTime: '20:00' })).json()).id;
+    const list = await (await admin(adminReq('GET', 'giveaway', null, cookie))).json();
+    assert.equal(list.giveaways.find((x) => x.id === id).status, 'geplant');
+    const d = await (await admin(adminReq('GET', `giveaway/${id}`, null, cookie))).json();
+    assert.match(d.announcement, /Ziehung am 31\.03\.2099 um 20:00 Uhr live im Stream/);
+    // Vorlage ohne {draw} (ältere Einstellungen): Termin wird angehängt; Befehl kündigt das geplante Gewinnspiel an, solange keins läuft
+    const g = await gw.getGiveaway(id);
+    const { rulesText } = await import('../netlify/lib/gwstats.mjs');
+    assert.match(rulesText({ giveawayRulesTemplate: 'Hallo {name}' }, g), /^Hallo Zukunft Ziehung am 31\.03\.2099 um 20:00 Uhr live im Stream\.$/);
+    assert.doesNotMatch(rulesText({ giveawayRulesTemplate: 'Hallo {name}' }, { ...g, drawDate: undefined }), /Ziehung/);
+    const others = (await gw.listGiveaways()).filter((x) => x.id !== id);
+    for (const o of others) await gw.saveGiveaway({ ...o, start: '2025-01-01', end: '2025-01-02' });
+    const reply = (await handleChat(ev('7020', 'Fan', '!gewinnspiel'), settings, at(0))).reply;
+    assert.match(reply, /Zukunft/); assert.match(reply, /Ziehung am 31\.03\.2099/);
+    assert.equal((await admin(adminReq('PUT', `giveaway/${id}`, { drawDate: '' }, cookie))).status, 200);
+    assert.equal((await gw.getGiveaway(id)).drawTime, undefined, 'ohne Datum keine Uhrzeit');
+    await admin(adminReq('DELETE', `giveaway/${id}`, null, cookie));
+    for (const o of others) await gw.saveGiveaway(o);
+  });
+
   await test('Backup enthält Gewinnspiele, Chat je Stream, Statistik und Ziehungsprotokolle', async () => {
     const b = await (await admin(adminReq('GET', 'backup', null, cookie))).json();
     for (const p of ['giveaway/', 'gwstream/', 'gwstats/', 'gwdraw/']) assert.ok(Object.keys(b.entries).some((k) => k.startsWith(p)), p);

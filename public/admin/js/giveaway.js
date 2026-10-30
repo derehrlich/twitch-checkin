@@ -12,7 +12,7 @@ const FIELD_IDS = { minStreams: 'gwMinStreams', minWeeks: 'gwMinWeeks', checkinP
 export async function loadGiveaways(selectId) {
   const { giveaways, defaults } = await api('GET', 'giveaway');
   const keep = selectId ?? $('gwSelect').value;
-  $('gwSelect').innerHTML = giveaways.length ? giveaways.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (${fmtDate(g.start)}–${fmtDate(g.end)})</option>`).join('') : '<option value="">Noch kein Gewinnspiel</option>';
+  $('gwSelect').innerHTML = giveaways.length ? giveaways.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (${fmtDate(g.start)}–${fmtDate(g.end)}, ${g.status})</option>`).join('') : '<option value="">Noch kein Gewinnspiel</option>';
   $('gwSelect').dataset.defaults = JSON.stringify(defaults);
   if (giveaways.some((g) => g.id === keep)) $('gwSelect').value = keep;
   await loadDetail();
@@ -33,7 +33,7 @@ async function loadDetail() {
 // ---- Formular
 
 function renderForm(g) {
-  $('gwName').value = g.name; $('gwStart').value = g.start; $('gwEnd').value = g.end;
+  $('gwName').value = g.name; $('gwStart').value = g.start; $('gwEnd').value = g.end; $('gwDrawDate').value = g.drawDate ?? ''; $('gwDrawTime').value = g.drawTime ?? '';
   for (const [k, id] of Object.entries(FIELD_IDS)) $(id).value = g[k];
   $('gwNeedsCheckin').checked = g.chatNeedsCheckin;
   $('gwCmpFrom').value = g.compareFrom ?? ''; $('gwCmpTo').value = g.compareTo ?? '';
@@ -47,7 +47,7 @@ function renderPrizes() {
 }
 
 function readForm() {
-  const body = { name: $('gwName').value, start: $('gwStart').value, end: $('gwEnd').value, chatNeedsCheckin: $('gwNeedsCheckin').checked, compareFrom: $('gwCmpFrom').value, compareTo: $('gwCmpTo').value, announcement: $('gwAnnouncement').value };
+  const body = { name: $('gwName').value, start: $('gwStart').value, end: $('gwEnd').value, drawDate: $('gwDrawDate').value, drawTime: $('gwDrawTime').value, chatNeedsCheckin: $('gwNeedsCheckin').checked, compareFrom: $('gwCmpFrom').value, compareTo: $('gwCmpTo').value, announcement: $('gwAnnouncement').value };
   for (const [k, id] of Object.entries(FIELD_IDS)) body[k] = $(id).value;
   body.fixedDays = [...$('gwFixed').querySelectorAll('input:checked')].map((i) => Number(i.dataset.day));
   body.prizes = [...$('gwPrizes').querySelectorAll('[data-i]')].map((r) => ({ title: r.querySelector('[data-f=title]').value, cost: r.querySelector('[data-f=cost]').value }));
@@ -105,7 +105,7 @@ export function initGiveaway() {
   $('gwSelect').addEventListener('change', run(loadDetail));
   $('gwNew').addEventListener('click', run(async () => {
     const d = JSON.parse($('gwSelect').dataset.defaults || '{}');
-    const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    const today = new Date(), now = new Date(today.getFullYear(), today.getMonth() + (today.getDate() >= 20 ? 1 : 0), 1), y = now.getFullYear(), m = now.getMonth(); // ab dem 20. wird der nächste Monat geplant
     const pad = (n) => String(n).padStart(2, '0');
     const last = new Date(y, m + 1, 0).getDate();
     const res = await api('POST', 'giveaway', { ...d, name: `Gewinnspiel ${now.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}`, start: `${y}-${pad(m + 1)}-01`, end: `${y}-${pad(m + 1)}-${pad(last)}`,

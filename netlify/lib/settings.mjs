@@ -143,8 +143,8 @@ export const DEFAULTS = {
   giveawayPointsCommand: '!punkte',
   giveawayRemindMinutes: 0, // 0 = keine Erinnerung im Chat
   giveawayDrawChat: true,
-  // Platzhalter: {name} {start} {end} {minStreams} {minWeeks} {prize}
-  giveawayRulesTemplate: '🎁 {name} ({start}–{end}): Check-in = 1 Punkt pro Stream, Chat-Aktivität und alle festen Streams geben Bonuspunkte. Teilnehmen darf, wer an {minStreams} Streams in {minWeeks} Wochen eingecheckt war. Teilnahme kostenlos – Abos und Bits haben keinen Einfluss auf die Gewinnchance. Dein Stand: !punkte',
+  // Platzhalter: {name} {start} {end} {minStreams} {minWeeks} {prize} {draw} (Ziehungstermin, leer ohne Termin)
+  giveawayRulesTemplate: '🎁 {name} ({start}–{end}): Check-in = 1 Punkt pro Stream, Chat-Aktivität und alle festen Streams geben Bonuspunkte. Teilnehmen darf, wer an {minStreams} Streams in {minWeeks} Wochen eingecheckt war. Teilnahme kostenlos – Abos und Bits haben keinen Einfluss auf die Gewinnchance. {draw} Dein Stand: !punkte',
   giveawayNoneTemplate: '{user}, gerade läuft kein Gewinnspiel.',
   // Platzhalter: {user} {points} {checkins} {weeks} {missing} (was zur Teilnahme noch fehlt) {minStreams} {minWeeks}
   giveawayPointsTemplate: '🎟️ {user}: {points} Punkte ({checkins} Check-ins in {weeks} Wochen) – du bist qualifiziert ✅',

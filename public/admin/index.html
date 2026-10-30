@@ -205,6 +205,10 @@
           <div><label for="gwName">Name</label><input id="gwName" maxlength="80"></div>
           <div class="row"><div><label for="gwStart">Beginn</label><input id="gwStart" type="date"></div><div><label for="gwEnd">Ende (einschließlich)</label><input id="gwEnd" type="date"></div></div>
         </div>
+        <div class="grid2">
+          <div class="row"><div><label for="gwDrawDate">Ziehungsdatum (optional)</label><input id="gwDrawDate" type="date"></div><div><label for="gwDrawTime">Uhrzeit</label><input id="gwDrawTime" type="time"></div></div>
+        </div>
+        <p class="muted">Der Termin steht automatisch in der Ankündigung, bei <code>!gewinnspiel</code> und in der Erinnerung im Chat. Ein Gewinnspiel mit Beginn in der Zukunft ist „geplant": Es zählt noch nichts, <code>!gewinnspiel</code> kündigt es aber schon an.</p>
         <h3>Preise und Kosten</h3>
         <div id="gwPrizes"></div>
         <div class="row"><button id="gwAddPrize" class="ghost">Platz hinzufügen</button></div>

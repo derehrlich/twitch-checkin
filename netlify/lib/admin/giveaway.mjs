@@ -28,7 +28,7 @@ export function splitChat(text, max = 480) {
   return parts.flatMap((p) => (p.length > max ? p.match(new RegExp(`.{1,${max}}`, 'g')) : [p]));
 }
 
-const summary = (g) => ({ id: g.id, name: g.name, start: g.start, end: g.end, cost: totalCost(g) });
+const summary = (g, today) => ({ id: g.id, name: g.name, start: g.start, end: g.end, cost: totalCost(g), status: g.start > today ? 'geplant' : g.end < today ? 'beendet' : 'läuft' });
 
 function streamList(g, today, data) {
   const { held, allDays, stats, checkins } = data;
@@ -100,7 +100,7 @@ async function detail(g, settings) {
 export async function giveaway({ route, method, body }) {
   const settings = await getSettings();
   if (route.length === 1) {
-    if (method === 'GET') return json({ giveaways: (await listGiveaways()).map(summary), defaults: RULE_DEFAULTS });
+    if (method === 'GET') return json({ giveaways: (await listGiveaways()).map((x) => summary(x, streamDay(settings))), defaults: RULE_DEFAULTS });
     if (method === 'POST') {
       const res = sanitizeGiveaway(body);
       if (res.error) return json({ error: res.error }, 400);
