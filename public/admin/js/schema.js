@@ -108,12 +108,15 @@ export const SCHEMA = {
       n('communityMsgCap', 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
       n('communityMsgGap', 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
       t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
+      t('communityRankCommand', 'Chat-Befehl für die Monatsrangliste', { maxlength: 26, placeholder: '!rangliste' }), n('communityRankSize', 'Wie viele Plätze im Chat zeigen', { min: 1, max: 10 }),
       t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
     ] },
-    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Verknüpfungsseite. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
+    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
       c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
       a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
       a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityRankTemplate', 'Antwort auf den Rangliste-Befehl', { month: 'Oktober 2026', list: '1. Anna (120) · 2. Ben (80)', me: ' · Du: Platz 7 (45)', url: 'https://…/rangliste' }),
+      a('communityRankEmpty', 'Antwort, wenn noch niemand Punkte hat', { month: 'Oktober 2026', url: 'https://…/rangliste' }),
     ] },
   ],
 

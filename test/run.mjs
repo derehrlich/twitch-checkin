@@ -1341,6 +1341,27 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.ok(!JSON.stringify(data.month).includes('111111111'), 'keine Discord-ID öffentlich');
   });
 
+  await test('Chat: !rangliste zeigt die Top-Plätze des Monats und den eigenen Platz, ohne Punkte eine Aufforderung', async () => {
+    await admin(adminReq('PUT', 'settings', { commandCooldown: 0, communityRankSize: 1 }, cookie));
+    const month = com.monthOf(await getSettings());
+    await com.saveLink({ discordId: '444444444', discordName: 'DoraDC', twitchId: '5010', twitchName: 'Dora' });
+    await db.set(`dmonth/${month}/444444444`, { msgs: 1, days: 1 });
+    await chatMsg('5001', 'Anna', '!rangliste');
+    assert.match(chats().at(-1), /Dorf-Rangliste .*: 1\. Anna \(\d+\)/);
+    assert.ok(!/Du: Platz/.test(chats().at(-1)), 'wer oben steht, braucht keine Extrazeile');
+    assert.match(chats().at(-1), /beispiel\.netlify\.app\/rangliste/);
+    await chatMsg('5010', 'Dora', '!rangliste');
+    assert.match(chats().at(-1), /1\. Anna .* · Du: Platz 2 \(\d+\)/);
+    await chatMsg('5555', 'Fremd', '!rangliste');
+    assert.ok(!/Du: Platz/.test(chats().at(-1)), 'Unverknüpfte bekommen keine Platzangabe');
+    await com.removeLink({ discordId: '444444444' });
+    const zero = { communityWeightMsg: 0, communityWeightDay: 0, communityWeightCheckin: 0 };
+    await admin(adminReq('PUT', 'settings', { communityRankSize: 5, ...zero }, cookie)); // ohne Gewichte hat niemand Punkte
+    await chatMsg('5555', 'Fremd', '!rangliste');
+    assert.match(chats().at(-1), /noch keine Punkte/, 'leere Rangliste');
+    await admin(adminReq('PUT', 'settings', { communityWeightMsg: 1, communityWeightDay: 10, communityWeightCheckin: 20 }, cookie));
+  });
+
   await test('Chat: !verknuepfen erklärt es, Check-in-Tipp nur einmal im Monat und nur für Unverknüpfte', async () => {
     await chatMsg('5002', 'Ben', '!verknuepfen');
     assert.match(chats().at(-1), /verknüpfe dein Twitch- und Discord-Konto/);

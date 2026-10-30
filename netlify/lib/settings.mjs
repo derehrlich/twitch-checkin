@@ -134,6 +134,11 @@ export const DEFAULTS = {
   // Platzhalter: {user} {url}
   communityLinkTemplate: '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}',
   communityTipTemplate: '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.',
+  communityRankCommand: '!rangliste', // zeigt die Top-Plätze des Monats im Chat
+  communityRankSize: 5,
+  // Platzhalter: {month} Monat, {list} "1. Anna (120) · 2. Ben (80)", {me} eigener Platz (nur wenn verknüpft und nicht in der Liste), {url} Rangliste-Seite
+  communityRankTemplate: '🏆 Dorf-Rangliste {month}: {list}{me} · Alle Plätze: {url}',
+  communityRankEmpty: '🏆 In der Dorf-Rangliste {month} stehen noch keine Punkte. Verknüpfe dich mit !verknuepfen und leg los! {url}',
   communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
@@ -178,6 +183,9 @@ function sanitize(input) {
   num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
   num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
   for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint']) str(k, 400);
+  for (const k of ['communityRankTemplate', 'communityRankEmpty']) str(k, 400);
+  num('communityRankSize', 1, 10);
+  if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
   num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
   num('communityMsgCap', 1, 500); num('communityMsgGap', 0, 3600);
   if (typeof input.communityCommand === 'string') { const v = input.communityCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityCommand = v; }

@@ -93,7 +93,7 @@ Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. *
 - **Geheimwort:** `LINK_SECRET` in Netlify setzen (langer Zufallstext) und denselben Wert beim VerwirrBot in `data/verwirrbot.env` eintragen. Damit signiert der Bot die Verknüpfungs-Links und meldet sich bei `/api/community/*` an. Ohne das Geheimwort ist alles ausgeschaltet.
 - **Verknüpfen:** im Discord `/verknuepfen`, privater Link zu `/verknuepfen`, Anmeldung mit Twitch (ohne Berechtigungen), **ausdrückliche Zustimmung** per Haken. Löschen geht jederzeit auf der Seite, im Discord mit `/verknuepfung_loeschen` oder im Admin.
 - **Punkte:** Nachrichten × 1 + aktive Tage × 10 + Check-in-Tage × 20 (alles im Admin einstellbar). Eine Nachricht zählt höchstens alle 60 Sekunden, pro Tag und Plattform höchstens 30. Gezählt wird nur wie viele, nie was geschrieben wird. Der Kanalinhaber und Bots zählen nicht.
-- **Anzeige:** `/rangliste` und der Panel-Reiter „Monat“ zeigen die Top-Plätze mit Hinweis, wie man mitmacht. Der Chat-Befehl `!verknuepfen` erklärt es, und wer eincheckt und noch nicht verknüpft ist, bekommt einmal im Monat einen kurzen Tipp.
+- **Anzeige:** `/rangliste` und der Panel-Reiter „Monat“ zeigen die Top-Plätze mit Hinweis, wie man mitmacht. Der Chat-Befehl `!rangliste` zeigt die Top 5 des Monats (und den eigenen Platz, wenn man verknüpft ist), `!verknuepfen` erklärt die Verknüpfung, und wer eincheckt und noch nicht verknüpft ist, bekommt einmal im Monat einen kurzen Tipp.
 - **Bot-Schnittstelle:** `GET /api/community/board`, `POST /api/community/sync`, `POST /api/community/unlink` (Bearer `LINK_SECRET`).
 
 ## Overlay aktualisiert sich selbst
