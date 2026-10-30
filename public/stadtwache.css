@@ -1,0 +1,107 @@
+/* Stadtwache – Design wie das VerwirrBot-Dashboard: dunkles Marineblau, gelber Akzent, Pixel-Überschriften,
+   Karten mit Tiefe, Hell/Dunkel. Gemeinsam für Admin und öffentliche Rangliste (das Stream-Overlay bleibt im Holz-Look, siehe theme.css). */
+@font-face { font-family: "Silkscreen"; src: url("/fonts/Silkscreen-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+
+:root {
+  --bg: #08131f; --bg2: #0d2236; --karte: #0f2438; --karte2: #153250;
+  --rand: rgba(142, 230, 255, .16); --rand-stark: rgba(142, 230, 255, .35);
+  --text: #eaf4fb; --leise: #8fc4dc;
+  --gelb: #f5c230; --gelb-text: #2a1a00;
+  --gruen: #5ddc7a; --orange: #ffa23d; --rot: #ff6b86;
+  --feld: #091a2a;
+  --schatten: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .25);
+  --pixel: "Silkscreen", ui-monospace, monospace;
+  --seite: 252px;
+}
+:root[data-theme="light"] {
+  --bg: #eef3f8; --bg2: #e3ecf5; --karte: #ffffff; --karte2: #f1f6fb;
+  --rand: rgba(18, 52, 86, .14); --rand-stark: rgba(18, 52, 86, .32);
+  --text: #12263a; --leise: #3d6682; --gelb: #c98f00; --gelb-text: #2a1a00;
+  --gruen: #1f9d4a; --orange: #c46a00; --rot: #d6284d; --feld: #f7fafd;
+  --schatten: 0 1px 2px rgba(18, 52, 86, .08), 0 8px 24px rgba(18, 52, 86, .08);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #eef3f8; --bg2: #e3ecf5; --karte: #ffffff; --karte2: #f1f6fb;
+    --rand: rgba(18, 52, 86, .14); --rand-stark: rgba(18, 52, 86, .32);
+    --text: #12263a; --leise: #3d6682; --gelb: #c98f00; --gelb-text: #2a1a00;
+    --gruen: #1f9d4a; --orange: #c46a00; --rot: #d6284d; --feld: #f7fafd;
+    --schatten: 0 1px 2px rgba(18, 52, 86, .08), 0 8px 24px rgba(18, 52, 86, .08);
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); max-width: 100%; overflow-x: clip; }
+body {
+  margin: 0; color: var(--text); min-height: 100vh; max-width: 100%; overflow-x: clip;
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background:
+    radial-gradient(900px 500px at 85% -10%, color-mix(in srgb, var(--gelb) 10%, transparent), transparent 70%),
+    radial-gradient(800px 600px at 0% 0%, color-mix(in srgb, var(--leise) 10%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+h1 { font-family: var(--pixel); font-weight: 700; color: var(--gelb); margin: 0; letter-spacing: .5px; line-height: 1.25; }
+h2 { margin: 0 0 12px; font-size: .78rem; color: var(--leise); text-transform: uppercase; letter-spacing: .14em; font-weight: 700; }
+h3 { margin: 18px 0 6px; font-size: 1rem; }
+a { color: var(--leise); text-underline-offset: 3px; }
+a:hover { color: var(--gelb); }
+::selection { background: var(--gelb); color: var(--gelb-text); }
+.hidden { display: none !important; }
+
+/* Kopf */
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rand);
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; min-width: 0; }
+.brand img { height: 40px; width: auto; border-radius: 10px; image-rendering: pixelated; flex: none; }
+.brand small { display: block; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--leise); line-height: 1.2; }
+.brand h1 { font-size: 1.25rem; }
+
+/* Karten */
+.card {
+  background: linear-gradient(180deg, var(--karte2), var(--karte) 60%);
+  border: 1px solid var(--rand); border-radius: 16px; box-shadow: var(--schatten); position: relative;
+}
+:root[data-theme="light"] .card { background: var(--karte); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .card { background: var(--karte); } }
+.muted { color: var(--leise); font-size: .9rem; }
+
+/* Knöpfe */
+button, .btn {
+  background: var(--gelb); color: var(--gelb-text); border: 0; border-radius: 10px; padding: 10px 18px;
+  font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer; text-decoration: none; display: inline-block;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 2px 6px rgba(0, 0, 0, .25);
+  transition: transform .12s, filter .12s, background .12s;
+}
+button:hover, .btn:hover { filter: brightness(1.08); transform: translateY(-1px); color: var(--gelb-text); }
+button:active, .btn:active { transform: translateY(0); }
+button:focus-visible, .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--gelb); outline-offset: 2px; }
+button.ghost, .btn.ghost, button.leise { background: transparent; color: var(--leise); border: 1px solid var(--rand-stark); box-shadow: none; padding: 7px 14px; font-weight: 600; }
+button.ghost:hover, .btn.ghost:hover, button.leise:hover { background: var(--karte2); color: var(--text); filter: none; }
+button.danger { background: var(--rot); color: #fff; }
+button:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
+.thema { font-size: 1.1rem; padding: 6px 11px; line-height: 1.2; }
+
+/* Eingabefelder */
+label { display: block; font-size: .9rem; font-weight: 600; color: var(--leise); margin: 14px 0 5px; }
+input, textarea, select {
+  width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--rand-stark);
+  background: var(--feld); color: inherit; font: inherit; transition: border-color .12s, box-shadow .12s;
+}
+textarea { min-height: 72px; resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gelb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gelb) 28%, transparent); }
+input[type=checkbox], input[type=radio] { accent-color: var(--gelb); width: 20px; height: 20px; flex: none; padding: 0; }
+input[type=file] { color: var(--leise); max-width: 100%; padding: 6px; }
+input[type=file]::file-selector-button { margin-right: 12px; border: 1px solid var(--rand-stark); background: transparent; color: var(--leise); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+code { background: var(--feld); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--rand); font-size: .88em; word-break: break-all; font-family: ui-monospace, Consolas, monospace; }
+
+/* Tabellen */
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--rand); vertical-align: top; }
+th { color: var(--leise); font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+tbody tr:hover td { background: color-mix(in srgb, var(--leise) 7%, transparent); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

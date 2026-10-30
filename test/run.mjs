@@ -1016,7 +1016,7 @@ await test('Panel-Extension: Zip enthält Seite, Skript mit eingesetzter Adresse
   const { buildExtension } = await import('../scripts/build-extension.mjs');
   const zip = buildExtension('https://meine-seite.de/');
   assert.equal(zip.readUInt32LE(0), 0x04034b50, 'beginnt mit einem Zip-Header');
-  for (const name of ['panel.html', 'panel.css', 'panel.js', 'fonts/fredoka-latin-400-normal.woff2', 'fonts/OFL-Fredoka.txt']) assert.ok(zip.includes(Buffer.from(name)), name);
+  for (const name of ['panel.html', 'panel.css', 'panel.js', 'fonts/Silkscreen-Bold.ttf']) assert.ok(zip.includes(Buffer.from(name)), name);
   assert.throws(() => buildExtension('http://unsicher.de'), /https/);
   assert.throws(() => buildExtension('https://seite.de/pfad'), /https/);
   const js = fs.readFileSync(new URL('../extension/panel.js', import.meta.url), 'utf8');
