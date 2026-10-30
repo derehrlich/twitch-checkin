@@ -74,6 +74,49 @@ export const SCHEMA = {
     ] },
   ],
 
+  einlaufsound: [
+    { title: 'Einlaufsound: Preise und Laufzeit', hint: 'Der <b>Kauf</b> gilt die eingestellten Monate. <b>Verlängern</b> bringt anteilig Monate (Verlängern-Preis ÷ Kaufpreis × Kauf-Monate). Die genaue Monatszahl setzt die Stadtwache selbst in Reward-Name und Beschreibung. Nach Änderungen die Rewards abgleichen.', items: [
+      c('entrySoundEnabled', 'Einlaufsound aktivieren (zwei Rewards: Kauf und Verlängern)'),
+      t('entrySoundBuyTitle', 'Kauf: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundBuyCost', 'Kauf: Preis (Kanalpunkte)', { min: 1 }),
+      n('entrySoundBuyMonths', 'Kauf: gilt so viele Monate', { min: 1, max: 36 }),
+      t('entrySoundExtendTitle', 'Verlängern: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundExtendCost', 'Verlängern: Preis (Kanalpunkte)', { min: 1 }),
+      n('entrySoundMaxMonths', 'Höchste Restlaufzeit in Monaten (darüber hinaus wird nicht verlängert)', { min: 1, max: 60 }),
+      n('entrySoundKeepMonths', 'Abgelaufene Sounds so viele Monate aufbewahren (in der Zeit verlängerbar)', { min: 0, max: 24 }),
+      n('entrySoundMaxSeconds', 'Längster Sound in Sekunden (das Overlay schneidet längere ab)', { min: 1, max: 30 }),
+      n('entrySoundUploadDays', 'Frist für den Upload nach dem Kauf in Tagen (danach Punkte zurück)', { min: 1, max: 90 }),
+    ] },
+    { title: 'Einlaufsound: Chat-Texte', hint: `Platzhalter: ${code('user')} Name, ${code('months')} Monate, ${code('until')} gültig bis, ${code('url')} Upload-Seite, ${code('days')} Frist, ${code('rest')} Restlaufzeit, ${code('max')} Obergrenze, ${code('reason')} Ablehnungsgrund. Nachrichten mit „Punkte zurück“ erstatten die Einlösung.`, items: [
+      a('entrySoundBuyTemplate', 'Nach dem Kauf', { user: 'Max', months: '6 Monate', url: 'https://…/einlaufsound', days: 14 }),
+      a('entrySoundHasTemplate', 'Kauf, obwohl schon ein Sound gilt', { user: 'Max', until: '14.04.2027' }),
+      a('entrySoundOpenTemplate', 'Kauf oder Verlängern, obwohl ein Kauf noch offen ist', { user: 'Max', url: 'https://…/einlaufsound' }),
+      a('entrySoundNoneTemplate', 'Verlängern ohne gekauften Sound', { user: 'Max' }),
+      a('entrySoundExtendTemplate', 'Nach dem Verlängern', { user: 'Max', months: '2 Monate', until: '14.04.2027', url: 'https://…/einlaufsound' }),
+      a('entrySoundTooMuchTemplate', 'Verlängern über der Obergrenze', { user: 'Max', max: '12 Monate', rest: '11,5 Monate' }),
+      a('entrySoundBusyTemplate', 'Gleichzeitige Einlösung'),
+      a('entrySoundApprovedTemplate', 'Sound freigegeben', { user: 'Max', until: '14.04.2027' }),
+      a('entrySoundRejectedTemplate', 'Sound abgelehnt, neuer Upload möglich', { user: 'Max', reason: 'zu laut', url: 'https://…/einlaufsound' }),
+      a('entrySoundRefundTemplate', 'Sound abgelehnt, Punkte zurück', { user: 'Max', reason: 'enthält Musik' }),
+      a('entrySoundExpiredTemplate', 'Upload-Frist abgelaufen, Punkte zurück', { user: 'Max' }),
+    ] },
+  ],
+
+  community: [
+    { title: 'Community-Rangliste des Monats', hint: 'Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. <b>Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.</b> Voraussetzung ist das Geheimwort <code>LINK_SECRET</code> in Netlify (und beim Bot). Nach dem Ein- oder Ausschalten die Webhooks abgleichen.', items: [
+      c('communityEnabled', 'Community-Rangliste aktivieren (Zählen, Verknüpfen, Monatsrangliste)'),
+      n('communityWeightMsg', 'Punkte je Nachricht', { min: 0, max: 1000 }), n('communityWeightDay', 'Punkte je aktivem Tag (Twitch und Discord getrennt gezählt)', { min: 0, max: 1000 }),
+      n('communityWeightCheckin', 'Punkte je Check-in-Tag', { min: 0, max: 1000 }),
+      n('communityMsgCap', 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
+      n('communityMsgGap', 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
+      t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
+      t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
+    ] },
+    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Verknüpfungsseite. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
+      c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
+      a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
+    ] },
+  ],
+
   abspann: [
     { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
       c('chatCommands', 'Chat-Befehle aktivieren'),
@@ -111,4 +154,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];

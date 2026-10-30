@@ -1058,5 +1058,325 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   assert.equal((await db.get('config/settings')).sounds?.follow, undefined, 'Verweis ohne Datei bereinigt');
 });
 
+
+// ---- Einlaufsound (Kauf, Upload, Freigabe, Verlängern, Ablauf)
+{
+  const entryFn = (await import('../netlify/functions/einlaufsound.mjs')).default;
+  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  const es = await import('../netlify/lib/entrysound.mjs');
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(200)]);
+  const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
+  const viewerReq = (method, p, body, ck) => new Request(BASE + '/api/einlaufsound/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+  let rid = 0;
+  const redeem = async (which, userId, name) => {
+    const state = await db.get('config/state');
+    const id = `es-${++rid}`;
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption(id, userId, name, which === 'buy' ? state.entryBuyRewardId : state.entryExtendRewardId) }));
+    return id;
+  };
+  const MONTH = 30.4375 * 86_400_000;
+  const monthsFromNow = (iso) => (Date.parse(iso) - Date.now()) / MONTH;
+
+  await test('Einlaufsound: Rewards mit genauer Monatszahl in Titel und Beschreibung, Verlängern anteilig aus den Preisen', async () => {
+    assert.equal((await admin(adminReq('PUT', 'settings', { entrySoundEnabled: true }, cookie))).status, 200);
+    const res = await admin(adminReq('POST', 'setup', {}, cookie));
+    const out = await res.json();
+    assert.deepEqual(out.entrySound, ['Eigener Einlaufsound (6 Monate)', 'Einlaufsound verlängern (+2 Monate)']);
+    const state = await db.get('config/state');
+    const extend = rewards.find((r) => r.id === state.entryExtendRewardId);
+    assert.equal(extend.cost, 25_000);
+    assert.equal(rewards.find((r) => r.id === state.entryBuyRewardId).cost, 75_000);
+    const s = await getSettings();
+    assert.equal(es.extendMonths(s), 2);
+    assert.equal(es.fmtMonths(1.5), '1,5 Monate'); assert.equal(es.fmtMonths(1), '1 Monat');
+    assert.equal(es.rewardTitles({ ...s, entrySoundBuyCost: 100_000 }).extend, 'Einlaufsound verlängern (+1,5 Monate)');
+    assert.ok(es.rewardPrompts(s).extend.includes('2 Monate'));
+  });
+
+  await test('Einlaufsound: Verlängern ohne gekauften Sound gibt Hinweis und Punkte zurück', async () => {
+    const id = await redeem('extend', '5001', 'Anna');
+    assert.equal(statusOf(id), 'CANCELED');
+    assert.match(chats().at(-1), /noch keinen Einlaufsound gekauft/);
+  });
+
+  await test('Einlaufsound: Kauf bleibt offen, zweiter Kauf wird erstattet', async () => {
+    const id = await redeem('buy', '5001', 'Anna');
+    assert.equal(statusOf(id), undefined, 'Einlösung bleibt bis zur Freigabe offen');
+    assert.match(chats().at(-1), /beispiel\.netlify\.app\/einlaufsound/);
+    assert.equal((await db.get('entrysound/5001')).uploadsLeft, 1);
+    const again = await redeem('buy', '5001', 'Anna');
+    assert.equal(statusOf(again), 'CANCELED');
+    assert.match(chats().at(-1), /wartet noch/);
+  });
+
+  await test('Zuschauer-Anmeldung: eigener Zweig, Tokens des Broadcasters bleiben unberührt', async () => {
+    const login = await auth(new Request(BASE + '/api/auth/viewer'));
+    assert.equal(login.status, 302);
+    const loc = new URL(login.headers.get('location'));
+    assert.equal(loc.searchParams.get('scope'), '');
+    const state = loc.searchParams.get('state');
+    assert.ok(state.startsWith('v:'));
+    const stateCookie = login.headers.get('set-cookie').split(';')[0];
+    await db.set('config/tokens', { ...(await db.get('config/tokens')), access_token: 'BLEIBT' });
+    assert.equal((await auth(new Request(`${BASE}/api/auth/callback?code=c&state=${state}`, { headers: { cookie: 'oauth_state=falsch' } }))).status, 400);
+    const back = await auth(new Request(`${BASE}/api/auth/callback?code=c&state=${state}`, { headers: { cookie: stateCookie } }));
+    assert.equal(back.status, 302); assert.equal(back.headers.get('location'), '/einlaufsound');
+    assert.match(back.headers.getSetCookie().join(';'), /viewer=/);
+    assert.equal((await db.get('config/tokens')).access_token, 'BLEIBT');
+  });
+
+  await test('Einlaufsound-Seite: ohne Anmeldung kein Upload, Dateityp und Größe werden geprüft, nur eine Datei zur Zeit', async () => {
+    const ck = viewer('5001', 'Anna');
+    const anon = await (await entryFn(viewerReq('GET', 'me'))).json();
+    assert.equal(anon.loggedIn, false);
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'a.wav', data: wav.toString('base64') }))).status, 401);
+    const me = await (await entryFn(viewerReq('GET', 'me', null, ck))).json();
+    assert.equal(me.status, 'awaiting'); assert.equal(me.uploadsLeft, 1); assert.equal(me.id, '5001');
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'a.txt', data: Buffer.from('kein Ton').toString('base64') }, ck))).status, 400);
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'gross.wav', data: Buffer.concat([wav, Buffer.alloc(700_000)]).toString('base64') }, ck))).status, 413);
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'ohne.wav', data: wav.toString('base64') }, viewer('6000', 'Fremd')))).status, 403, 'ohne Kauf kein Upload');
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'anna.wav', data: wav.toString('base64') }, ck))).status, 200);
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'zwei.wav', data: wav.toString('base64') }, ck))).status, 409);
+    assert.equal((await entryFn(viewerReq('GET', 'audio?id=5001'))).status, 404, 'noch nicht freigegebene Dateien werden nicht ausgeliefert');
+  });
+
+  await test('Einlaufsound: Freigabe schließt den Kauf ab, Laufzeit 6 Monate, Check-in spielt den Sound', async () => {
+    const list = await (await admin(adminReq('GET', 'entrysound', null, cookie))).json();
+    assert.equal(list.entries[0].status, 'pending');
+    assert.match(list.info.titles.extend, /\+2 Monate/);
+    const file = await (await admin(adminReq('GET', 'entrysound/5001/pending', null, cookie))).json();
+    assert.equal(file.type, 'audio/wav');
+    assert.equal((await admin(adminReq('POST', 'entrysound/5001/approve', {}, cookie))).status, 200);
+    const rec = await db.get('entrysound/5001');
+    assert.ok(Math.abs(monthsFromNow(rec.validUntil) - 6) < 0.1, 'etwa 6 Monate');
+    assert.equal(rec.purchase, null); assert.equal(rec.uploadsLeft, 0);
+    assert.equal(statusOf('es-2'), 'FULFILLED');
+    assert.match(chats().at(-1), /freigegeben/);
+    assert.equal((await entryFn(viewerReq('GET', `audio?id=5001&v=${rec.soundVersion}`))).status, 200);
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption('es-checkin-1', '5001', 'Anna', (await db.get('config/state')).rewardId) }));
+    const ev = await db.get((await db.list('event/')).at(-1));
+    assert.equal(ev.type, 'checkin');
+    assert.equal(ev.entrySound.url, `/api/einlaufsound/audio?id=5001&v=${rec.soundVersion}`);
+    assert.equal(ev.entrySound.max, 5);
+  });
+
+  await test('Einlaufsound: Kauf bei gültigem Sound wird erstattet', async () => {
+    const id = await redeem('buy', '5001', 'Anna');
+    assert.equal(statusOf(id), 'CANCELED');
+    assert.match(chats().at(-1), /schon einen Einlaufsound/);
+  });
+
+  await test('Einlaufsound: Verlängern bringt 2 Monate und Upload-Recht, Obergrenze 12 Monate', async () => {
+    const before = (await db.get('entrysound/5001')).validUntil;
+    const id = await redeem('extend', '5001', 'Anna');
+    assert.equal(statusOf(id), 'FULFILLED');
+    const rec = await db.get('entrysound/5001');
+    assert.ok(Math.abs((Date.parse(rec.validUntil) - Date.parse(before)) / MONTH - 2) < 0.1);
+    assert.equal(rec.uploadsLeft, 1);
+    assert.match(chats().at(-1), /um 2 Monate/);
+    assert.equal(statusOf(await redeem('extend', '5001', 'Anna')), 'FULFILLED'); // 10 Monate
+    assert.equal(statusOf(await redeem('extend', '5001', 'Anna')), 'FULFILLED'); // 12 Monate
+    const over = await redeem('extend', '5001', 'Anna');
+    assert.equal(statusOf(over), 'CANCELED', 'mehr als 12 Monate geht nicht');
+    assert.match(chats().at(-1), /mehr als 12 Monate Restlaufzeit geht nicht/);
+    assert.ok(monthsFromNow((await db.get('entrysound/5001')).validUntil) <= 12.05);
+  });
+
+  await test('Einlaufsound: neuer Sound nach Verlängern, Ablehnung lässt neuen Upload zu, Laufzeit bleibt', async () => {
+    const ck = viewer('5001', 'Anna');
+    const until = (await db.get('entrysound/5001')).validUntil;
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'neu.wav', data: wav.toString('base64') }, ck))).status, 200);
+    assert.equal((await admin(adminReq('POST', 'entrysound/5001/reject', { reason: 'zu laut' }, cookie))).status, 200);
+    assert.match(chats().at(-1), /abgelehnt \(zu laut\)/);
+    const rec = await db.get('entrysound/5001');
+    assert.equal(rec.uploadsLeft, 1); assert.equal(rec.rejected.reason, 'zu laut'); assert.equal(rec.validUntil, until);
+    const oldVersion = rec.soundVersion;
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'neu2.wav', data: wav.toString('base64') }, ck))).status, 200);
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal((await admin(adminReq('POST', 'entrysound/5001/approve', {}, cookie))).status, 200);
+    const next = await db.get('entrysound/5001');
+    assert.ok(next.soundVersion > oldVersion); assert.equal(next.validUntil, until); assert.equal(next.uploadsLeft, 0);
+  });
+
+  await test('Einlaufsound: Ablehnen und erstatten gibt beim Kauf die Punkte zurück und räumt auf', async () => {
+    const id = await redeem('buy', '5002', 'Ben');
+    await entryFn(viewerReq('POST', 'upload', { name: 'b.wav', data: wav.toString('base64') }, viewer('5002', 'Ben')));
+    assert.equal((await admin(adminReq('POST', 'entrysound/5002/reject', { reason: 'Musik', refund: true }, cookie))).status, 200);
+    assert.equal(statusOf(id), 'CANCELED');
+    assert.match(chats().at(-1), /Deine Punkte bekommst du zurück/);
+    assert.equal(await db.get('entrysound/5002'), null);
+    assert.equal(await db.get('entrysound-pending/5002'), null);
+  });
+
+  await test('Einlaufsound: ohne Upload innerhalb der Frist gibt es die Punkte automatisch zurück', async () => {
+    const id = await redeem('buy', '5003', 'Cleo');
+    const rec = await db.get('entrysound/5003');
+    await db.set('entrysound/5003', { ...rec, purchase: { ...rec.purchase, at: new Date(Date.now() - 20 * 86_400_000).toISOString() } });
+    await admin(adminReq('GET', 'entrysound', null, cookie)); // Aufräumen beim Öffnen
+    assert.equal(statusOf(id), 'CANCELED');
+    assert.match(chats().at(-1), /nicht rechtzeitig/);
+    assert.equal(await db.get('entrysound/5003'), null);
+  });
+
+  await test('Einlaufsound: Abgelaufen spielt der normale Ton, in der Aufbewahrungszeit verlängerbar ab heute, danach gelöscht', async () => {
+    const s = await getSettings();
+    const rec = await db.get('entrysound/5001');
+    const past = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    await db.set('entrysound/5001', { ...rec, validUntil: past });
+    assert.equal(await es.activeSoundFor('5001', s), null);
+    const id = await redeem('extend', '5001', 'Anna');
+    assert.equal(statusOf(id), 'FULFILLED');
+    assert.ok(Math.abs(monthsFromNow((await db.get('entrysound/5001')).validUntil) - 2) < 0.1, 'zählt ab heute');
+    assert.ok(await es.activeSoundFor('5001', s));
+    // länger als 3 Monate abgelaufen: weg
+    await db.set('entrysound/5001', { ...(await db.get('entrysound/5001')), validUntil: new Date(Date.now() - 120 * 86_400_000).toISOString(), uploadsLeft: 0 });
+    await admin(adminReq('GET', 'entrysound', null, cookie));
+    assert.equal(await db.get('entrysound/5001'), null);
+    assert.equal(await db.get('entrysound-file/5001'), null);
+    assert.equal(statusOf(await redeem('extend', '5001', 'Anna')), 'CANCELED');
+  });
+
+  await test('Einlaufsound: ausgeschaltet spielt kein persönlicher Sound', async () => {
+    await db.set('entrysound/5004', { id: '5004', name: 'Dirk', soundVersion: 1, validUntil: new Date(Date.now() + 86_400_000).toISOString(), uploadsLeft: 0 });
+    assert.ok(await es.activeSoundFor('5004', await getSettings()));
+    await admin(adminReq('PUT', 'settings', { entrySoundEnabled: false }, cookie));
+    assert.equal(await es.activeSoundFor('5004', await getSettings()), null);
+  });
+}
+
+
+// ---- Community-Rangliste und Konto-Verknüpfung
+{
+  const verknuepfen = (await import('../netlify/functions/verknuepfen.mjs')).default;
+  const community = (await import('../netlify/functions/community.mjs')).default;
+  const leaderboard = (await import('../netlify/functions/leaderboard.mjs')).default;
+  const com = await import('../netlify/lib/community.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
+  const vReq = (method, p, body, ck) => new Request(BASE + '/api/verknuepfen/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const bot = (method, p, body, secret = 'geheimwort-12345') => community(new Request(BASE + '/api/community/' + p, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` }, body: body ? JSON.stringify(body) : undefined }));
+  const token = (discordId, name = 'AnnaDC', exp = Date.now() + 600_000, secret = 'geheimwort-12345') => com.signLinkToken({ discordId, discordName: name, exp }, secret);
+  const chatMsg = (id, name, text = 'hallo') => webhook(signed('notification', { subscription: { type: 'channel.chat.message' }, event: { broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: crypto.randomUUID(), message: { text } } }));
+
+  await test('Community: ohne LINK_SECRET alles aus, Bot-Schnittstelle nur mit Geheimwort', async () => {
+    assert.equal((await bot('GET', 'board')).status, 503);
+    process.env.LINK_SECRET = 'geheimwort-12345';
+    assert.equal((await bot('GET', 'board', null, 'falsch')).status, 401);
+    assert.equal((await community(new Request(BASE + '/api/community/board'))).status, 401, 'ohne Anmeldung');
+    await admin(adminReq('PUT', 'settings', { communityEnabled: true, chatEnabled: true, chatCommands: true }, cookie));
+    assert.equal((await bot('GET', 'board')).status, 200);
+  });
+
+  await test('Verknüpfen: Link-Token wird geprüft, ohne Zustimmung und Anmeldung passiert nichts', async () => {
+    assert.ok(com.verifyLinkToken(token('111111111')));
+    assert.equal(com.verifyLinkToken(token('111111111', 'x', Date.now() - 1000)), null, 'abgelaufen');
+    assert.equal(com.verifyLinkToken(token('111111111', 'x', Date.now() + 1000, 'anderes-geheimwort')), null, 'falsch signiert');
+    const invite = token('111111111', 'AnnaDC');
+    const anon = await (await verknuepfen(vReq('GET', `me?t=${encodeURIComponent(invite)}`))).json();
+    assert.equal(anon.loggedIn, false); assert.equal(anon.invite.discordName, 'AnnaDC');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: invite }))).status, 401, 'ohne Twitch-Anmeldung');
+    const ck = viewer('5001', 'Anna');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { t: invite }, ck))).status, 400, 'ohne Zustimmung');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: 'kaputt' }, ck))).status, 400, 'ungültiger Link');
+    assert.equal(await com.linkByTwitch('5001'), null);
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: invite }, ck))).status, 200);
+    const link = await com.linkByTwitch('5001');
+    assert.equal(link.discordId, '111111111'); assert.equal(link.twitchName, 'Anna');
+    assert.equal((await com.linkByDiscord('111111111')).twitchId, '5001');
+  });
+
+  await test('Verknüpfen: Anmeldung gibt den Link-Token weiter, nur eigene Seiten als Ziel', async () => {
+    const login = await auth(new Request(BASE + '/api/auth/viewer?next=/verknuepfen&t=abc'));
+    const cookies = login.headers.getSetCookie().join(';');
+    assert.match(cookies, /viewer_next=%2Fverknuepfen/); assert.match(cookies, /link_token=abc/);
+    const evil = await auth(new Request(BASE + '/api/auth/viewer?next=https://boese.example'));
+    assert.match(evil.headers.getSetCookie().join(';'), /viewer_next=%2Feinlaufsound/, 'fremde Ziele werden ignoriert');
+  });
+
+  await test('Zählen: Mindestabstand und Tageslimit, Kanalinhaber zählt nicht', async () => {
+    const s = await getSettings();
+    const t0 = new Date('2030-05-10T12:00:00Z');
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, t0), true);
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + 30_000)), false, 'unter 60 Sekunden');
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + 61_000)), true);
+    for (let i = 2; i < 40; i++) await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + i * 61_000));
+    const rec = await db.get('cmonth/2030-05/5001');
+    assert.equal(rec.msgs, 30, 'höchstens 30 pro Tag'); assert.equal(rec.days, 1);
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date('2030-05-11T12:00:00Z')), true, 'neuer Tag zählt wieder'); assert.equal((await db.get('cmonth/2030-05/5001')).days, 2);
+    await chatMsg('999', 'Kanal'); // Kanalinhaber
+    assert.equal(await db.get(`cmonth/${com.monthOf(s)}/999`), null);
+    await chatMsg('5001', 'Anna');
+    assert.equal((await db.get(`cmonth/${com.monthOf(s)}/5001`)).msgs, 1);
+  });
+
+  await test('Discord-Zahlen vom Bot: gültiger Monat, Werte begrenzt, Rangliste mit Gewichten und nur verknüpfte Konten', async () => {
+    const s = await getSettings(); const month = com.monthOf(s);
+    assert.equal((await bot('POST', 'sync', { month: '1999-01', rows: [] })).status, 400, 'alter Monat');
+    const res = await bot('POST', 'sync', { month, rows: [{ discordId: '111111111', msgs: 10, days: 3 }, { discordId: '222222222', msgs: 99999, days: 99 }, { discordId: 'kaputt', msgs: 1, days: 1 }] });
+    assert.deepEqual(await res.json(), { ok: true, saved: 1 }, 'Unverknüpfte und ungültige IDs werden nicht gespeichert');
+    assert.equal(await db.get(`dmonth/${month}/222222222`), null, 'ohne Verknüpfung keine Daten');
+    await com.saveLink({ discordId: '222222222', discordName: 'Gast', twitchId: '5009', twitchName: 'Gast' });
+    await bot('POST', 'sync', { month, rows: [{ discordId: '222222222', msgs: 99999, days: 99 }] });
+    assert.deepEqual(await db.get(`dmonth/${month}/222222222`), { msgs: 930, days: 31 }, 'Werte begrenzt (30 × 31 Nachrichten, 31 Tage)');
+    await com.removeLink({ discordId: '222222222' });
+    await db.set('user/5001', { name: 'Anna', count: 1, days: [`${month}-01`, `${month}-02`], sessions: {} });
+    const board = await com.monthBoard(s);
+    assert.equal(board.rows.length, 1, 'nur das verknüpfte Konto');
+    const r = board.rows[0];
+    assert.equal(r.points, (1 + 10) * 1 + (1 + 3) * 10 + 2 * 20, 'Twitch 1 + Discord 10 Nachrichten, 4 aktive Tage, 2 Check-ins');
+    const who = await (await bot('GET', 'link?discordId=111111111')).json();
+    assert.deepEqual(who, { linked: true, twitchName: 'Anna' });
+    assert.deepEqual(await (await bot('GET', 'link?discordId=999999999')).json(), { linked: false, twitchName: null });
+    const api = await (await bot('GET', 'board')).json();
+    assert.deepEqual(api.linked, ['111111111']);
+    assert.equal(api.rules.msgCap, 30); assert.equal(api.rows[0].discordId, '111111111'); assert.equal(api.rows[0].points, r.points);
+  });
+
+  await test('Öffentliche Rangliste zeigt die Monatswertung mit Hinweis, nur Namen und Punkte', async () => {
+    const data = await (await leaderboard(new Request(BASE + '/api/leaderboard'))).json();
+    assert.equal(data.month.rows.length, 1);
+    assert.deepEqual(Object.keys(data.month.rows[0]).sort(), ['name', 'value']);
+    assert.match(data.month.hint, /verknüpft/);
+    assert.ok(!JSON.stringify(data.month).includes('111111111'), 'keine Discord-ID öffentlich');
+  });
+
+  await test('Chat: !verknuepfen erklärt es, Check-in-Tipp nur einmal im Monat und nur für Unverknüpfte', async () => {
+    await chatMsg('5002', 'Ben', '!verknuepfen');
+    assert.match(chats().at(-1), /verknüpfe dein Twitch- und Discord-Konto/);
+    const s = await getSettings();
+    assert.match(await com.linkTip('5002', 'Ben', s), /noch nicht in der Monatsrangliste/);
+    assert.equal(await com.linkTip('5002', 'Ben', s), null, 'nur einmal im Monat');
+    assert.equal(await com.linkTip('5001', 'Anna', s), null, 'Verknüpfte bekommen keinen Tipp');
+  });
+
+  await test('Verknüpfung löschen: durch die Person, durch den Bot und im Admin, danach nicht mehr in der Rangliste', async () => {
+    const ck = viewer('5001', 'Anna');
+    const place = await (await verknuepfen(vReq('GET', 'place', null, ck))).json();
+    assert.equal(place.rank, 1);
+    assert.equal((await verknuepfen(vReq('POST', 'unlink', {}, ck))).status, 200);
+    assert.equal(await com.linkByTwitch('5001'), null); assert.equal(await com.linkByDiscord('111111111'), null);
+    assert.equal((await com.monthBoard(await getSettings())).rows.length, 0);
+    await com.saveLink({ discordId: '111111111', discordName: 'AnnaDC', twitchId: '5001', twitchName: 'Anna' });
+    assert.deepEqual(await (await bot('POST', 'unlink', { discordId: '111111111' })).json(), { ok: true });
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5002', twitchName: 'Ben' });
+    const list = await (await admin(adminReq('GET', 'community', null, cookie))).json();
+    assert.equal(list.links.length, 1); assert.equal(list.secretSet, true);
+    assert.deepEqual(await (await admin(adminReq('DELETE', 'community/5002', null, cookie))).json(), { ok: true });
+    // neue Verknüpfung desselben Discord-Kontos mit anderem Twitch-Konto ersetzt die alte
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5002', twitchName: 'Ben' });
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5003', twitchName: 'Cleo' });
+    assert.equal(await com.linkByTwitch('5002'), null); assert.equal((await com.linkByDiscord('333333333')).twitchId, '5003');
+  });
+
+  await test('Backup enthält Einlaufsounds, Verknüpfungen und Monatszahlen', async () => {
+    const b = await (await admin(adminReq('GET', 'backup', null, cookie))).json();
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('link/')));
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('cmonth/')));
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('dmonth/')));
+  });
+  delete process.env.LINK_SECRET;
+}
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

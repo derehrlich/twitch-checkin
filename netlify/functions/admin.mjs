@@ -7,6 +7,8 @@ import { tests } from '../lib/admin/tests.mjs';
 import { raids } from '../lib/admin/raids.mjs';
 import { sounds, images } from '../lib/admin/media.mjs';
 import { soundboard } from '../lib/admin/soundboard.mjs';
+import { entrysound } from '../lib/admin/entrysound.mjs';
+import { community } from '../lib/admin/community.mjs';
 import { users, exportCsv } from '../lib/admin/users.mjs';
 import { backup } from '../lib/admin/backup.mjs';
 
@@ -22,6 +24,8 @@ const ROUTES = {
   sound: sounds,
   image: images,
   soundboard,
+  entrysound,
+  community,
   users,
   'export.csv': exportCsv,
   backup,

@@ -5,6 +5,7 @@ import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { allUsers } from '../lib/admin/common.mjs';
 import { db } from '../lib/store.mjs';
 import { json } from '../lib/http.mjs';
+import { monthBoard, secretSet } from '../lib/community.mjs';
 
 export const config = { path: '/api/leaderboard' };
 
@@ -27,8 +28,14 @@ export default async () => {
   }
   const top = (key, list = rows) => [...list].filter((r) => r[key] > 0).sort((a, b) => b[key] - a[key] || b.count - a.count || a.name.localeCompare(b.name, 'de')).slice(0, n)
     .map((r) => ({ name: r.name, value: r[key] }));
+  // Monatsrangliste: nur verknüpfte Konten (freiwillig), dazu der Hinweis, wie man mitmacht
+  let month = null;
+  if (settings.communityEnabled && secretSet()) {
+    const board = await monthBoard(settings);
+    month = { label: board.label, rows: board.rows.slice(0, n).map((r) => ({ name: r.name, value: r.points })), hint: settings.communityHint };
+  }
   return json(
-    { updated: new Date().toISOString(), visitors: rows.length, visits: top('count'), chatters: top('messages', chatRows), streaks: top('streak'), records: top('record'), minutes: top('minutes') },
+    { updated: new Date().toISOString(), visitors: rows.length, month, visits: top('count'), chatters: top('messages', chatRows), streaks: top('streak'), records: top('record'), minutes: top('minutes') },
     // Die Twitch-Panel-Extension liest die Daten von einer anderen Adresse (…ext-twitch.tv), die Zahlen sind ohnehin öffentlich
     200, { 'cache-control': 'public, max-age=60', 'access-control-allow-origin': '*' },
   );

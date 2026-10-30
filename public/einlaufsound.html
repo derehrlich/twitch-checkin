@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<title>Einlaufsound – Stadtwache</title>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<script src="/thema.js" defer></script>
+<style>
+  main { max-width: 640px; margin: 0 auto; padding: 28px 20px 56px; display: grid; gap: 18px; }
+  section.card { padding: 22px 26px 26px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .ok { color: var(--gruen); font-weight: 700; } .warn { color: var(--orange); font-weight: 700; } .bad { color: var(--rot); font-weight: 700; }
+  ul { margin: 8px 0 0; padding-left: 20px; } li { margin: 4px 0; }
+  .hidden { display: none !important; }
+  @media (max-width: 640px) { main { padding: 18px 14px 40px; } .brand img { display: none; } section.card { padding: 18px 16px 20px; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Einlaufsound</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+  <button id="logout" class="ghost hidden">Abmelden</button>
+</header>
+<main>
+  <section class="card" id="intro">
+    <h2>Dein Sound beim Check-in</h2>
+    <p>Mit einem Einlaufsound spielt das Overlay beim Check-in deinen eigenen Sound statt des normalen Tons. Du bekommst ihn für Kanalpunkte im Twitch-Kanal.</p>
+    <div id="state"></div>
+  </section>
+  <section class="card hidden" id="uploadCard">
+    <h2>Sound hochladen</h2>
+    <label for="file">Datei (MP3, WAV oder OGG)</label>
+    <input id="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg">
+    <p class="muted" id="fileInfo"></p>
+    <div class="row"><button id="listen" class="ghost" disabled>▶ Anhören</button><button id="send" disabled>Zur Prüfung einreichen</button></div>
+    <p class="muted" id="msg" role="status"></p>
+  </section>
+  <section class="card">
+    <h2>Regeln</h2>
+    <ul id="rules"></ul>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (iso) => new Date(iso).toLocaleDateString('de-DE');
+let me = null, chosen = null;
+
+function line(parent, cls, text) { const p = document.createElement('p'); if (cls) p.className = cls; p.textContent = text; parent.append(p); return p; }
+
+async function load() {
+  me = await (await fetch('/api/einlaufsound/me', { cache: 'no-store' })).json();
+  const st = $('state'); st.replaceChildren();
+  $('logout').classList.toggle('hidden', !me.loggedIn);
+  $('uploadCard').classList.add('hidden');
+  if (new URLSearchParams(location.search).has('abgebrochen')) line(st, 'warn', 'Die Anmeldung wurde abgebrochen.');
+  if (!me.enabled) { line(st, 'muted', 'Der Einlaufsound ist gerade nicht aktiv.'); return rules(); }
+  if (!me.loggedIn) {
+    line(st, '', 'Melde dich mit Twitch an, damit wir wissen, wer du bist. Es werden keine Berechtigungen für dein Konto angefragt.');
+    const a = document.createElement('a'); a.className = 'btn'; a.href = '/api/auth/viewer'; a.textContent = 'Mit Twitch anmelden'; st.append(a);
+    return rules();
+  }
+  line(st, '', `Hallo ${me.name}!`);
+  const t = me.titles;
+  if (me.status === 'none') line(st, '', `Du hast noch keinen Einlaufsound. Löse im Twitch-Kanal den Reward „${t.buy}“ ein, danach kannst du hier deine Datei hochladen.`);
+  if (me.status === 'awaiting') line(st, 'warn', 'Dein Kauf wartet auf deinen Upload. Lade unten deine Datei hoch.');
+  if (me.status === 'pending') line(st, 'warn', `„${me.pending.name}“ wird geprüft. Du bekommst Bescheid im Chat.`);
+  if (me.status === 'active') {
+    line(st, 'ok', `Dein Einlaufsound ist aktiv und gilt bis ${fmt(me.validUntil)}.`);
+    const audio = document.createElement('audio'); audio.controls = true; audio.src = `/api/einlaufsound/audio?id=${me.id}&v=${me.soundVersion}`; audio.style.width = '100%'; st.append(audio);
+    line(st, 'muted', `Verlängern: Reward „${t.extend}“. Damit kannst du auch einen neuen Sound hochladen.`);
+  }
+  if (me.status === 'expired') line(st, 'warn', `Dein Einlaufsound ist am ${fmt(me.validUntil)} abgelaufen und noch eine Weile gespeichert. Mit dem Reward „${t.extend}“ wird er wieder aktiv.`);
+  if (me.rejected) line(st, 'bad', `Dein letzter Sound wurde abgelehnt: ${me.rejected.reason}`);
+  if (me.uploadsLeft > 0 && !me.pending) $('uploadCard').classList.remove('hidden');
+  rules();
+}
+
+function rules() {
+  const l = $('rules'); l.replaceChildren();
+  const s = me?.limits ?? { seconds: 5, bytes: 600000 };
+  for (const text of [`Höchstens ${s.seconds} Sekunden, längere Sounds werden abgeschnitten.`, `Dateigröße höchstens ${Math.round(s.bytes / 1000)} KB.`, 'Keine Musik und keine urheberrechtlich geschützten Songs, sonst droht dem Kanal Ärger mit Twitch.', 'Nicht zu laut und nichts Beleidigendes. Alles wird vor der Freigabe angehört.']) {
+    const li = document.createElement('li'); li.textContent = text; l.append(li);
+  }
+}
+
+$('file').addEventListener('change', () => {
+  chosen = null; $('send').disabled = true; $('listen').disabled = true; $('msg').textContent = '';
+  const f = $('file').files[0]; if (!f) return;
+  const { seconds, bytes } = me.limits;
+  if (f.size > bytes) { $('fileInfo').textContent = `Die Datei ist zu groß (${Math.round(f.size / 1000)} KB, erlaubt sind ${Math.round(bytes / 1000)} KB).`; return; }
+  const url = URL.createObjectURL(f), a = new Audio(url);
+  a.addEventListener('loadedmetadata', () => {
+    const len = a.duration;
+    if (Number.isFinite(len) && len > seconds + 0.5) { $('fileInfo').textContent = `Der Sound ist ${len.toFixed(1)} Sekunden lang, erlaubt sind ${seconds}. Bitte kürzen.`; return; }
+    $('fileInfo').textContent = `${f.name} · ${Number.isFinite(len) ? len.toFixed(1) + ' Sekunden' : 'Länge unbekannt'}`;
+    chosen = { file: f, url }; $('send').disabled = false; $('listen').disabled = false;
+  });
+  a.addEventListener('error', () => { $('fileInfo').textContent = 'Diese Datei kann nicht abgespielt werden.'; });
+});
+$('listen').addEventListener('click', () => { if (chosen) new Audio(chosen.url).play(); });
+$('send').addEventListener('click', async () => {
+  if (!chosen) return;
+  $('send').disabled = true; $('msg').textContent = 'Wird hochgeladen …';
+  const data = await new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.readAsDataURL(chosen.file); });
+  const res = await fetch('/api/einlaufsound/upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: chosen.file.name, data }) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) { $('msg').textContent = body.error || 'Das hat nicht geklappt.'; $('send').disabled = false; return; }
+  $('file').value = ''; $('fileInfo').textContent = ''; chosen = null; await load();
+});
+$('logout').addEventListener('click', async () => { await fetch('/api/einlaufsound/logout', { method: 'POST' }); await load(); });
+load().catch(() => { $('state').textContent = 'Die Seite konnte nicht geladen werden.'; });
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { handleCheckout, handleRedemption, handleRescue } from '../lib/checkin.m
 import { handleRaid } from '../lib/raid.mjs';
 import { handleAlert } from '../lib/alerts.mjs';
 import { getBoard, handleSoundboard } from '../lib/soundboard.mjs';
+import { handleEntryBuy, handleEntryExtend } from '../lib/entrysound.mjs';
 import { handleChat } from '../lib/chat.mjs';
 import { logEvent } from '../lib/credits.mjs';
 import { ALERT_TYPES, CHAT_TYPE } from '../lib/twitch.mjs';
@@ -65,8 +66,10 @@ export default async (req) => {
     const isCheckin = Boolean(state.rewardId) && e.reward.id === state.rewardId;
     const isCheckout = Boolean(state.checkoutRewardId) && e.reward.id === state.checkoutRewardId;
     const isRescue = Boolean(state.streakRewardId) && e.reward.id === state.streakRewardId;
-    const board = isCheckin || isCheckout || isRescue ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
-    if (!isCheckin && !isCheckout && !isRescue && !board) return new Response(null, { status: 204 });
+    const isEntryBuy = Boolean(state.entryBuyRewardId) && e.reward.id === state.entryBuyRewardId;
+    const isEntryExtend = Boolean(state.entryExtendRewardId) && e.reward.id === state.entryExtendRewardId;
+    const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
+    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !board) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
@@ -74,6 +77,8 @@ export default async (req) => {
       const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward };
       const settings = await getSettings();
       if (board) await handleSoundboard(redemption, board, settings);
+      else if (isEntryBuy) await handleEntryBuy(redemption, settings);
+      else if (isEntryExtend) await handleEntryExtend(redemption, settings);
       else await (isRescue ? handleRescue : isCheckout ? handleCheckout : handleRedemption)(redemption, settings);
     } catch (err) {
       console.error('Check-in fehlgeschlagen:', err);

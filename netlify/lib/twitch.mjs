@@ -77,12 +77,12 @@ export async function setRedemptionStatus(redemptionId, rewardId, status) {
 
 // Legt die Rewards an (oder passt Preis/Namen an) und merkt sich die IDs.
 // Check-out nur, wenn aktiviert; ein früher angelegter Check-out-Reward wird dann in Twitch deaktiviert.
-export async function ensureRewards(settings) {
+export async function ensureRewards(settings, entry = null) {
   const { user_id } = await userToken();
   const state = (await db.get('config/state')) ?? {};
   const { data: list } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
 
-  const make = async ({ stateKey, title, cost, prompt, color }) => {
+  const make = async ({ stateKey, title, cost, prompt, color, syncPrompt = false }) => {
     let reward = list.find((r) => r.id === state[stateKey]) ?? list.find((r) => r.title === title);
     if (!reward) {
       try {
@@ -93,8 +93,8 @@ export async function ensureRewards(settings) {
         }
         throw e;
       }
-    } else if (reward.title !== title || reward.cost !== cost || reward.is_enabled === false) {
-      reward = (await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: reward.id }, body: { title, cost, is_enabled: true } })).data[0];
+    } else if (reward.title !== title || reward.cost !== cost || reward.is_enabled === false || (syncPrompt && reward.prompt !== prompt)) {
+      reward = (await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: reward.id }, body: { title, cost, is_enabled: true, ...(syncPrompt ? { prompt } : {}) } })).data[0];
     }
     state[stateKey] = reward.id;
     return reward;
@@ -115,8 +115,20 @@ export async function ensureRewards(settings) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.streakRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.streakRewardId;
   }
+  // Einlaufsound: Kauf und Verlängern. Titel und Beschreibung tragen die genaue Monatszahl (kommt fertig aus entrysound.mjs).
+  let entryBuy = null, entryExtend = null;
+  if (settings.entrySoundEnabled && entry) {
+    entryBuy = await make({ stateKey: 'entryBuyRewardId', title: entry.titles.buy, cost: settings.entrySoundBuyCost, prompt: entry.prompts.buy, color: '#1F6FEB', syncPrompt: true });
+    entryExtend = await make({ stateKey: 'entryExtendRewardId', title: entry.titles.extend, cost: settings.entrySoundExtendCost, prompt: entry.prompts.extend, color: '#1F6FEB', syncPrompt: true });
+  } else {
+    for (const k of ['entryBuyRewardId', 'entryExtendRewardId']) {
+      if (!state[k]) continue;
+      await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state[k] }, body: { is_enabled: false } }).catch(() => {});
+      delete state[k];
+    }
+  }
   await db.set('config/state', state);
-  return { checkin, checkout, streak };
+  return { checkin, checkout, streak, entryBuy, entryExtend };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge
