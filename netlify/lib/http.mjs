@@ -44,4 +44,21 @@ export function hasSession(req) {
   try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).exp > Date.now(); } catch { return false; }
 }
 
+// Zuschauer-Anmeldung (Upload-Seite für den Einlaufsound): eigener Cookie, enthält nur Twitch-ID und Anzeigename.
+// Ohne SESSION_SECRET oder ADMIN_PASSWORD gibt es keine Anmeldung, weil sich der Cookie nicht signieren ließe.
+export function makeViewerSession({ id, name }) {
+  const payload = Buffer.from(JSON.stringify({ id, name, exp: Date.now() + 30 * 86_400_000 })).toString('base64url');
+  return `${payload}.${sign(payload)}`;
+}
+
+export function viewerFrom(req) {
+  if (!secret()) return null;
+  const [payload, sig] = (parseCookies(req).viewer || '').split('.');
+  if (!payload || !sig || !safeEqual(sig, sign(payload))) return null;
+  try {
+    const v = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    return v.exp > Date.now() && /^\d{1,20}$/.test(String(v.id)) ? { id: String(v.id), name: String(v.name || '') } : null;
+  } catch { return null; }
+}
+
 export { safeEqual };

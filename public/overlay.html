@@ -156,6 +156,16 @@ function slotFor(ev) {
   return ev.milestone ? 'milestone' : 'checkin';
 }
 
+// Persönlicher Einlaufsound einer Person (kommt mit dem Check-in-Ereignis). Er wird nach max Sekunden abgeschnitten,
+// damit auch zu lange Dateien den Stream nicht aufhalten.
+const personal = {}; // Adresse -> Audio
+function personalPick(entry) {
+  if (!personal[entry.url]) { const a = new Audio(entry.url); a.preload = 'auto'; personal[entry.url] = a; }
+  const audio = personal[entry.url];
+  audio.volume = volume;
+  return { slot: 'checkin', audio, maxMs: Math.max(1, Number(entry.max) || 5) * 1000 };
+}
+
 // Wählt den Ton für einen Platz: { audio } bei einer Datei, sonst { slot } für den eingebauten Klang
 function pickSound(slot = 'checkin') {
   let file = null, inCheckinFamily = false;
@@ -167,7 +177,7 @@ function pickSound(slot = 'checkin') {
   return { slot, audio: file };
 }
 // Länge einer Sounddatei in ms (höchstens 30 s): das Schild bleibt so lange stehen, der Ton wird nie abgeschnitten
-const soundMs = (pick) => (pick.audio && Number.isFinite(pick.audio.duration) ? Math.min(30_000, Math.ceil(pick.audio.duration * 1000) + 200) : 0);
+const soundMs = (pick) => (pick.audio && Number.isFinite(pick.audio.duration) ? Math.min(pick.maxMs ?? 30_000, Math.ceil(pick.audio.duration * 1000) + 200) : 0);
 let currentAudio = null;
 function startSound(pick) {
   if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch { /* egal */ } currentAudio = null; } // nichts überlappt
@@ -175,6 +185,7 @@ function startSound(pick) {
   currentAudio = pick.audio;
   pick.audio.currentTime = 0;
   pick.audio.play().catch(() => playChime(volume, pick.slot));
+  if (pick.maxMs) { const a = pick.audio; setTimeout(() => { if (currentAudio === a) { try { a.pause(); } catch { /* egal */ } } }, pick.maxMs); }
 }
 
 // ---------- Bilder/GIFs über den Schildern (Platz wie beim Ton; Resub nimmt ohne eigenes Bild das Sub-Bild) ----------
@@ -308,7 +319,7 @@ function checkView(ev) {
 // Check-in, Check-out und Meilenstein: Karte mit Münze
 async function showCard(ev) {
   const v = checkView(ev);
-  const pick = pickSound(slotFor(ev));
+  const pick = ev.entrySound ? personalPick(ev.entrySound) : pickSound(slotFor(ev));
   const dur = Math.max(ev.milestone ? Math.round(duration * 1.7) : duration, soundMs(pick)); // Meilensteine bleiben länger stehen
   stage.innerHTML = `<div class="wrap${ev.milestone ? ' milestone' : ''}" style="animation-duration:${dur}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">

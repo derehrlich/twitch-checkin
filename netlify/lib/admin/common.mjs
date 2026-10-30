@@ -24,6 +24,8 @@ function readUpload(body, { max, sniff, tooBig, badType }) {
   return { buf, type };
 }
 export const audioUpload = (body) => readUpload(body, { max: AUDIO_MAX, sniff: sniffAudio, tooBig: 'Die Datei ist zu groß (maximal 1,5 MB)', badType: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' });
+// Wie audioUpload, aber mit eigener Höchstgröße (Zuschauer-Uploads sind kleiner)
+export const audioUploadMax = (body, max) => readUpload(body, { max, sniff: sniffAudio, tooBig: `Die Datei ist zu groß (maximal ${Math.round(max / 1000)} KB)`, badType: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' });
 export const imageUpload = (body) => readUpload(body, { max: IMAGE_MAX, sniff: sniffImage, tooBig: 'Die Datei ist zu groß (maximal 3 MB)', badType: 'Nur GIF-, PNG-, JPG- oder WebP-Dateien sind erlaubt' });
 
 // Hochgeladene Datei so ablegen, wie die Auslieferungs-Functions sie lesen

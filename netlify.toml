@@ -24,3 +24,8 @@
   from = "/rangliste"
   to = "/rangliste.html"
   status = 200
+
+[[redirects]]
+  from = "/einlaufsound"
+  to = "/einlaufsound.html"
+  status = 200

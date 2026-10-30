@@ -39,6 +39,7 @@
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
+      <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="besucher" role="tab">Besucher</button>
       <button data-tab="tests" role="tab">Tests</button>
@@ -154,6 +155,18 @@
         <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ die Rewards abgleichen. Höchstens 20 Einträge, Sounds bis 1,5 MB, ein Ton endet nach spätestens 20 Sekunden.</p>
       </section>
       <div data-schema="soundboard" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Einlaufsound -->
+    <div class="tab-panel hidden" data-panel="einlaufsound">
+      <section class="card">
+        <h2>Einlaufsound prüfen</h2>
+        <p id="entryInfo" class="muted"></p>
+        <div id="entryRows"></div>
+        <div class="row" style="margin-top:12px"><button class="js-sync">Rewards mit Twitch abgleichen</button></div>
+        <p class="muted">Zuschauer melden sich auf <code id="entryUrl"></code> mit Twitch an und laden dort ihre Datei hoch. Bei einem Kauf bleibt die Einlösung bis zu deiner Freigabe offen. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Die Länge prüfst du beim Anhören, das Overlay schneidet zu lange Sounds ohnehin ab.</p>
+      </section>
+      <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
     </div>
 
     <!-- Medien -->

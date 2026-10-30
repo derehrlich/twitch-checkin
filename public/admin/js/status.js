@@ -13,7 +13,7 @@ export async function loadStatus() {
     check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${esc(missing)}</b>`) +
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
     (s.missingScopes.length ? check('warn', `Es fehlen Twitch-Berechtigungen (${esc(s.missingScopes.join(', '))}) – bitte „Mit Twitch verbinden“ erneut klicken`) : '') +
-    reward(s.rewardId, true, 'Check-in') + reward(s.checkoutRewardId, s.checkoutEnabled, 'Check-out') + reward(s.streakRewardId, s.streakRescueEnabled, 'Streak-Retter') +
+    reward(s.rewardId, true, 'Check-in') + reward(s.checkoutRewardId, s.checkoutEnabled, 'Check-out') + reward(s.streakRewardId, s.streakRescueEnabled, 'Streak-Retter') + reward(s.entryRewardId, s.entrySoundEnabled, 'Einlaufsound') +
     check(sub === 'enabled' ? 'ok' : sub ? 'warn' : 'bad',
       s.revoked ? `Webhook widerrufen (${esc(s.revoked)}), bitte neu abgleichen`
       : sub === 'enabled' ? 'Webhooks aktiv – Ereignisse werden empfangen'

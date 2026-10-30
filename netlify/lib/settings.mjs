@@ -95,6 +95,31 @@ export const DEFAULTS = {
   // Öffentliche Rangliste (/rangliste und Twitch-Panel-Extension)
   leaderboardPublic: true,
   leaderboardSize: 10,
+  // Persönlicher Einlaufsound (Kanalpunkte): Kauf gilt buyMonths Monate, Verlängern ist anteilig am Kaufpreis
+  // (Monate = buyMonths * extendCost / buyCost), die Restlaufzeit ist auf maxMonths begrenzt. Abgelaufene Sounds
+  // bleiben keepMonths Monate gespeichert und lassen sich in der Zeit verlängern.
+  entrySoundEnabled: false,
+  entrySoundBuyTitle: 'Eigener Einlaufsound',
+  entrySoundBuyCost: 75_000,
+  entrySoundBuyMonths: 6,
+  entrySoundExtendTitle: 'Einlaufsound verlängern',
+  entrySoundExtendCost: 25_000,
+  entrySoundMaxMonths: 12,
+  entrySoundKeepMonths: 3,
+  entrySoundMaxSeconds: 5, // das Overlay schneidet längere Sounds nach so vielen Sekunden ab
+  entrySoundUploadDays: 14, // so lange hat man nach dem Kauf Zeit für den Upload, danach gibt es die Punkte zurück
+  // Platzhalter: {user} {months} {until} {url} {days} {rest} {max} {reason}
+  entrySoundBuyTemplate: '🔊 {user}, danke! Lade deinen Einlaufsound hier hoch: {url} (innerhalb von {days} Tagen). Nach der Prüfung gilt er {months}. Gefällt er nicht, bekommst du deine Punkte zurück.',
+  entrySoundHasTemplate: '{user}, du hast schon einen Einlaufsound (gültig bis {until}) – zum Verlängern nimm bitte „Einlaufsound verlängern“. Deine Punkte bekommst du zurück.',
+  entrySoundOpenTemplate: '{user}, dein Kauf wartet noch auf deinen Upload oder auf die Prüfung: {url} Deine Punkte bekommst du zurück.',
+  entrySoundNoneTemplate: '{user}, du hast noch keinen Einlaufsound gekauft – nimm zuerst „Eigener Einlaufsound“. Deine Punkte bekommst du zurück.',
+  entrySoundExtendTemplate: '🔊 {user} verlängert den Einlaufsound um {months} – gültig bis {until}. Einen neuen Sound kannst du hier hochladen: {url}',
+  entrySoundTooMuchTemplate: '{user}, mehr als {max} Restlaufzeit geht nicht (aktuell noch {rest}). Deine Punkte bekommst du zurück.',
+  entrySoundBusyTemplate: '{user}, gerade läuft schon eine Einlösung für dich – bitte gleich noch einmal versuchen. Deine Punkte bekommst du zurück.',
+  entrySoundApprovedTemplate: '🔊 {user}, dein Einlaufsound ist freigegeben und gilt bis {until}!',
+  entrySoundRejectedTemplate: '{user}, dein Einlaufsound wurde leider abgelehnt ({reason}). Lade hier einen anderen hoch: {url}',
+  entrySoundRefundTemplate: '{user}, dein Einlaufsound wurde abgelehnt ({reason}). Deine Punkte bekommst du zurück.',
+  entrySoundExpiredTemplate: '{user}, du hast deinen Einlaufsound nicht rechtzeitig hochgeladen. Deine Punkte bekommst du zurück.',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -132,6 +157,11 @@ function sanitize(input) {
   }
   for (const k of ['streakCmdTemplate', 'streakCmdNone', 'topTemplate']) str(k, 400);
   str('creditsTitle', 80); str('creditsOutro', 80); str('creditsIgnore', 400);
+  for (const k of ['entrySoundBuyTemplate', 'entrySoundHasTemplate', 'entrySoundOpenTemplate', 'entrySoundNoneTemplate', 'entrySoundExtendTemplate', 'entrySoundTooMuchTemplate', 'entrySoundBusyTemplate', 'entrySoundApprovedTemplate', 'entrySoundRejectedTemplate', 'entrySoundRefundTemplate', 'entrySoundExpiredTemplate']) str(k, 400);
+  str('entrySoundBuyTitle', 30); str('entrySoundExtendTitle', 30); // Platz für die Monate hinter dem Namen (Twitch erlaubt 45 Zeichen)
+  num('entrySoundBuyCost', 1, 1_000_000); num('entrySoundExtendCost', 1, 1_000_000);
+  num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
+  num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
   num('commandCooldown', 0, 600); num('topSize', 1, 10); num('creditsSpeed', 20, 300); num('leaderboardSize', 3, 25);
   num('alertDuration', 2000, 30_000);
   num('raidDuration', 2000, 30_000);
@@ -154,7 +184,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

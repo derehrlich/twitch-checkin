@@ -76,6 +76,16 @@ Im Admin unter *Kanalpunkte-Soundboard* legst du Einträge an. Jeder Eintrag ist
 - **Grenzen:** höchstens 20 Einträge, ein Ton endet nach spätestens 20 Sekunden. Die Töne werden im Overlay vorab geladen, damit sie ohne Verzögerung spielen.
 - Ein Soundboard-Reward zählt **nicht** als Check-in.
 
+## Einlaufsound (Kanalpunkte)
+
+Zwei Stufen, beide ohne zweite Währung (nur Kanalpunkte). Einschalten im Admin unter *Einlaufsound*, danach die Rewards abgleichen.
+
+- **Kauf** („Eigener Einlaufsound (6 Monate)“, Standard 75.000 Punkte): Die Einlösung bleibt offen. Die Person meldet sich auf `/einlaufsound` mit Twitch an (ohne Berechtigungen) und lädt ihre Datei hoch. Du hörst sie im Admin an und gibst sie frei, erst dann ist der Kauf abgeschlossen und die Laufzeit beginnt. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Ohne Upload innerhalb der Frist (14 Tage) gibt es die Punkte automatisch zurück.
+- **Verlängern** („Einlaufsound verlängern (+2 Monate)“, Standard 25.000 Punkte): sofort gültig. Die Monate sind anteilig: Verlängern-Preis ÷ Kaufpreis × Kauf-Monate, die genaue Zahl steht automatisch im Reward-Namen. Dabei darf die Person einmal einen neuen Sound hochladen (wieder mit Freigabe). Höchstens 12 Monate Restlaufzeit; ohne Sound oder darüber gibt es einen Chat-Hinweis und die Punkte zurück.
+- **Nach Ablauf** spielt wieder der normale Ton. Der Sound bleibt 3 Monate gespeichert und lässt sich in der Zeit verlängern (zählt ab heute), danach wird er gelöscht.
+- Das **Overlay** spielt den Sound beim Check-in und schneidet ihn nach 5 Sekunden ab (einstellbar). Die Länge wird auf dem Server nicht ausgelesen, deshalb prüfst du beim Anhören.
+- Die Anmeldung der Zuschauer nutzt dieselbe Redirect-URL wie der Admin (`/api/auth/callback`), in der Twitch-App ist nichts Neues einzutragen. Sie braucht `ADMIN_PASSWORD` oder `SESSION_SECRET`, um den Cookie zu signieren.
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).
@@ -138,11 +148,11 @@ Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch 
 ## Projektaufbau
 
 ```
-netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, credits, leaderboard, twitch-webhook
-netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, settings, twitch, store, http …
-netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, users, backup
+netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, einlaufsound, credits, leaderboard, twitch-webhook
+netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, entrysound, settings, twitch, store, http …
+netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, entrysound, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
-public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste
+public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste, public/einlaufsound.html Upload-Seite
 extension/           Twitch-Panel-Extension (Quelltext), scripts/build-extension.mjs baut daraus public/stadtwache-panel.zip
 public/admin/        Admin-Oberfläche: index.html (Gerüst), admin.css, js/ (ein Skript je Bereich)
 test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)
@@ -155,7 +165,7 @@ test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optiona
 
 ## Look
 
-Overlay und Admin teilen sich den Holz-Look aus `public/theme.css`; der Admin-Hintergrund entspricht dem Holz der Alert-Schilder (Raster und Streifen auf `#724C31`, `body.wood` in `admin.css`): Holz mit Maserung, Pergamentkarten, Messing-Nieten und weiche Schatten. Die Farben stehen als Variablen oben im File. Schriften: Fredoka und Pixelify Sans (nur für den Schriftzug), beide frei lizenziert und in `public/fonts/` abgelegt.
+Zwei Stile: **Overlay und Abspann** (Stream-Grafiken) nutzen den Holz-Look aus `public/theme.css`. **Admin, Rangliste, Einlaufsound-Seite und Twitch-Panel** haben das Design des VerwirrBot-Dashboards (Marineblau mit gelbem Akzent, Silkscreen-Überschriften, Karten, Seitenleiste am PC, Hell/Dunkel-Schalter 🌓): gemeinsame Basis `public/stadtwache.css`, Schalter in `public/thema.js`, Admin-Besonderheiten in `public/admin/admin.css`, Panel in `extension/panel.css`.
 
 - **Grafiken**: `public/img/lantern.png` (Laterne) und `public/img/lama.png` (Maskottchen) stammen aus deinen Streamplan-Assets. Einfach durch gleichnamige PNGs mit transparentem Hintergrund ersetzen.
 - **Töne pro Alert**: Im Admin unter *Medien → Töne* hat jeder Alert (Check-in, Check-out, Meilenstein, Raid, Follow, Sub, Resub, Gift-Subs, Bits, Streak-Rettung) einen eigenen Platz für eine Sounddatei (MP3, WAV oder OGG, höchstens 1,5 MB). Sie gilt im Overlay nach wenigen Sekunden, ohne Neuladen. Fehlt eine eigene Datei, spielt das Overlay einen eingebauten Klang, der je Alert anders klingt (Horn beim Raid, Münze bei Bits, Glitzern bei Gift-Subs …). Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Beim Check-in gilt die Reihenfolge: hochgeladener Ton, `public/checkin.mp3` (falls vorhanden), eingebauter Klang. Bereits hochgeladene Check-in-Töne bleiben erhalten.
