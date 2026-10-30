@@ -1314,14 +1314,22 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     const s = await getSettings(); const month = com.monthOf(s);
     assert.equal((await bot('POST', 'sync', { month: '1999-01', rows: [] })).status, 400, 'alter Monat');
     const res = await bot('POST', 'sync', { month, rows: [{ discordId: '111111111', msgs: 10, days: 3 }, { discordId: '222222222', msgs: 99999, days: 99 }, { discordId: 'kaputt', msgs: 1, days: 1 }] });
-    assert.deepEqual(await res.json(), { ok: true, saved: 2 });
+    assert.deepEqual(await res.json(), { ok: true, saved: 1 }, 'Unverknüpfte und ungültige IDs werden nicht gespeichert');
+    assert.equal(await db.get(`dmonth/${month}/222222222`), null, 'ohne Verknüpfung keine Daten');
+    await com.saveLink({ discordId: '222222222', discordName: 'Gast', twitchId: '5009', twitchName: 'Gast' });
+    await bot('POST', 'sync', { month, rows: [{ discordId: '222222222', msgs: 99999, days: 99 }] });
     assert.deepEqual(await db.get(`dmonth/${month}/222222222`), { msgs: 930, days: 31 }, 'Werte begrenzt (30 × 31 Nachrichten, 31 Tage)');
+    await com.removeLink({ discordId: '222222222' });
     await db.set('user/5001', { name: 'Anna', count: 1, days: [`${month}-01`, `${month}-02`], sessions: {} });
     const board = await com.monthBoard(s);
     assert.equal(board.rows.length, 1, 'nur das verknüpfte Konto');
     const r = board.rows[0];
     assert.equal(r.points, (1 + 10) * 1 + (1 + 3) * 10 + 2 * 20, 'Twitch 1 + Discord 10 Nachrichten, 4 aktive Tage, 2 Check-ins');
+    const who = await (await bot('GET', 'link?discordId=111111111')).json();
+    assert.deepEqual(who, { linked: true, twitchName: 'Anna' });
+    assert.deepEqual(await (await bot('GET', 'link?discordId=999999999')).json(), { linked: false, twitchName: null });
     const api = await (await bot('GET', 'board')).json();
+    assert.deepEqual(api.linked, ['111111111']);
     assert.equal(api.rules.msgCap, 30); assert.equal(api.rows[0].discordId, '111111111'); assert.equal(api.rows[0].points, r.points);
   });
 

@@ -107,6 +107,7 @@ export async function saveDiscordMonth(settings, month, rows, now = new Date()) 
   let saved = 0;
   for (const r of Array.isArray(rows) ? rows.slice(0, 2000) : []) {
     if (!DISCORD_ID.test(String(r?.discordId))) continue;
+    if (!(await linkByDiscord(String(r.discordId)))) continue; // nur für Verknüpfte speichern, nur sie haben zugestimmt
     const clamp = (v, max) => Math.min(max, Math.max(0, Math.round(Number(v) || 0)));
     await db.set(`dmonth/${month}/${r.discordId}`, { msgs: clamp(r.msgs, settings.communityMsgCap * 31), days: clamp(r.days, 31) });
     saved++;

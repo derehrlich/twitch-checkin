@@ -1,11 +1,12 @@
 // Schnittstelle für den VerwirrBot (Anmeldung mit dem gemeinsamen Geheimwort LINK_SECRET als Bearer-Token):
-//   GET  /api/community/board    Rangliste des Monats (verknüpfte Konten) samt Regeln, damit der Bot dieselben Gewichte nutzt
+//   GET  /api/community/board    Rangliste des Monats (verknüpfte Konten), Liste der verknüpften Discord-IDs und Regeln, damit der Bot dieselben Gewichte nutzt
+//   GET  /api/community/link?discordId=...   ist dieses Discord-Konto verknüpft? { linked, twitchName }
 //   POST /api/community/sync     Discord-Zahlen des Monats melden { month, rows: [{ discordId, msgs, days }] }
 //   POST /api/community/unlink   Verknüpfung löschen { discordId }
 // Öffentlich zugänglich ist nur die Rangliste in /api/leaderboard.
 import { getSettings } from '../lib/settings.mjs';
 import { json } from '../lib/http.mjs';
-import { botAuthorized, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/community.mjs';
+import { allLinks, botAuthorized, DISCORD_ID, linkByDiscord, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/community.mjs';
 
 export const config = { path: ['/api/community/*'] };
 
@@ -19,8 +20,14 @@ export default async (req) => {
 
   if (route[0] === 'board' && req.method === 'GET') {
     const board = await monthBoard(settings);
-    return json({ enabled: settings.communityEnabled, month: board.month, label: board.label, rules: { weights: weights(settings), msgCap: settings.communityMsgCap, msgGap: settings.communityMsgGap },
+    // linked: alle verknüpften Discord-IDs, damit der Bot nur für sie Zahlen meldet
+    return json({ enabled: settings.communityEnabled, month: board.month, linked: (await allLinks()).map((l) => l.discordId), label: board.label, rules: { weights: weights(settings), msgCap: settings.communityMsgCap, msgGap: settings.communityMsgGap },
       rows: board.rows.slice(0, 200).map((r) => ({ discordId: r.discordId, name: r.name, points: r.points })) });
+  }
+  if (route[0] === 'link' && req.method === 'GET') {
+    const id = new URL(req.url).searchParams.get('discordId') ?? '';
+    const link = DISCORD_ID.test(id) ? await linkByDiscord(id) : null;
+    return json({ linked: Boolean(link), twitchName: link?.twitchName ?? null });
   }
   if (route[0] === 'sync' && writes) {
     if (!settings.communityEnabled) return json({ error: 'Die Community-Rangliste ist ausgeschaltet' }, 403);
