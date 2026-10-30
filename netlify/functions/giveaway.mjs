@@ -29,6 +29,6 @@ export default async (req) => {
   const draw = (await listDraws(g.id)).at(-1) ?? null;
   return json({
     giveaway: { name: g.name, start: g.start, end: g.end, prizes: g.prizes.map((p, i) => ({ place: i + 1, title: p.title })) },
-    draw: draw ? { at: draw.at, done: draw.done, places: draw.places, winners: draw.winners.map((w) => ({ place: w.place, name: w.name, prize: w.prize })) } : null,
+    draw: draw ? { at: draw.at, done: draw.done, places: draw.places, winners: draw.winners.filter((w) => !w.forfeited).sort((a, b) => a.place - b.place).map((w) => ({ place: w.place, name: w.name, prize: w.prize })) } : null,
   });
 };

@@ -315,9 +315,23 @@ export async function listDraws(gid) {
  * Zieht den nächsten Platz. Läuft keine Ziehung (oder ist die letzte fertig und fresh gesetzt), beginnt eine neue mit eingefrorenem Punktestand.
  * Teilnehmerliste, Punkte, Gewinner und Zeitstempel landen im Protokoll. Der Platz wird atomar reserviert, ein Doppelklick zieht nicht doppelt.
  */
-export async function drawNext(g, settings, { fresh = false, rand = crypto.randomInt, now = Date.now() } = {}) {
+export async function drawNext(g, settings, { fresh = false, replace = null, rand = crypto.randomInt, now = Date.now() } = {}) {
   const draws = await listDraws(g.id);
   let draw = draws.at(-1);
+  if (replace) { // Gewinner verfällt (z. B. keine Meldung in der Frist): derselbe Platz geht an einen Nachrücker aus dem eingefrorenen Topf
+    const old = draw?.winners.find((w) => w.place === replace && !w.forfeited);
+    if (!old) return { error: 'Für diesen Platz gibt es keinen Gewinner, der verfallen könnte' };
+    const pool = draw.participants.filter((p) => !draw.winners.some((w) => w.id === p.id));
+    const lock = `gwlock/${g.id}/${draw.id}/${replace}-r${draw.winners.length}`;
+    if (!(await db.setIfNew(lock, 1))) return { error: 'Es wird gerade gezogen, bitte kurz warten' };
+    const res = drawOne(pool, rand);
+    if (!res) return { error: 'Es ist niemand mehr im Topf, der nachrücken könnte' };
+    old.forfeited = true; old.forfeitedAt = now;
+    draw.winners.push({ place: replace, id: res.winner.id, name: res.winner.name, points: res.winner.points, chance: pct((res.winner.points / res.tickets) * 100), pool: pool.length, prize: prizeText(g, replace), at: now, replaces: old.id });
+    draw.done = draw.winners.filter((w) => !w.forfeited).length >= draw.places;
+    await db.set(dKey(g.id, draw.at), draw);
+    return { draw, winner: draw.winners.at(-1) };
+  }
   if (!draw || draw.done) {
     if (draw && !fresh) return { error: 'Die Ziehung ist abgeschlossen. Für eine neue Ziehung bitte „Neue Ziehung“ wählen.' };
     const { rows } = await loadGiveaway(g, settings);
@@ -325,14 +339,15 @@ export async function drawNext(g, settings, { fresh = false, rand = crypto.rando
     if (!participants.length) return { error: 'Niemand ist qualifiziert, es gibt nichts zu ziehen' };
     draw = { id: pad(now), gid: g.id, name: g.name, at: now, rules: { ...g, announcement: undefined, cancelled: g.cancelled }, places: g.prizes.length, participants, winners: [], done: false };
   }
-  const place = draw.winners.length + 1;
-  if (!(await db.setIfNew(`gwlock/${g.id}/${draw.id}/${place}`, 1))) return { error: 'Es wird gerade gezogen, bitte kurz warten' };
+  const place = draw.winners.filter((w) => !w.forfeited).length + 1;
+  const lockN = draw.winners.length + 1; // Zahl aller bisherigen Ziehungen: ein verfallener Platz sperrt sich nicht selbst
+  if (!(await db.setIfNew(`gwlock/${g.id}/${draw.id}/${place}-${lockN}`, 1))) return { error: 'Es wird gerade gezogen, bitte kurz warten' };
   const pool = draw.participants.filter((p) => !draw.winners.some((w) => w.id === p.id));
   const res = drawOne(pool, rand);
   if (!res) { draw.done = true; await db.set(dKey(g.id, draw.at), draw); return { draw, error: 'Es sind nicht genug qualifizierte Teilnehmer übrig' }; }
   const w = res.winner;
   draw.winners.push({ place, id: w.id, name: w.name, points: w.points, chance: pct((w.points / res.tickets) * 100), pool: pool.length, prize: prizeText(g, place), at: now });
-  draw.done = draw.winners.length >= draw.places || pool.length === 1;
+  draw.done = draw.winners.filter((w) => !w.forfeited).length >= draw.places || pool.length === 1;
   await db.set(dKey(g.id, draw.at), draw);
   return { draw, winner: draw.winners.at(-1) };
 }

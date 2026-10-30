@@ -6,7 +6,7 @@
 //   DELETE giveaway/<id>             löschen (nur ohne Ziehung)
 //   PUT    giveaway/<id>/stream      { day, cancelled } Stream als ausgefallen markieren oder zurücknehmen
 //   POST   giveaway/<id>/announce    Ankündigungstext in den Chat
-//   POST   giveaway/<id>/draw        { fresh? } nächsten Platz ziehen
+//   POST   giveaway/<id>/draw        { fresh? | replace: Platz } nächsten Platz ziehen oder Nachrücker für einen verfallenen Platz
 import { getSettings } from '../settings.mjs';
 import { streamDay } from '../checkin.mjs';
 import { sendChat } from '../twitch.mjs';
@@ -145,7 +145,7 @@ export async function giveaway({ route, method, body }) {
   }
 
   if (route[2] === 'draw' && method === 'POST') {
-    const res = await drawNext(g, settings, { fresh: body.fresh === true });
+    const res = await drawNext(g, settings, { fresh: body.fresh === true, replace: Number(body.replace) || null });
     if (res.error) return json({ error: res.error, draw: res.draw ?? null }, res.draw ? 200 : 409);
     if (settings.giveawayDrawChat && settings.chatEnabled) await sendChat(winnerChat(settings, res.winner)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     return json({ draw: res.draw, winner: res.winner });

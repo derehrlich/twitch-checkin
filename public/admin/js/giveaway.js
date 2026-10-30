@@ -79,8 +79,8 @@ function renderDraw() {
   $('gwDraw').textContent = last && !last.done ? `Platz ${placesDone + 1} ziehen` : last ? 'Ziehung abgeschlossen' : 'Platz 1 ziehen';
   $('gwDraw').disabled = Boolean(last?.done);
   $('gwDrawFresh').classList.toggle('hidden', !last?.done);
-  const view = (d) => `<ol>${d.winners.map((w) => `<li><b>Platz ${w.place}: ${esc(w.name)}</b> – ${esc(w.prize)} <span class="muted">(${w.points} Punkte, ${num(w.chance)} % Chance bei ${w.pool} im Topf)</span></li>`).join('')}</ol>`;
-  $('gwWinners').innerHTML = last ? `<h3>Aktuelle Ziehung vom ${new Date(last.at).toLocaleString('de-DE')}</h3>${view(last)}` : '';
+  const view = (d, live = false) => `<ol>${d.winners.map((w) => `<li>${w.forfeited ? '<s>' : ''}<b>Platz ${w.place}: ${esc(w.name)}</b> – ${esc(w.prize)}${w.forfeited ? '</s> <i>verfallen, Nachrücker gezogen</i>' : ''} <span class="muted">(${w.points} Punkte, ${num(w.chance)} % Chance bei ${w.pool} im Topf${w.replaces ? ', Nachrücker' : ''})</span>${live && !w.forfeited ? ` <button class="ghost" data-act="forfeit" data-place="${w.place}">Verfällt – Nachrücker ziehen</button>` : ''}</li>`).join('')}</ol>`;
+  $('gwWinners').innerHTML = last ? `<h3>Aktuelle Ziehung vom ${new Date(last.at).toLocaleString('de-DE')}</h3>${view(last, true)}` : '';
   $('gwLog').innerHTML = draws.length ? draws.slice().reverse().map((d) => `<details><summary>${new Date(d.at).toLocaleString('de-DE')} – ${d.winners.length} von ${d.places} Plätzen${d.done ? '' : ' (nicht beendet)'}</summary>${view(d)}<p class="muted">Teilnehmer beim Start (${d.participants.length}): ${d.participants.map((p) => `${esc(p.name)} ${p.points}`).join(' · ')}</p></details>`).join('') : '<p class="muted">Noch keine Ziehung.</p>';
 }
 
@@ -136,5 +136,11 @@ export function initGiveaway() {
     if (res.winner) toast(`Platz ${res.winner.place}: ${res.winner.name} 🎉`);
   });
   $('gwDraw').addEventListener('click', draw(false));
+  $('gwWinners').addEventListener('click', run(async (e) => {
+    const btn = e.target.closest('button[data-act=forfeit]');
+    if (!btn || !confirm(`Gewinner von Platz ${btn.dataset.place} verfällt (keine Meldung in der Frist)? Es wird ein Nachrücker gezogen.`)) return;
+    const res = await api('POST', `giveaway/${$('gwSelect').value}/draw`, { replace: Number(btn.dataset.place) });
+    await loadDetail(); toast(`Nachrücker Platz ${res.winner.place}: ${res.winner.name} 🎉`);
+  }));
   $('gwDrawFresh').addEventListener('click', draw(true));
 }

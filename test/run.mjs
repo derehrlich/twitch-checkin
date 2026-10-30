@@ -1579,6 +1579,23 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.equal(fresh.winner.place, 1); assert.equal((await db.list(`gwdraw/${gid}/`)).length, 2);
   });
 
+  await test('Ziehung: verfallener Gewinner wird durch Nachrücker ersetzt, Protokoll bleibt vollständig', async () => {
+    const id = (await (await admin(adminReq('POST', 'giveaway', { name: 'Nachrücker', start: '2026-11-01', end: '2026-11-30', prizes: [{ title: 'A', cost: 0 }, { title: 'B', cost: 0 }] }, cookie))).json()).id;
+    const g = await gw.getGiveaway(id);
+    const draw = (body) => admin(adminReq('POST', `giveaway/${id}/draw`, body, cookie)).then((r) => r.json());
+    const p1 = (await draw({})).winner, p2 = (await draw({})).winner;
+    assert.equal((await draw({ replace: 3 })).error.length > 0, true, 'Platz 3 gibt es nicht');
+    const r = await draw({ replace: 1 });
+    assert.equal(r.winner.place, 1); assert.notEqual(r.winner.id, p1.id); assert.notEqual(r.winner.id, p2.id); assert.equal(r.winner.replaces, p1.id);
+    const log = (await gw.listDraws(id)).at(-1);
+    assert.equal(log.winners.length, 3); assert.equal(log.winners.filter((w) => w.forfeited).length, 1); assert.equal(log.done, true);
+    const pub = await (await gwPublic(new Request(BASE + '/api/giveaway?id=' + id))).json();
+    assert.ok(pub.giveaway);
+    const again = await draw({ replace: 1 }); // auch der Nachrücker kann verfallen, solange noch jemand im Topf ist
+    assert.ok(again.winner || again.error);
+    await gw.saveGiveaway({ ...g, start: '2025-02-01', end: '2025-02-02' });
+  });
+
   await test('Ziehung: nicht genug Qualifizierte, parallele Klicks vergeben einen Platz nur einmal', async () => {
     const small = (await (await admin(adminReq('POST', 'giveaway', { name: 'Klein', start: '2026-11-01', end: '2026-11-30', prizes: [{ title: 'A', cost: 0 }, { title: 'B', cost: 0 }] }, cookie))).json()).id;
     const g = await gw.getGiveaway(small);
