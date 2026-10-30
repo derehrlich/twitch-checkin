@@ -1245,5 +1245,130 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   });
 }
 
+
+// ---- Community-Rangliste und Konto-Verknüpfung
+{
+  const verknuepfen = (await import('../netlify/functions/verknuepfen.mjs')).default;
+  const community = (await import('../netlify/functions/community.mjs')).default;
+  const leaderboard = (await import('../netlify/functions/leaderboard.mjs')).default;
+  const com = await import('../netlify/lib/community.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
+  const vReq = (method, p, body, ck) => new Request(BASE + '/api/verknuepfen/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const bot = (method, p, body, secret = 'geheimwort-12345') => community(new Request(BASE + '/api/community/' + p, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` }, body: body ? JSON.stringify(body) : undefined }));
+  const token = (discordId, name = 'AnnaDC', exp = Date.now() + 600_000, secret = 'geheimwort-12345') => com.signLinkToken({ discordId, discordName: name, exp }, secret);
+  const chatMsg = (id, name, text = 'hallo') => webhook(signed('notification', { subscription: { type: 'channel.chat.message' }, event: { broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: crypto.randomUUID(), message: { text } } }));
+
+  await test('Community: ohne LINK_SECRET alles aus, Bot-Schnittstelle nur mit Geheimwort', async () => {
+    assert.equal((await bot('GET', 'board')).status, 503);
+    process.env.LINK_SECRET = 'geheimwort-12345';
+    assert.equal((await bot('GET', 'board', null, 'falsch')).status, 401);
+    assert.equal((await community(new Request(BASE + '/api/community/board'))).status, 401, 'ohne Anmeldung');
+    await admin(adminReq('PUT', 'settings', { communityEnabled: true, chatEnabled: true, chatCommands: true }, cookie));
+    assert.equal((await bot('GET', 'board')).status, 200);
+  });
+
+  await test('Verknüpfen: Link-Token wird geprüft, ohne Zustimmung und Anmeldung passiert nichts', async () => {
+    assert.ok(com.verifyLinkToken(token('111111111')));
+    assert.equal(com.verifyLinkToken(token('111111111', 'x', Date.now() - 1000)), null, 'abgelaufen');
+    assert.equal(com.verifyLinkToken(token('111111111', 'x', Date.now() + 1000, 'anderes-geheimwort')), null, 'falsch signiert');
+    const invite = token('111111111', 'AnnaDC');
+    const anon = await (await verknuepfen(vReq('GET', `me?t=${encodeURIComponent(invite)}`))).json();
+    assert.equal(anon.loggedIn, false); assert.equal(anon.invite.discordName, 'AnnaDC');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: invite }))).status, 401, 'ohne Twitch-Anmeldung');
+    const ck = viewer('5001', 'Anna');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { t: invite }, ck))).status, 400, 'ohne Zustimmung');
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: 'kaputt' }, ck))).status, 400, 'ungültiger Link');
+    assert.equal(await com.linkByTwitch('5001'), null);
+    assert.equal((await verknuepfen(vReq('POST', 'confirm', { consent: true, t: invite }, ck))).status, 200);
+    const link = await com.linkByTwitch('5001');
+    assert.equal(link.discordId, '111111111'); assert.equal(link.twitchName, 'Anna');
+    assert.equal((await com.linkByDiscord('111111111')).twitchId, '5001');
+  });
+
+  await test('Verknüpfen: Anmeldung gibt den Link-Token weiter, nur eigene Seiten als Ziel', async () => {
+    const login = await auth(new Request(BASE + '/api/auth/viewer?next=/verknuepfen&t=abc'));
+    const cookies = login.headers.getSetCookie().join(';');
+    assert.match(cookies, /viewer_next=%2Fverknuepfen/); assert.match(cookies, /link_token=abc/);
+    const evil = await auth(new Request(BASE + '/api/auth/viewer?next=https://boese.example'));
+    assert.match(evil.headers.getSetCookie().join(';'), /viewer_next=%2Feinlaufsound/, 'fremde Ziele werden ignoriert');
+  });
+
+  await test('Zählen: Mindestabstand und Tageslimit, Kanalinhaber zählt nicht', async () => {
+    const s = await getSettings();
+    const t0 = new Date('2030-05-10T12:00:00Z');
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, t0), true);
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + 30_000)), false, 'unter 60 Sekunden');
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + 61_000)), true);
+    for (let i = 2; i < 40; i++) await com.countCommunityChat('5001', 'Anna', s, new Date(t0.getTime() + i * 61_000));
+    const rec = await db.get('cmonth/2030-05/5001');
+    assert.equal(rec.msgs, 30, 'höchstens 30 pro Tag'); assert.equal(rec.days, 1);
+    assert.equal(await com.countCommunityChat('5001', 'Anna', s, new Date('2030-05-11T12:00:00Z')), true, 'neuer Tag zählt wieder'); assert.equal((await db.get('cmonth/2030-05/5001')).days, 2);
+    await chatMsg('999', 'Kanal'); // Kanalinhaber
+    assert.equal(await db.get(`cmonth/${com.monthOf(s)}/999`), null);
+    await chatMsg('5001', 'Anna');
+    assert.equal((await db.get(`cmonth/${com.monthOf(s)}/5001`)).msgs, 1);
+  });
+
+  await test('Discord-Zahlen vom Bot: gültiger Monat, Werte begrenzt, Rangliste mit Gewichten und nur verknüpfte Konten', async () => {
+    const s = await getSettings(); const month = com.monthOf(s);
+    assert.equal((await bot('POST', 'sync', { month: '1999-01', rows: [] })).status, 400, 'alter Monat');
+    const res = await bot('POST', 'sync', { month, rows: [{ discordId: '111111111', msgs: 10, days: 3 }, { discordId: '222222222', msgs: 99999, days: 99 }, { discordId: 'kaputt', msgs: 1, days: 1 }] });
+    assert.deepEqual(await res.json(), { ok: true, saved: 2 });
+    assert.deepEqual(await db.get(`dmonth/${month}/222222222`), { msgs: 930, days: 31 }, 'Werte begrenzt (30 × 31 Nachrichten, 31 Tage)');
+    await db.set('user/5001', { name: 'Anna', count: 1, days: [`${month}-01`, `${month}-02`], sessions: {} });
+    const board = await com.monthBoard(s);
+    assert.equal(board.rows.length, 1, 'nur das verknüpfte Konto');
+    const r = board.rows[0];
+    assert.equal(r.points, (1 + 10) * 1 + (1 + 3) * 10 + 2 * 20, 'Twitch 1 + Discord 10 Nachrichten, 4 aktive Tage, 2 Check-ins');
+    const api = await (await bot('GET', 'board')).json();
+    assert.equal(api.rules.msgCap, 30); assert.equal(api.rows[0].discordId, '111111111'); assert.equal(api.rows[0].points, r.points);
+  });
+
+  await test('Öffentliche Rangliste zeigt die Monatswertung mit Hinweis, nur Namen und Punkte', async () => {
+    const data = await (await leaderboard(new Request(BASE + '/api/leaderboard'))).json();
+    assert.equal(data.month.rows.length, 1);
+    assert.deepEqual(Object.keys(data.month.rows[0]).sort(), ['name', 'value']);
+    assert.match(data.month.hint, /verknüpft/);
+    assert.ok(!JSON.stringify(data.month).includes('111111111'), 'keine Discord-ID öffentlich');
+  });
+
+  await test('Chat: !verknuepfen erklärt es, Check-in-Tipp nur einmal im Monat und nur für Unverknüpfte', async () => {
+    await chatMsg('5002', 'Ben', '!verknuepfen');
+    assert.match(chats().at(-1), /verknüpfe dein Twitch- und Discord-Konto/);
+    const s = await getSettings();
+    assert.match(await com.linkTip('5002', 'Ben', s), /noch nicht in der Monatsrangliste/);
+    assert.equal(await com.linkTip('5002', 'Ben', s), null, 'nur einmal im Monat');
+    assert.equal(await com.linkTip('5001', 'Anna', s), null, 'Verknüpfte bekommen keinen Tipp');
+  });
+
+  await test('Verknüpfung löschen: durch die Person, durch den Bot und im Admin, danach nicht mehr in der Rangliste', async () => {
+    const ck = viewer('5001', 'Anna');
+    const place = await (await verknuepfen(vReq('GET', 'place', null, ck))).json();
+    assert.equal(place.rank, 1);
+    assert.equal((await verknuepfen(vReq('POST', 'unlink', {}, ck))).status, 200);
+    assert.equal(await com.linkByTwitch('5001'), null); assert.equal(await com.linkByDiscord('111111111'), null);
+    assert.equal((await com.monthBoard(await getSettings())).rows.length, 0);
+    await com.saveLink({ discordId: '111111111', discordName: 'AnnaDC', twitchId: '5001', twitchName: 'Anna' });
+    assert.deepEqual(await (await bot('POST', 'unlink', { discordId: '111111111' })).json(), { ok: true });
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5002', twitchName: 'Ben' });
+    const list = await (await admin(adminReq('GET', 'community', null, cookie))).json();
+    assert.equal(list.links.length, 1); assert.equal(list.secretSet, true);
+    assert.deepEqual(await (await admin(adminReq('DELETE', 'community/5002', null, cookie))).json(), { ok: true });
+    // neue Verknüpfung desselben Discord-Kontos mit anderem Twitch-Konto ersetzt die alte
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5002', twitchName: 'Ben' });
+    await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5003', twitchName: 'Cleo' });
+    assert.equal(await com.linkByTwitch('5002'), null); assert.equal((await com.linkByDiscord('333333333')).twitchId, '5003');
+  });
+
+  await test('Backup enthält Einlaufsounds, Verknüpfungen und Monatszahlen', async () => {
+    const b = await (await admin(adminReq('GET', 'backup', null, cookie))).json();
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('link/')));
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('cmonth/')));
+    assert.ok(Object.keys(b.entries).some((k) => k.startsWith('dmonth/')));
+  });
+  delete process.env.LINK_SECRET;
+}
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

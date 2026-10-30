@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<title>Konten verknüpfen – Stadtwache</title>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<script src="/thema.js" defer></script>
+<style>
+  main { max-width: 640px; margin: 0 auto; padding: 28px 20px 56px; display: grid; gap: 18px; }
+  section.card { padding: 22px 26px 26px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .ok { color: var(--gruen); font-weight: 700; } .warn { color: var(--orange); font-weight: 700; } .bad { color: var(--rot); font-weight: 700; }
+  ul { margin: 8px 0 0; padding-left: 20px; } li { margin: 6px 0; }
+  .consent { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0 0; color: var(--text); font-weight: 400; font-size: 1rem; }
+  .consent input { margin-top: 3px; }
+  .hidden { display: none !important; }
+  @media (max-width: 640px) { main { padding: 18px 14px 40px; } .brand img { display: none; } section.card { padding: 18px 16px 20px; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Konten verknüpfen</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+</header>
+<main>
+  <section class="card">
+    <h2>Twitch und Discord verbinden</h2>
+    <div id="state"></div>
+  </section>
+  <section class="card">
+    <h2>Was passiert mit deinen Daten?</h2>
+    <ul id="privacy"></ul>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const invite = new URLSearchParams(location.search).get('t');
+let me = null;
+
+function el(tag, cls, text, parent) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; parent?.append(e); return e; }
+const post = (path, body) => fetch('/api/verknuepfen/' + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }).then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }));
+const loginUrl = () => '/api/auth/viewer?next=/verknuepfen' + (invite ? '&t=' + encodeURIComponent(invite) : '');
+
+async function load() {
+  me = await (await fetch('/api/verknuepfen/me' + (invite ? '?t=' + encodeURIComponent(invite) : ''), { cache: 'no-store' })).json();
+  const st = $('state'); st.replaceChildren();
+  if (!me.enabled) { el('p', 'muted', 'Die Verknüpfung ist gerade nicht aktiv.', st); return privacy(); }
+
+  if (me.linked) {
+    el('p', 'ok', `Verknüpft: ${me.name} (Twitch) ↔ ${me.linked.discordName || 'Discord'}`, st);
+    const place = el('p', 'muted', '', st);
+    fetch('/api/verknuepfen/place', { cache: 'no-store' }).then((r) => r.json()).then((p) => { place.textContent = p.rank ? `Dein Platz im ${p.label}: ${p.rank} von ${p.total} (${p.points} Punkte).` : `Im ${p.label} hast du noch keine Punkte. Schreib im Chat oder im Discord und check dich ein.`; });
+    const row = el('div', 'row', null, st);
+    const del = el('button', 'danger', 'Verknüpfung löschen', row);
+    del.addEventListener('click', async () => { if (!confirm('Verknüpfung wirklich löschen? Dein Name verschwindet dann aus der öffentlichen Rangliste.')) return; await post('unlink'); await load(); });
+    return privacy();
+  }
+
+  if (!me.invite) {
+    el('p', '', 'Du verknüpfst deine Konten mit dem Befehl im Discord:', st);
+    const ol = el('ol', '', null, st);
+    for (const t of ['Tippe im Discord-Server /verknuepfen.', 'Öffne den privaten Link, den der Bot dir schickt.', 'Melde dich mit Twitch an und stimme zu.']) el('li', '', t, ol);
+    if (me.hint) el('p', 'muted', me.hint, st);
+    return privacy();
+  }
+
+  if (!me.loggedIn) {
+    el('p', '', `Du bist dabei, dein Discord-Konto „${me.invite.discordName || 'Discord'}“ mit deinem Twitch-Konto zu verbinden. Melde dich dafür mit Twitch an, damit wir sicher wissen, wer du bist. Dabei werden keine Berechtigungen für dein Konto angefragt.`, st);
+    const a = el('a', 'btn', 'Mit Twitch anmelden', el('div', 'row', null, st)); a.href = loginUrl();
+    return privacy();
+  }
+
+  el('p', '', `Verbinden: Twitch „${me.name}“ ↔ Discord „${me.invite.discordName || 'Discord'}“`, st);
+  const lab = el('label', 'consent', null, st);
+  const box = el('input'); box.type = 'checkbox'; lab.append(box);
+  el('span', '', 'Ich stimme zu, dass mein Twitch-Name mit meinen Punkten in der öffentlichen Monatsrangliste angezeigt wird.', lab);
+  const row = el('div', 'row', null, st);
+  const go = el('button', '', 'Jetzt verknüpfen', row); go.disabled = true;
+  const msg = el('p', 'muted', '', st); msg.setAttribute('role', 'status');
+  box.addEventListener('change', () => { go.disabled = !box.checked; });
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    const r = await post('confirm', { consent: true, ...(invite ? { t: invite } : {}) });
+    if (!r.ok) { msg.textContent = r.body.error || 'Das hat nicht geklappt.'; msg.className = 'bad'; go.disabled = false; return; }
+    history.replaceState(null, '', '/verknuepfen'); await load();
+  });
+  privacy();
+}
+
+function privacy() {
+  const l = $('privacy'); l.replaceChildren();
+  for (const t of [
+    'Die Verknüpfung ist freiwillig. Ohne deine Zustimmung wird nichts verbunden und dein Name steht nirgends in der Rangliste.',
+    'Gezeigt wird nur dein Twitch-Name mit deiner Punktzahl, in der Rangliste auf dieser Seite und im Twitch-Panel.',
+    'Punkte entstehen aus der Anzahl deiner Chat- und Discord-Nachrichten, deinen aktiven Tagen und deinen Check-ins. Gezählt wird nur wie viele, nie was du schreibst.',
+    'Du kannst die Verknüpfung jederzeit hier oder mit /verknuepfung_loeschen im Discord löschen.',
+  ]) el('li', '', t, l);
+}
+load().catch(() => { $('state').textContent = 'Die Seite konnte nicht geladen werden.'; });
+</script>
+</body>
+</html>

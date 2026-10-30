@@ -29,3 +29,8 @@
   from = "/einlaufsound"
   to = "/einlaufsound.html"
   status = 200
+
+[[redirects]]
+  from = "/verknuepfen"
+  to = "/verknuepfen.html"
+  status = 200

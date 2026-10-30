@@ -1,14 +1,14 @@
 // /api/admin/backup: Sicherung als JSON herunterladen (GET) und wieder einspielen (POST).
-// Enthalten: Besucher, Einstellungen, Soundboard, Raid-Zähler, Stream-Tage und Reward-IDs.
+// Enthalten: Besucher, Einstellungen, Soundboard, Raid-Zähler, Stream-Tage, Reward-IDs, Einlaufsound-Einträge, Verknüpfungen und Monatszahlen.
 // Nie enthalten: Twitch-Tokens (nach einem Restore neu verbinden) und kurzlebige Daten (event/, seen/).
 // Töne und Bilder (auch die des Soundboards) sind groß und deshalb nur mit ?media=1 dabei (Netlify-Functions schaffen höchstens ca. 6 MB je Anfrage).
 import { db } from '../store.mjs';
 import { json } from '../http.mjs';
 
 const FORMAT = 'stadtwache-backup';
-const DATA_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/'];
+const DATA_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/', 'entrysound/', 'link/', 'cmonth/', 'dmonth/'];
 const DATA_KEYS = ['config/settings', 'config/soundboard', 'config/state'];
-const MEDIA_PREFIXES = ['sound/', 'image/', 'soundboard/'];
+const MEDIA_PREFIXES = ['sound/', 'image/', 'soundboard/', 'entrysound-file/'];
 const inScope = (key, media) => DATA_KEYS.includes(key) || [...DATA_PREFIXES, ...(media ? MEDIA_PREFIXES : [])].some((p) => key.startsWith(p));
 
 async function keysOf(media) {

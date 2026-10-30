@@ -4,6 +4,8 @@ import { db } from '../lib/store.mjs';
 import { cookie, hasSession, makeViewerSession, parseCookies, safeEqual, text } from '../lib/http.mjs';
 import { SCOPES, siteUrl, toStored, tokenRequest, userByLogin } from '../lib/twitch.mjs';
 
+const NEXT_PAGES = ['/einlaufsound', '/verknuepfen'];
+
 export const config = { path: ['/api/auth/login', '/api/auth/viewer', '/api/auth/callback'] };
 
 export default async (req) => {
@@ -17,7 +19,14 @@ export default async (req) => {
     const state = `v:${crypto.randomUUID()}`;
     const auth = new URL('https://id.twitch.tv/oauth2/authorize');
     auth.search = new URLSearchParams({ client_id: process.env.TWITCH_CLIENT_ID, redirect_uri: redirectUri, response_type: 'code', scope: '', state });
-    return new Response(null, { status: 302, headers: { Location: auth.toString(), 'Set-Cookie': cookie(req, 'oauth_state', state, 600) } });
+    // Wohin es danach geht (nur eigene Seiten) und, für die Verknüpfung, der Link-Token vom Bot (wird später geprüft)
+    const next = NEXT_PAGES.includes(url.searchParams.get('next')) ? url.searchParams.get('next') : '/einlaufsound';
+    const invite = url.searchParams.get('t');
+    const headers = new Headers({ Location: auth.toString() });
+    headers.append('Set-Cookie', cookie(req, 'oauth_state', state, 600));
+    headers.append('Set-Cookie', cookie(req, 'viewer_next', next, 600));
+    if (invite && invite.length <= 1500) headers.append('Set-Cookie', cookie(req, 'link_token', invite, 3600));
+    return new Response(null, { status: 302, headers });
   }
   if (url.pathname.endsWith('/callback') && url.searchParams.get('state')?.startsWith('v:')) return viewerCallback(req, url, redirectUri);
 
@@ -59,9 +68,11 @@ async function viewerCallback(req, url, redirectUri) {
     const who = await fetch('https://id.twitch.tv/oauth2/validate', { headers: { Authorization: `OAuth ${t.access_token}` } }).then((r) => r.json());
     if (!who.user_id) throw new Error('Twitch hat die Anmeldung nicht bestätigt');
     const profile = await userByLogin(who.login).catch(() => null); // Anzeigename mit Groß- und Kleinschreibung
-    const headers = new Headers({ Location: '/einlaufsound' });
+    const next = parseCookies(req).viewer_next;
+    const headers = new Headers({ Location: NEXT_PAGES.includes(next) ? next : '/einlaufsound' });
     headers.append('Set-Cookie', cookie(req, 'viewer', makeViewerSession({ id: who.user_id, name: profile?.display_name || who.login }), 30 * 86400));
     headers.append('Set-Cookie', cookie(req, 'oauth_state', '', 0));
+    headers.append('Set-Cookie', cookie(req, 'viewer_next', '', 0));
     return new Response(null, { status: 302, headers });
   } catch (e) {
     return text('Anmeldung fehlgeschlagen: ' + e.message, 400);

@@ -9,7 +9,7 @@ body { display: flex; flex-direction: column; color: var(--text); font: 400 15px
 header { padding: 10px 10px 6px; text-align: center; }
 .brand { font-family: 'Silkscreen', ui-monospace, monospace; font-weight: 700; font-size: 15px; letter-spacing: .5px; color: var(--gelb); margin-bottom: 8px; }
 nav { display: flex; gap: 4px; padding: 3px; background: var(--karte); border: 1px solid var(--rand); border-radius: 10px; }
-nav button { flex: 1 1 0; min-width: 0; font: inherit; font-weight: 600; font-size: 13px; padding: 6px 4px; cursor: pointer; color: var(--leise); background: transparent; border: 0; border-radius: 8px; }
+nav button { flex: 1 1 0; min-width: 0; font: inherit; font-weight: 600; font-size: 12px; padding: 6px 4px; cursor: pointer; color: var(--leise); background: transparent; border: 0; border-radius: 8px; }
 nav button:hover { background: var(--karte2); color: var(--text); }
 nav button[aria-selected=true] { background: var(--gelb); color: var(--gelb-text); font-weight: 700; }
 nav button:focus-visible { outline: 2px solid var(--gelb); outline-offset: 1px; }
@@ -23,5 +23,6 @@ li::before { content: counter(r); width: 22px; flex: none; text-align: right; fo
 li:nth-child(1)::before { content: '🥇'; } li:nth-child(2)::before { content: '🥈'; } li:nth-child(3)::before { content: '🥉'; }
 li span { min-width: 0; overflow-wrap: anywhere; }
 li b { margin-left: auto; font-weight: 700; white-space: nowrap; padding-left: 6px; color: var(--gelb); }
+.hint { margin: 12px 0 4px; font-size: 12px; color: var(--leise); }
 .empty { margin: 14px 0; color: var(--leise); text-align: center; }
 footer { padding: 6px 10px 8px; text-align: center; font-size: 11px; color: var(--leise); }

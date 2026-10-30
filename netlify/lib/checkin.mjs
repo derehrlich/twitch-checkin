@@ -1,6 +1,7 @@
 import { db } from './store.mjs';
 import { sendChat, setRedemptionStatus } from './twitch.mjs';
 import { activeSoundFor } from './entrysound.mjs';
+import { linkTip } from './community.mjs';
 import { findRescue, getStreamDays, parseLevels, streakFor } from './streak.mjs';
 
 const pad = (n) => String(n).padStart(15, '0');
@@ -67,6 +68,10 @@ export async function handleRedemption(redemption, settings) {
     await pushOverlay({ type: 'checkin', user: user_name, count: result.count, streak: streak.current, milestone, ...(entrySound ? { entrySound } : {}) });
     if (settings.chatEnabled) await sendChat(fill(milestone ? settings.milestoneTemplate : settings.chatTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     await setRedemptionStatus(id, reward.id, 'FULFILLED');
+    if (settings.chatEnabled) { // Tipp zur Verknüpfung, einmal im Monat und nur für Unverknüpfte
+      const tip = await linkTip(user_id, user_name, settings).catch(() => null);
+      if (tip) await sendChat(tip).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+    }
   } else {
     if (settings.chatEnabled) await sendChat(fill(settings.duplicateTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     await setRedemptionStatus(id, reward.id, 'CANCELED'); // Punkte zurück

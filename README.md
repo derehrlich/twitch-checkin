@@ -86,6 +86,16 @@ Zwei Stufen, beide ohne zweite Währung (nur Kanalpunkte). Einschalten im Admin 
 - Das **Overlay** spielt den Sound beim Check-in und schneidet ihn nach 5 Sekunden ab (einstellbar). Die Länge wird auf dem Server nicht ausgelesen, deshalb prüfst du beim Anhören.
 - Die Anmeldung der Zuschauer nutzt dieselbe Redirect-URL wie der Admin (`/api/auth/callback`), in der Twitch-App ist nichts Neues einzutragen. Sie braucht `ADMIN_PASSWORD` oder `SESSION_SECRET`, um den Cookie zu signieren.
 
+## Community-Rangliste des Monats und Verknüpfung
+
+Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. **Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.** Einschalten im Admin unter *Community*, danach die Webhooks abgleichen.
+
+- **Geheimwort:** `LINK_SECRET` in Netlify setzen (langer Zufallstext) und denselben Wert beim VerwirrBot in `data/verwirrbot.env` eintragen. Damit signiert der Bot die Verknüpfungs-Links und meldet sich bei `/api/community/*` an. Ohne das Geheimwort ist alles ausgeschaltet.
+- **Verknüpfen:** im Discord `/verknuepfen`, privater Link zu `/verknuepfen`, Anmeldung mit Twitch (ohne Berechtigungen), **ausdrückliche Zustimmung** per Haken. Löschen geht jederzeit auf der Seite, im Discord mit `/verknuepfung_loeschen` oder im Admin.
+- **Punkte:** Nachrichten × 1 + aktive Tage × 10 + Check-in-Tage × 20 (alles im Admin einstellbar). Eine Nachricht zählt höchstens alle 60 Sekunden, pro Tag und Plattform höchstens 30. Gezählt wird nur wie viele, nie was geschrieben wird. Der Kanalinhaber und Bots zählen nicht.
+- **Anzeige:** `/rangliste` und der Panel-Reiter „Monat“ zeigen die Top-Plätze mit Hinweis, wie man mitmacht. Der Chat-Befehl `!verknuepfen` erklärt es, und wer eincheckt und noch nicht verknüpft ist, bekommt einmal im Monat einen kurzen Tipp.
+- **Bot-Schnittstelle:** `GET /api/community/board`, `POST /api/community/sync`, `POST /api/community/unlink` (Bearer `LINK_SECRET`).
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).
@@ -142,17 +152,17 @@ Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch 
 - **Abspann** (`/abspann`): Der Bot merkt sich pro Stream-Tag, wer geschrieben (**Chatter**), gefolgt, abonniert (inkl. Resub-Monate), Subs verschenkt, Bits geschickt oder geraidet hat – **auch bei ausgeschalteten Alerts**. Die Namen laufen als Scrolltext durch, am Ende bleibt die Schlusszeile stehen. In OBS legst du dafür eine eigene Szene „Stream-Ende“ an (Browserquelle 1920×1080 auf `https://DEINE-SEITE.netlify.app/abspann`, „Browser aktualisieren, wenn Szene aktiv wird“ einschalten). Bots (Nightbot & Co.) und dein eigener Name werden ausgelassen, die Liste lässt sich ändern. Ohne Hintergrund: `?transparent`, anderes Tempo: `?speed=100`, früherer Stream-Tag: `?day=2026-10-28`, Vorschau mit Beispieldaten: `?demo`.
   Der Abspann läuft bewusst als Szene und nicht als Alert: Twitch meldet „Stream beendet“ erst, wenn dein Encoder schon aus ist, die Zuschauer sähen die Karte dann nicht mehr.
 - **Rangliste** (`/rangliste`): öffentliche Seite mit **Anwesenden** (Besuche), **Chattern** (Nachrichten), aktueller Streak, Streak-Rekord und Zeit im Stream (nur Namen und Zahlen, einmal pro Minute zwischengespeichert, abschaltbar). Die Chat-Zählung beginnt beim Einschalten von *Chat-Nachrichten zählen*, dein Name und Bots zählen nicht. Als OBS-Browserquelle geht `/rangliste?overlay` (transparent, ohne Kopf).
-- **Twitch-Panel:** Normale Panels zeigen nur ein festes Bild mit Link. Sofort geht ein Panel mit **Link** auf `/rangliste`. Live im Panel zeigt die **Panel-Extension** (`extension/`, fertiges Zip unter `/stadtwache-panel.zip`) die Plätze in drei Reitern (Anwesende, Chatter, Streaks). Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Anleitung: [`docs/twitch-panel.md`](docs/twitch-panel.md). Bei eigener Adresse: `npm run build:extension -- https://deine-adresse.de`.
+- **Twitch-Panel:** Normale Panels zeigen nur ein festes Bild mit Link. Sofort geht ein Panel mit **Link** auf `/rangliste`. Live im Panel zeigt die **Panel-Extension** (`extension/`, fertiges Zip unter `/stadtwache-panel.zip`) die Plätze in vier Reitern (Besuche, Chat, Streaks, Monat). Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Anleitung: [`docs/twitch-panel.md`](docs/twitch-panel.md). Bei eigener Adresse: `npm run build:extension -- https://deine-adresse.de`.
 - **Kosten:** Jede Chatnachricht ist ein Function-Aufruf auf Netlify. Bei sehr aktivem Chat steigt der Verbrauch deutlich. Wer das nicht möchte, schaltet *Chat-Befehle*, *Abspann* und *Chat-Nachrichten zählen* aus und gleicht die Webhooks ab, dann wird der Chat-Webhook wieder entfernt.
 
 ## Projektaufbau
 
 ```
-netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, einlaufsound, credits, leaderboard, twitch-webhook
+netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, einlaufsound, verknuepfen, community, credits, leaderboard, twitch-webhook
 netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, entrysound, settings, twitch, store, http …
 netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, entrysound, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
-public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste, public/einlaufsound.html Upload-Seite
+public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste, public/einlaufsound.html Upload-Seite, public/verknuepfen.html Verknüpfung
 extension/           Twitch-Panel-Extension (Quelltext), scripts/build-extension.mjs baut daraus public/stadtwache-panel.zip
 public/admin/        Admin-Oberfläche: index.html (Gerüst), admin.css, js/ (ein Skript je Bereich)
 test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)

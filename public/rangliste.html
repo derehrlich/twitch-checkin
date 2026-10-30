@@ -24,6 +24,7 @@
   li:nth-child(1)::before { content: '🥇'; } li:nth-child(2)::before { content: '🥈'; } li:nth-child(3)::before { content: '🥉'; }
   li b { margin-left: auto; font-weight: 700; white-space: nowrap; color: var(--gelb); }
   li span { overflow-wrap: anywhere; }
+  section.month { grid-column: 1 / -1; }
   .foot { text-align: center; color: var(--leise); font-size: .9rem; margin: 0; }
   body.overlay .foot { display: none; }
   @media (max-width: 640px) { main { padding: 18px 14px 40px; } .brand img { display: none; } }
@@ -56,6 +57,22 @@ async function load() {
     if (!res.ok) throw new Error(res.status === 404 ? 'Die Rangliste ist gerade nicht öffentlich.' : 'Die Rangliste konnte nicht geladen werden.');
     const data = await res.json();
     grid.replaceChildren();
+    if (data.month) { // Monatsrangliste: nur verknüpfte Konten, mit Hinweis wie man mitmacht
+      const sec = document.createElement('section'); sec.className = 'card month';
+      const h = document.createElement('h2'); h.textContent = `Aktivste im ${data.month.label}`; sec.append(h);
+      if (data.month.rows.length) {
+        const ol = document.createElement('ol');
+        for (const row of data.month.rows) {
+          const li = document.createElement('li');
+          const name = document.createElement('span'); name.textContent = row.name;
+          const val = document.createElement('b'); val.textContent = `${row.value} Punkte`;
+          li.append(name, val); ol.append(li);
+        }
+        sec.append(ol);
+      } else { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Noch keine Punkte in diesem Monat.'; sec.append(p); }
+      if (data.month.hint) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = data.month.hint; const a = document.createElement('a'); a.href = '/verknuepfen'; a.textContent = ' Mehr dazu'; p.append(a); sec.append(p); }
+      grid.append(sec);
+    }
     for (const [key, title, fmt] of BOARDS) {
       const sec = document.createElement('section'); sec.className = 'card';
       const h = document.createElement('h2'); h.textContent = title; sec.append(h);

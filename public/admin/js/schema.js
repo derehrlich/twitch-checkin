@@ -100,6 +100,23 @@ export const SCHEMA = {
     ] },
   ],
 
+  community: [
+    { title: 'Community-Rangliste des Monats', hint: 'Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. <b>Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.</b> Voraussetzung ist das Geheimwort <code>LINK_SECRET</code> in Netlify (und beim Bot). Nach dem Ein- oder Ausschalten die Webhooks abgleichen.', items: [
+      c('communityEnabled', 'Community-Rangliste aktivieren (Zählen, Verknüpfen, Monatsrangliste)'),
+      n('communityWeightMsg', 'Punkte je Nachricht', { min: 0, max: 1000 }), n('communityWeightDay', 'Punkte je aktivem Tag (Twitch und Discord getrennt gezählt)', { min: 0, max: 1000 }),
+      n('communityWeightCheckin', 'Punkte je Check-in-Tag', { min: 0, max: 1000 }),
+      n('communityMsgCap', 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
+      n('communityMsgGap', 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
+      t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
+      t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
+    ] },
+    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Verknüpfungsseite. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
+      c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
+      a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
+    ] },
+  ],
+
   abspann: [
     { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
       c('chatCommands', 'Chat-Befehle aktivieren'),
@@ -137,4 +154,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];

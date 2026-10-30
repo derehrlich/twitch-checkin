@@ -120,6 +120,21 @@ export const DEFAULTS = {
   entrySoundRejectedTemplate: '{user}, dein Einlaufsound wurde leider abgelehnt ({reason}). Lade hier einen anderen hoch: {url}',
   entrySoundRefundTemplate: '{user}, dein Einlaufsound wurde abgelehnt ({reason}). Deine Punkte bekommst du zurück.',
   entrySoundExpiredTemplate: '{user}, du hast deinen Einlaufsound nicht rechtzeitig hochgeladen. Deine Punkte bekommst du zurück.',
+  // Community-Rangliste des Monats: Twitch-Chat, Check-ins und Discord (vom VerwirrBot) zählen zusammen.
+  // Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben (/verknuepfen im Discord, LINK_SECRET nötig).
+  // Punkte = Nachrichten × wMsg + aktive Tage × wDay + Check-in-Tage × wCheckin
+  communityEnabled: false,
+  communityWeightMsg: 1,
+  communityWeightDay: 10,
+  communityWeightCheckin: 20,
+  communityMsgCap: 30, // gezählte Nachrichten pro Tag und Plattform
+  communityMsgGap: 60, // Sekunden Mindestabstand zwischen zwei gezählten Nachrichten
+  communityCommand: '!verknuepfen',
+  communityTip: true, // Beim Check-in einmal im Monat einen Tipp an Unverknüpfte
+  // Platzhalter: {user} {url}
+  communityLinkTemplate: '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}',
+  communityTipTemplate: '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.',
+  communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -127,7 +142,7 @@ export const DEFAULTS = {
 };
 
 // Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
-export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats);
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -162,6 +177,10 @@ function sanitize(input) {
   num('entrySoundBuyCost', 1, 1_000_000); num('entrySoundExtendCost', 1, 1_000_000);
   num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
   num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
+  for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint']) str(k, 400);
+  num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
+  num('communityMsgCap', 1, 500); num('communityMsgGap', 0, 3600);
+  if (typeof input.communityCommand === 'string') { const v = input.communityCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityCommand = v; }
   num('commandCooldown', 0, 600); num('topSize', 1, 10); num('creditsSpeed', 20, 300); num('leaderboardSize', 3, 25);
   num('alertDuration', 2000, 30_000);
   num('raidDuration', 2000, 30_000);
@@ -184,7 +203,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

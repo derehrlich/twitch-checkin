@@ -4,7 +4,7 @@ Die Kanalseite zeigt unter dem Stream Panels. Ein normales Panel besteht nur aus
 
 | | Link-Panel | Panel-Extension |
 |---|---|---|
-| Zeigt Plätze live im Panel | nein, öffnet die Seite `/rangliste` | **ja**: Anwesende, Chatter, Streaks in drei Reitern |
+| Zeigt Plätze live im Panel | nein, öffnet die Seite `/rangliste` | **ja**: Besuche, Chat, Streaks und Monat in vier Reitern |
 | Sichtbar für alle Zuschauer | **sofort** | erst **nach Twitch-Prüfung** (im Teststatus nur für dich und Testkonten) |
 | Aufwand | 5 Minuten | Entwicklerkonsole, Zip hochladen, ggf. Prüfung |
 
@@ -39,8 +39,9 @@ npm run build:extension -- https://deine-adresse.de
 
 ## Was die Rangliste enthält
 
-- **Anwesende:** Besuche (Check-ins).
+- **Besuche:** Besuche (Check-ins).
 - **Chatter:** Chat-Nachrichten. Gezählt wird ab dem Einschalten von *Chat-Nachrichten zählen* im Admin, Twitch liefert keinen Verlauf. Dein eigener Name und die Bots aus der Ausnahmeliste zählen nicht.
 - **Streaks:** aktuelle Streak und Rekord.
+- **Monat:** Rangliste des laufenden Monats aus Twitch-Chat, Check-ins und Discord. Nur Konten, die sich selbst verknüpft haben, erscheinen (siehe README, „Community-Rangliste“). Unter der Liste steht der Hinweis, wie man mitmacht.
 
 Die Rangliste lässt sich im Admin (*Chat & Abspann → Rangliste*) abschalten, dann zeigen Seite und Extension „nicht öffentlich“.

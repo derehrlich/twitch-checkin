@@ -40,6 +40,7 @@
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
+      <button data-tab="community" role="tab">Community</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="besucher" role="tab">Besucher</button>
       <button data-tab="tests" role="tab">Tests</button>
@@ -167,6 +168,22 @@
         <p class="muted">Zuschauer melden sich auf <code id="entryUrl"></code> mit Twitch an und laden dort ihre Datei hoch. Bei einem Kauf bleibt die Einlösung bis zu deiner Freigabe offen. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Die Länge prüfst du beim Anhören, das Overlay schneidet zu lange Sounds ohnehin ab.</p>
       </section>
       <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Community -->
+    <div class="tab-panel hidden" data-panel="community">
+      <section class="card">
+        <h2>Verknüpfte Konten</h2>
+        <p id="comInfo" class="muted"></p>
+        <div id="comTop"></div>
+        <div class="tabelle" style="overflow-x:auto"><table>
+          <thead><tr><th>Twitch</th><th>Discord</th><th>Seit</th><th></th></tr></thead>
+          <tbody id="comRows"></tbody>
+        </table></div>
+        <p class="muted">Verknüpft wird nur freiwillig: im Discord <code>/verknuepfen</code>, dann Anmeldung mit Twitch und ausdrückliche Zustimmung auf <code id="comUrl"></code>. Wer die Verknüpfung löschen lässt, verschwindet sofort aus der öffentlichen Rangliste. Zum Einrichten braucht es das Geheimwort <code>LINK_SECRET</code> in Netlify und beim VerwirrBot.</p>
+        <div class="row" style="margin-top:12px"><button class="js-sync">Rewards &amp; Webhooks abgleichen</button></div>
+      </section>
+      <div data-schema="community" style="display:grid; gap:22px;"></div>
     </div>
 
     <!-- Medien -->
