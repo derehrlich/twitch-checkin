@@ -12,7 +12,7 @@ function renderItem(i) {
 
 // Zusammenhängende Textfelder und Zahlen stehen in einem Raster, Haken und große Textfelder in voller Breite
 function renderGroup(g) {
-  let html = `<section class="px-box card"><h2>${g.title}</h2>`;
+  let html = `<section class="card"><h2>${g.title}</h2>`;
   let grid = [];
   const flush = () => { if (grid.length) html += `<div class="grid2">${grid.join('')}</div>`; grid = []; };
   for (const i of g.items) {

@@ -8,9 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILES = [
   ['panel.html', 'extension/panel.html'], ['panel.css', 'extension/panel.css'], ['panel.js', 'extension/panel.js'],
-  ['fonts/fredoka-latin-400-normal.woff2', 'public/fonts/fredoka-latin-400-normal.woff2'],
-  ['fonts/fredoka-latin-600-normal.woff2', 'public/fonts/fredoka-latin-600-normal.woff2'],
-  ['fonts/OFL-Fredoka.txt', 'public/fonts/OFL-Fredoka.txt'],
+  ['fonts/Silkscreen-Bold.ttf', 'public/fonts/Silkscreen-Bold.ttf'],
 ];
 
 /** Minimaler Zip-Schreiber (Deflate), damit kein zusätzliches Paket nötig ist. */

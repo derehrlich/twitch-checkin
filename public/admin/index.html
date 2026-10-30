@@ -5,22 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Stadtwache Admin</title>
-<link rel="stylesheet" href="/theme.css">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
 <link rel="stylesheet" href="/admin/admin.css">
 <script src="/chime.js"></script>
+<script src="/thema.js" defer></script>
 <script type="module" src="/admin/js/main.js"></script>
 </head>
-<body class="wood">
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Stadtwache Admin</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+  <button id="logout" class="ghost hidden">Abmelden</button>
+</header>
 <main>
-  <header class="plaque">
-    <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
-    <div class="titles"><small>EhrlichVerwirrt</small><h1>Stadtwache Admin</h1></div>
-    <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
-    <button id="logout" class="ghost hidden">Abmelden</button>
-  </header>
 
   <!-- Anmeldung -->
-  <section id="login" class="px-box card hidden">
+  <section id="login" class="card hidden">
     <h2>Anmelden</h2>
     <form id="loginForm" class="row">
       <div><label for="pw">Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password" required></div>
@@ -50,7 +52,7 @@
 
     <!-- Start -->
     <div class="tab-panel" data-panel="start">
-      <section class="px-box card">
+      <section class="card">
         <h2>Status</h2>
         <div id="checks"></div>
         <div class="row" style="margin-top:12px">
@@ -63,11 +65,11 @@
           <p class="muted">Webhook: <code id="uWebhook"></code></p>
         </details>
       </section>
-      <section class="px-box card">
+      <section class="card">
         <h2>Überblick</h2>
         <div class="stats" id="startStats"></div>
       </section>
-      <section class="px-box card">
+      <section class="card">
         <h2>OBS-Overlay</h2>
         <p>Browser-Quelle in OBS mit dieser Adresse (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
         <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
@@ -89,7 +91,7 @@
     <!-- Raids -->
     <div class="tab-panel hidden" data-panel="raids">
       <div data-schema="raids" style="display:grid; gap:22px;"></div>
-      <section class="px-box card">
+      <section class="card">
         <h2>Erfasste Raids</h2>
         <p class="muted">Alle Kanäle, für die der Bot einen Raid-Stand kennt. <b>Live</b> heißt: der Raid kam beim Bot an. <b>Nachgetragen</b> heißt: du hast den Stand von Hand eingetragen. Ein Klick auf eine Zeile übernimmt den Kanal ins Formular unten, um den Stand zu ändern.</p>
         <div class="stats" id="raidStats"></div>
@@ -98,7 +100,7 @@
           <tbody id="raidList"></tbody>
         </table></div>
       </section>
-      <section class="px-box card">
+      <section class="card">
         <h2>Frühere Raids nachtragen</h2>
         <p class="muted">Twitch liefert keinen Raid-Verlauf, der Bot zählt ab dem ersten empfangenen Raid. Hier trägst du den Stand früherer Raids ein, damit „schon zum 3. Mal bei uns“ stimmt. Tipp: Deine früheren Raids findest du in Twitch unter <i>Creator-Dashboard → Aktivitäts-Feed</i> oder in den Stream-Zusammenfassungen.</p>
         <div class="row">
@@ -116,7 +118,7 @@
 
     <!-- Chat & Abspann -->
     <div class="tab-panel hidden" data-panel="abspann">
-      <section class="px-box card">
+      <section class="card">
         <h2>Abspann und Rangliste ansehen</h2>
         <p class="muted"><b>Abspann:</b> In OBS eine eigene Szene „Stream-Ende“ mit einer Browserquelle (1920×1080) auf <code id="creditsUrl"></code> anlegen und „Browser aktualisieren, wenn Szene aktiv wird“ einschalten. Beim Wechsel in die Szene laufen die Namen des heutigen Streams durch.<br>
         <b>Rangliste:</b> Die Seite <code id="boardUrl"></code> zeigt die Bestenlisten. Für ein Twitch-Panel legst du unter deinem Kanal im Bereich „Info“ ein Panel an (Bild + Link) und trägst diese Adresse als Link ein. Als OBS-Quelle geht <code id="boardOverlayUrl"></code>.</p>
@@ -126,7 +128,7 @@
           <a class="btn ghost" href="/rangliste" target="_blank" rel="noopener">Rangliste öffnen</a>
         </div>
       </section>
-      <section class="px-box card">
+      <section class="card">
         <h2>Twitch-Panel mit Rangliste</h2>
         <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://twitch-checkin.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
         <div class="row">
@@ -139,7 +141,7 @@
 
     <!-- Soundboard -->
     <div class="tab-panel hidden" data-panel="soundboard">
-      <section class="px-box card">
+      <section class="card">
         <h2>Kanalpunkte-Soundboard</h2>
         <p>Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit einer Sounddatei. Löst ein Zuschauer ihn ein, spielt das Overlay den Sound und zeigt kurz ein kleines Schild mit Name und Sound. Die Abklingzeit erzwingt Twitch selbst. Ein Eintrag ohne Sounddatei oder ohne Haken bei „Aktiv“ wird in Twitch ausgeschaltet.</p>
         <div id="boardRows"></div>
@@ -156,12 +158,12 @@
 
     <!-- Medien -->
     <div class="tab-panel hidden" data-panel="medien">
-      <section class="px-box card">
+      <section class="card">
         <h2>Töne</h2>
         <p class="muted">Jeder Alert kann einen eigenen Ton haben (MP3, WAV oder OGG, höchstens 1,5 MB). Ohne eigene Datei spielt das Overlay einen eingebauten Klang, der je Alert anders klingt. Check-out und Meilenstein nehmen ohne eigene Datei den Check-in-Ton, Resub den Sub-Ton. Die Lautstärke stellst du unter „Allgemein“ ein.</p>
         <div id="soundRows"></div>
       </section>
-      <section class="px-box card">
+      <section class="card">
         <h2>Bilder und GIFs</h2>
         <p class="muted">Ein großes Bild oder GIF schaut über dem Alert-Schild hervor (GIF, PNG, JPG oder WebP, höchstens 3 MB, am besten quadratisch mit transparentem Hintergrund, etwa 320 × 320). Ohne Bild sitzt das Lama auf dem Schild. Resub nimmt ohne eigenes Bild das Sub-Bild.</p>
         <div id="imageRows"></div>
@@ -170,7 +172,7 @@
 
     <!-- Besucher -->
     <div class="tab-panel hidden" data-panel="besucher">
-      <section class="px-box card">
+      <section class="card">
         <h2>Besucher</h2>
         <div class="stats" id="stats"></div>
         <div class="row" style="margin-top:12px">
@@ -183,7 +185,7 @@
           <thead><tr><th>Name</th><th>Besuche</th><th>Streak (Rekord)</th><th>Gesamtzeit</th><th>Ø Dauer</th><th>Zuletzt</th></tr></thead>
           <tbody id="users"></tbody>
         </table></div>
-        <div id="detail" class="hidden" style="margin-top:18px; border-top:4px dotted var(--plaque); padding-top:14px">
+        <div id="detail" class="hidden" style="margin-top:18px; padding-top:14px">
           <h2 id="dName"></h2>
           <div class="days" id="dDays"></div>
           <div class="row">
@@ -197,7 +199,7 @@
 
     <!-- Tests -->
     <div class="tab-panel hidden" data-panel="tests">
-      <section class="px-box card">
+      <section class="card">
         <h2>Tests</h2>
         <p class="muted">Schickt Beispiel-Ereignisse ans Overlay oder in den Chat. Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung. Soundboard-Einträge testest du im Reiter „Soundboard“.</p>
         <div class="grid2">
@@ -227,7 +229,7 @@
     <div class="tab-panel hidden" data-panel="allgemein">
       <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
 
-      <section class="px-box card" id="backupCard">
+      <section class="card" id="backupCard">
         <h2>Backup &amp; Wiederherstellen</h2>
         <p class="muted">Die Sicherung enthält Besucher mit Streaks und Dauer, alle Einstellungen, das Soundboard, Raid-Zähler und Reward-IDs. Die Twitch-Verbindung ist bewusst nicht dabei, nach dem Wiederherstellen einmal „Mit Twitch verbinden“ und „Rewards &amp; Webhooks abgleichen“ klicken. Praktisch auch für den Umzug auf einen anderen Server.</p>
         <div class="row">
