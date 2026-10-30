@@ -22,6 +22,7 @@ let clips = [
   { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
 ];
 let subs = []; // aktive Webhook-Subscriptions
+let liveViewers = null, followerTotal = 100; // Stream-Status für die Gewinnspiel-Statistik (null = offline)
 const failSubTypes = new Set(); // Typen, deren Abo der simulierte Twitch mit 403 ablehnt
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
@@ -33,6 +34,8 @@ globalThis.fetch = async (url, init = {}) => {
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
   }
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
+  if (u.pathname.endsWith('/helix/streams')) return ok({ data: liveViewers == null ? [] : [{ type: 'live', viewer_count: liveViewers }] });
+  if (u.pathname.endsWith('/channels/followers')) return ok({ total: followerTotal, data: [] });
   if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
   if (u.pathname.endsWith('/helix/channels') && channelsFail) return ok({ error: 'boom' }, 500);
   if (u.pathname.endsWith('/helix/clips') && clipsFail) return ok({ error: 'boom' }, 500);
@@ -108,7 +111,7 @@ await test('Admin: ohne Login 401, falsches Passwort 401, richtiges Passwort lie
 });
 
 // Abspann und Chat-Befehle haben eigene Tests weiter unten; die älteren Tests rechnen ohne ihre zusätzlichen Webhooks
-await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false, chatStats: false }, cookie));
+await admin(adminReq('PUT', 'settings', { creditsEnabled: false, chatCommands: false, chatStats: false, giveawayEnabled: false }, cookie));
 
 await test('Twitch verbinden: Login-Redirect und Callback speichern Tokens', async () => {
   assert.equal((await auth(new Request(BASE + '/api/auth/login'))).status, 401, 'ohne Admin-Session gesperrt');
@@ -1377,6 +1380,270 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   });
   delete process.env.LINK_SECRET;
 }
+
+// ---- Gewinnspiele
+{
+  const gw = await import('../netlify/lib/giveaway.mjs');
+  const { handleChat } = await import('../netlify/lib/chat.mjs');
+  const { pollStats } = await import('../netlify/lib/gwstats.mjs');
+  const gwPublic = (await import('../netlify/functions/giveaway.mjs')).default;
+  const { splitChat } = await import('../netlify/lib/admin/giveaway.mjs');
+  const R = { ...gw.RULE_DEFAULTS };
+  const T0 = Date.parse('2026-11-02T19:00:00Z');
+  const rec = (msgs, minutes, first = T0) => ({ msgs, first, last: first + minutes * 60_000 });
+
+  await test('Gewinnspiel: Wochen beginnen am Montag, Wochentage stimmen', () => {
+    assert.equal(gw.weekdayOf('2026-11-02'), 1); assert.equal(gw.weekdayOf('2026-11-06'), 5);
+    assert.equal(gw.weekOf('2026-11-08'), '2026-11-02', 'Sonntag gehört zur Woche davor');
+    assert.equal(gw.weekOf('2026-11-09'), '2026-11-09');
+    assert.equal(gw.addDays('2026-11-30', 1), '2026-12-01');
+  });
+
+  await test('Chatpunkte: Randfälle bei genau 3 und 10 Nachrichten und genau 30 Minuten', () => {
+    const pts = (r) => { const p = gw.chatPointsFor(r, R); return p.chat + p.high; };
+    assert.equal(pts(rec(2, 120)), 0, '2 Nachrichten reichen nicht');
+    assert.equal(pts(rec(3, 29.99)), 0, 'knapp unter 30 Minuten');
+    assert.equal(pts(rec(3, 30)), 1, 'genau 3 Nachrichten und genau 30 Minuten');
+    assert.equal(pts(rec(9, 90)), 1);
+    assert.equal(pts(rec(10, 30)), 2, 'genau 10 Nachrichten: sehr aktiv');
+    assert.equal(pts(rec(40, 29)), 0, 'viele Nachrichten, aber zu kurz: kein Punkt, auch nicht für „sehr aktiv“');
+    assert.equal(pts(null), 0);
+  });
+
+  // Stream-Tage im November 2026: Mo 2, Di 3, Mi 4, Do 5, Fr 6, Mo 9, Fr 13, Mo 16, Fr 20
+  const streams = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09', '2026-11-13', '2026-11-16', '2026-11-20'];
+  const fixedAll = ['2026-11-02', '2026-11-06', '2026-11-09', '2026-11-13', '2026-11-16', '2026-11-20'];
+  const standings = (checkins, over = {}) => gw.computeStandings({ rules: { ...R, ...over.rules }, streamDays: over.streams ?? streams, checkins, chat: over.chat ?? {}, names: Object.fromEntries(Object.keys(checkins).map((k) => [k, k])) });
+  const by = (rows, id) => rows.find((r) => r.id === id);
+
+  await test('Punkte und Schwelle: Check-in, Streak-Bonus, Schwelle genau erreicht und knapp verfehlt', () => {
+    const rows = standings({
+      alle: fixedAll,                                   // 6 Streams, 3 Wochen, alle festen: 6 + 3×2
+      fuenf: fixedAll.slice(0, 5),                      // 5 Streams: knapp unter der Stream-Schwelle
+      zweiWochen: ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09'], // 6 Streams, nur 2 Wochen
+    });
+    const a = by(rows, 'alle');
+    assert.deepEqual([a.checkins, a.weeks, a.checkinPts, a.streakPts, a.points, a.qualified], [6, 3, 6, 6, 12, true]);
+    const f = by(rows, 'fuenf');
+    assert.equal(f.qualified, false); assert.equal(f.missingStreams, 1); assert.equal(f.missingWeeks, 0);
+    assert.equal(f.streakPts, 4, 'Wochen 1 und 2 komplett, in Woche 3 fehlt Fr 20');
+    const z = by(rows, 'zweiWochen');
+    assert.equal(z.qualified, false); assert.equal(z.weeks, 2); assert.equal(z.missingWeeks, 1); assert.equal(z.missingStreams, 0);
+    assert.equal(z.streakPts, 2, 'Woche 1 komplett (Mo 2 und Fr 6), Woche 2 verlangt Mo 9 und Fr 13');
+  });
+
+  await test('Ausgefallener fester Stream wird nicht verlangt und gibt keine Punkte', () => {
+    const checkins = { d: ['2026-11-09'], e: ['2026-11-09', '2026-11-13'] };
+    const normal = standings(checkins);
+    assert.equal(by(normal, 'd').streakPts, 0, 'Fr 13 hat stattgefunden und fehlt');
+    assert.equal(by(normal, 'e').streakPts, 2);
+    const without13 = streams.filter((d) => d !== '2026-11-13');
+    const cancelled = standings(checkins, { streams: without13 });
+    assert.equal(by(cancelled, 'd').streakPts, 2, 'Fr 13 ausgefallen: nur Mo 9 verlangt');
+    assert.equal(by(cancelled, 'e').checkins, 1, 'Check-in am ausgefallenen Tag zählt nicht');
+    assert.equal(by(cancelled, 'e').points, 3);
+  });
+
+  await test('Chatpunkte zählen nur im Stream mit Check-in; Chat-Aktivität ohne Check-in gibt nichts', () => {
+    const chat = { a: { '2026-11-02': rec(10, 45), '2026-11-03': rec(3, 30) }, nurChat: { '2026-11-02': rec(12, 60) } };
+    const rows = standings({ a: ['2026-11-02'] }, { chat });
+    assert.equal(by(rows, 'a').chatPts, 2, 'Di 3 ohne Check-in zählt nicht, Mo 2 gibt chat + sehr aktiv');
+    assert.equal(by(rows, 'a').points, 1 + 2 + 0);
+    assert.equal(by(rows, 'nurChat'), undefined);
+    const loose = standings({ a: ['2026-11-02'] }, { chat, rules: { chatNeedsCheckin: false } });
+    assert.equal(by(loose, 'a').chatPts, 3); assert.equal(by(loose, 'nurChat').chatPts, 2);
+  });
+
+  await test('Gewinnchance: Anteil der Punkte unter den Qualifizierten, Nicht-Qualifizierte 0 %', () => {
+    const rows = standings({ alle: fixedAll, fuenf: fixedAll.slice(0, 5) });
+    assert.equal(by(rows, 'alle').chance, 100); assert.equal(by(rows, 'fuenf').chance, 0);
+    const two = standings({ x: fixedAll, y: ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09'].concat([]), z: fixedAll });
+    assert.equal(by(two, 'y').qualified, false);
+    assert.equal(Math.round(by(two, 'x').chance), 50);
+  });
+
+  await test('Ziehung: jeder Punkt ein Los, Grenzen exakt', () => {
+    const pool = [{ id: 'a', points: 3 }, { id: 'b', points: 1 }];
+    const pick = (r) => gw.drawOne(pool, () => r).winner.id;
+    assert.deepEqual([0, 1, 2, 3].map(pick), ['a', 'a', 'a', 'b']);
+    assert.equal(gw.drawOne([], () => 0), null);
+    const counts = { a: 0, b: 0 };
+    for (let i = 0; i < 4000; i++) counts[gw.drawOne(pool).winner.id]++;
+    assert.ok(counts.a > 2800 && counts.a < 3200, `ca. 75 % für a, war ${counts.a}`);
+  });
+
+  await test('Auswertung: Vergleichszeitraum, Kosten pro Wirkung, fehlende Daten sind null', () => {
+    assert.deepEqual(gw.defaultCompare('2026-11-01', '2026-11-30'), { from: '2026-10-01', to: '2026-10-31' });
+    assert.deepEqual(gw.defaultCompare('2026-11-10', '2026-11-19'), { from: '2026-10-31', to: '2026-11-09' });
+    assert.equal(gw.costPer(10, 4), 2.5); assert.equal(gw.costPer(10, 0), null); assert.equal(gw.costPer(10, -2), null); assert.equal(gw.costPer(0, 3), null); assert.equal(gw.costPer(10, null), null);
+    const m = gw.periodMetrics({
+      from: '2026-11-01', to: '2026-11-30', streamDays: ['2026-10-30', '2026-11-02', '2026-11-06'],
+      stats: { '2026-11-02': { samples: 2, sum: 20, peak: 14 }, '2026-11-06': { samples: 2, sum: 30, peak: 18 } },
+      chat: { '2026-11-02': { a: { all: 5, msgs: 3 }, b: { all: 2, msgs: 1 } } },
+      checkins: { a: ['2026-10-30', '2026-11-02', '2026-11-06'], b: ['2026-11-02'] }, followersBefore: 100, followersAfter: 112,
+    });
+    assert.deepEqual(m, { streams: 2, avgViewers: 12.5, peakViewers: 18, messages: 7, chatters: 2, checkins: 3, returning: 0, followers: 12 });
+    const empty = gw.periodMetrics({ from: '2026-10-01', to: '2026-10-31', streamDays: ['2026-10-30'], stats: {}, chat: {}, checkins: { a: ['2026-10-30'] } });
+    assert.deepEqual([empty.avgViewers, empty.messages, empty.followers, empty.checkins], [null, null, null, 1]);
+  });
+
+  await test('Chat-Teile für die Ankündigung bleiben unter 500 Zeichen', () => {
+    const long = Array.from({ length: 30 }, (_, i) => `Das ist Satz Nummer ${i}.`).join(' ');
+    const parts = splitChat(long);
+    assert.ok(parts.length > 1 && parts.every((p) => p.length <= 480));
+    assert.equal(parts.join(' '), long);
+  });
+
+  // ---- Zählen im Chat
+  await admin(adminReq('PUT', 'settings', { giveawayEnabled: true, chatCommands: true, chatEnabled: true, creditsEnabled: false, chatStats: false, communityEnabled: false, creditsIgnore: 'nightbot', giveawayMsgGap: 30, commandCooldown: 0 }, cookie));
+  const settings = await getSettings();
+  const at = (sec) => new Date(T0 + sec * 1000);
+  const ev = (id, name, text) => ({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: crypto.randomUUID(), message: { text } });
+  const day = streamDay(settings, at(0));
+
+  await test('Chat zählt höchstens eine Nachricht pro 30 Sekunden; Befehle, Streamer und Bots zählen nicht', async () => {
+    await handleChat(ev('7001', 'Zora', 'hallo'), settings, at(0));
+    await handleChat(ev('7001', 'Zora', 'nochmal'), settings, at(10));        // zu früh
+    await handleChat(ev('7001', 'Zora', '!punkte'), { ...settings, giveawayEnabled: false }, at(15)); // Befehl
+    await handleChat(ev('7001', 'Zora', 'drittes'), settings, at(30));        // genau 30 s: zählt
+    await handleChat(ev('7001', 'Zora', 'viertes'), settings, at(59));        // 29 s nach der letzten gezählten: zählt nicht
+    await handleChat(ev('999', 'streamerin', 'ich bin es'), settings, at(40));
+    await handleChat(ev('7002', 'NightBot', 'Folgt mir!'), settings, at(40));
+    const z = await db.get(`gwstream/${day}/7001`);
+    assert.deepEqual([z.msgs, z.all, z.first, z.last], [2, 4, T0, T0 + 30_000]);
+    assert.equal(await db.get(`gwstream/${day}/999`), null); assert.equal(await db.get(`gwstream/${day}/7002`), null);
+  });
+
+  // ---- Admin-Oberfläche, Ziehung, öffentliche Sicht
+  const seedUser = (id, name, days) => db.set(`user/${id}`, { name, count: days.length, first: null, last: null, days, sessions: {} });
+  let gid;
+  await test('Admin: Gewinnspiel anlegen prüft Eingaben, Rangliste rechnet mit Check-ins und Chat', async () => {
+    const bad = await admin(adminReq('POST', 'giveaway', { name: 'X', start: '2026-11-30', end: '2026-11-01', prizes: [{ title: 'P', cost: 1 }] }, cookie));
+    assert.equal(bad.status, 400);
+    assert.equal((await admin(adminReq('POST', 'giveaway', { name: 'X', start: '2026-11-01', end: '2026-11-30', prizes: [] }, cookie))).status, 400);
+    const res = await (await admin(adminReq('POST', 'giveaway', { name: 'Novemberlos', start: '2026-11-01', end: '2026-11-30', prizes: [{ title: 'Enshrouded Premium Edition (Key)', cost: 10 }, { title: 'Wunschbau', cost: 0 }, { title: 'Namensschild', cost: '0' }] }, cookie))).json();
+    gid = res.id;
+    for (const d of streams) await db.setIfNew(`streamday/${d}`, 1);
+    await seedUser('7001', 'Zora', fixedAll);
+    await seedUser('7003', 'Yuri', fixedAll.slice(0, 5));
+    await seedUser('7004', 'Xaver', fixedAll);
+    await seedUser('7005', 'Wanda', fixedAll);
+    await seedUser('999', 'streamerin', fixedAll); // der Streamer selbst darf nicht mitspielen
+    for (const [id, name, d] of [['7004', 'Xaver', '2026-11-02'], ['7005', 'Wanda', '2026-11-02']]) await db.set(`gwstream/${d}/${id}`, { name, msgs: 10, all: 12, first: T0, last: T0 + 45 * 60_000 });
+    const d = await (await admin(adminReq('GET', `giveaway/${gid}`, null, cookie))).json();
+    assert.equal(d.rows.find((r) => r.name === 'streamerin'), undefined);
+    const zora = d.rows.find((r) => r.name === 'Zora');
+    assert.deepEqual([zora.points, zora.qualified], [12, true]);
+    assert.equal(d.rows.find((r) => r.name === 'Xaver').points, 14, '12 + Chat (1) + sehr aktiv (1)');
+    assert.equal(d.rows.find((r) => r.name === 'Yuri').qualified, false);
+    assert.equal(d.totals.cost, 10); assert.equal(d.totals.qualified, 3);
+    assert.equal(d.announcementWarning, false, 'die Vorlage enthält den Hinweis auf Kostenlosigkeit, Abos und Bits');
+    assert.match(d.announcement, /Abos und Bits haben keinen Einfluss/);
+  });
+
+  await test('Admin: Stream als ausgefallen markieren ändert die Punkte; ohne Check-in verlangt der Streak-Bonus nichts', async () => {
+    const put = (body) => admin(adminReq('PUT', `giveaway/${gid}/stream`, body, cookie));
+    assert.equal((await put({ day: '2026-12-24', cancelled: true })).status, 400, 'außerhalb des Zeitraums');
+    assert.equal((await put({ day: '2026-11-20', cancelled: true })).status, 200);
+    let d = await (await admin(adminReq('GET', `giveaway/${gid}`, null, cookie))).json();
+    assert.equal(d.rows.find((r) => r.name === 'Zora').points, 5 + 3 * 2, 'Fr 20 zählt nicht mehr: 5 Check-ins, 3 Streak-Wochen');
+    assert.equal(d.rows.find((r) => r.name === 'Yuri').streakPts, 6, 'Yuri fehlte nur am ausgefallenen Fr 20 und bekommt jetzt den Bonus der dritten Woche');
+    assert.equal(d.streams.find((s) => s.day === '2026-11-20').status, 'ausgefallen');
+    assert.equal((await put({ day: '2026-11-20', cancelled: false })).status, 200);
+    d = await (await admin(adminReq('GET', `giveaway/${gid}`, null, cookie))).json();
+    assert.equal(d.rows.find((r) => r.name === 'Zora').points, 12);
+  });
+
+  await test('Ziehung: nacheinander drei verschiedene Gewinner, Protokoll, Chat, danach gesperrt', async () => {
+    const before = chats().length;
+    const draw = async (body = {}) => (await admin(adminReq('POST', `giveaway/${gid}/draw`, body, cookie)));
+    const ids = [];
+    for (let place = 1; place <= 3; place++) {
+      const res = await (await draw()).json();
+      assert.equal(res.winner.place, place); ids.push(res.winner.id);
+      assert.equal(res.draw.done, place === 3);
+    }
+    assert.equal(new Set(ids).size, 3, 'jeder gewinnt nur einmal');
+    assert.ok(!ids.includes('7003') && !ids.includes('999'), 'nur Qualifizierte');
+    assert.equal(chats().length - before, 3);
+    assert.match(chats().at(-1), /Platz 3: .* gewinnt Namensschild/);
+    const done = await draw();
+    assert.equal(done.status, 409, 'abgeschlossen: ohne fresh keine weitere Ziehung');
+    const d = await (await admin(adminReq('GET', `giveaway/${gid}`, null, cookie))).json();
+    const log = d.draws[0];
+    assert.equal(log.participants.length, 3); assert.ok(log.at > 0);
+    assert.deepEqual(log.winners.map((w) => w.prize), ['Enshrouded Premium Edition (Key)', 'Wunschbau', 'Namensschild']);
+    assert.ok(log.winners.every((w) => w.points > 0 && w.chance > 0));
+    assert.equal((await admin(adminReq('DELETE', `giveaway/${gid}`, null, cookie))).status, 409, 'mit Ziehung nicht löschbar');
+    const fresh = await (await draw({ fresh: true })).json();
+    assert.equal(fresh.winner.place, 1); assert.equal((await db.list(`gwdraw/${gid}/`)).length, 2);
+  });
+
+  await test('Ziehung: nicht genug Qualifizierte, parallele Klicks vergeben einen Platz nur einmal', async () => {
+    const small = (await (await admin(adminReq('POST', 'giveaway', { name: 'Klein', start: '2026-11-01', end: '2026-11-30', prizes: [{ title: 'A', cost: 0 }, { title: 'B', cost: 0 }] }, cookie))).json()).id;
+    const g = await gw.getGiveaway(small);
+    const one = await gw.drawNext(g, settings, { rand: () => 0 });
+    const two = await Promise.all([gw.drawNext(g, settings, { rand: () => 0 }), gw.drawNext(g, settings, { rand: () => 0 })]);
+    assert.equal(two.filter((r) => r.error).length, 1, 'einer der beiden Klicks wird abgewiesen');
+    const log = (await gw.listDraws(small)).at(-1);
+    assert.equal(log.winners.length, 2); assert.notEqual(log.winners[0].id, log.winners[1].id);
+    assert.ok(one.winner);
+    await gw.saveGiveaway({ ...g, start: '2025-01-01', end: '2025-01-02' }); // aus dem Weg räumen, damit es nicht mit dem Novemberlos überlappt
+  });
+
+  await test('Öffentliche Sicht zeigt Gewinner ohne Kosten; Rangliste für Discord nur mit Geheimwort und ohne Chancen', async () => {
+    const pub = await (await gwPublic(new Request(BASE + '/api/giveaway'))).json();
+    assert.ok(pub.giveaway.name); assert.ok(!JSON.stringify(pub).includes('cost'));
+    process.env.LINK_SECRET = 'geheimwort-test-geheimwort';
+    assert.equal((await gwPublic(new Request(BASE + '/api/giveaway/ranking'))).status, 401);
+    const rank = await (await gwPublic(new Request(BASE + '/api/giveaway/ranking', { headers: { authorization: 'Bearer geheimwort-test-geheimwort' } }))).json();
+    assert.ok(rank.rows.length && rank.rows.every((r) => !('chance' in r) && 'qualified' in r));
+    delete process.env.LINK_SECRET;
+  });
+
+  await test('Chat: !gewinnspiel und !punkte, Antwort je nach Stand', async () => {
+    const g = await gw.getGiveaway(gid);
+    const now = at(0);
+    await gw.saveGiveaway({ ...g, start: '2026-11-01', end: '2026-11-30' });
+    // „heute“ liegt je nach Testdatum nicht im Zeitraum: Zeitraum auf heute erweitern, ohne die Daten zu verändern
+    const today = streamDay(settings);
+    await gw.saveGiveaway({ ...g, start: today < '2026-11-01' ? today : '2026-11-01', end: today > '2026-11-30' ? today : '2026-11-30' });
+    const rules = await handleChat(ev('7010', 'Neu', '!gewinnspiel'), settings, now);
+    assert.match(rules.reply, /Novemberlos/); assert.match(rules.reply, /Abos und Bits haben keinen Einfluss/);
+    assert.match((await handleChat(ev('7001', 'Zora', '!punkte'), settings, now)).reply, /Zora: 12 Punkte.*qualifiziert/);
+    assert.match((await handleChat(ev('7003', 'Yuri', '!punkte'), settings, now)).reply, /Yuri: 9 Punkte \(5 Check-ins in 3 Wochen\).*fehlt noch: 1 Stream\./);
+    assert.match((await handleChat(ev('7011', 'Nie', '!punkte'), settings, now)).reply, /noch keine Punkte/);
+  });
+
+  await test('Statistik-Job: Zuschauer und Follower pro Tag, Erinnerung im Chat nur live und im Abstand', async () => {
+    await admin(adminReq('PUT', 'settings', { giveawayRemindMinutes: 30 }, cookie));
+    const s2 = await getSettings();
+    const g = (await gw.listGiveaways()).find((x) => x.id === gid);
+    const t = new Date();
+    const d = streamDay(s2, t);
+    await db.delete(`gwstats/${d}`);
+    liveViewers = null; followerTotal = 150;
+    assert.deepEqual(await pollStats(t), { live: false, viewers: null });
+    assert.equal((await db.get(`gwstats/${d}`)).followers, 150); assert.equal((await db.get(`gwstats/${d}`)).samples, 0);
+    const before = chats().length;
+    liveViewers = 12; assert.equal((await pollStats(t)).live, true);
+    liveViewers = 20; await pollStats(new Date(t.getTime() + 5 * 60_000));
+    const st = await db.get(`gwstats/${d}`);
+    assert.deepEqual([st.samples, st.sum, st.peak], [2, 32, 20]);
+    assert.equal(chats().length - before, 1, 'nur eine Erinnerung innerhalb von 30 Minuten');
+    const lastChat = calls.filter((c) => c.path.endsWith('/chat/messages')).at(-1).body; // der Mock lässt Bodies mit „=“ als Text stehen
+    assert.match(typeof lastChat === 'string' ? JSON.parse(lastChat).message : lastChat.message, /Teilnahme kostenlos/);
+    liveViewers = null;
+    assert.ok(g);
+  });
+
+  await test('Backup enthält Gewinnspiele, Chat je Stream, Statistik und Ziehungsprotokolle', async () => {
+    const b = await (await admin(adminReq('GET', 'backup', null, cookie))).json();
+    for (const p of ['giveaway/', 'gwstream/', 'gwstats/', 'gwdraw/']) assert.ok(Object.keys(b.entries).some((k) => k.startsWith(p)), p);
+  });
+  await admin(adminReq('PUT', 'settings', { giveawayEnabled: false, giveawayRemindMinutes: 0 }, cookie));
+}
+
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

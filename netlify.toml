@@ -34,3 +34,8 @@
   from = "/verknuepfen"
   to = "/verknuepfen.html"
   status = 200
+
+[[redirects]]
+  from = "/gewinnspiel"
+  to = "/gewinnspiel.html"
+  status = 200

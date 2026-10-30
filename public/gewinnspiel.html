@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gewinnspiel</title>
+<meta name="color-scheme" content="dark light">
+<link rel="stylesheet" href="/stadtwache.css">
+<style>
+  /* Browserquelle für OBS: transparent, zeigt die Gewinner der Ziehung nacheinander. */
+  body { background: transparent; overflow: hidden; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px; display: grid; gap: 14px; }
+  h1 { margin: 0; text-align: center; font-size: 2rem; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+  .win { display: flex; gap: 18px; align-items: baseline; padding: 16px 24px; border-radius: 16px; background: var(--karte); border: 2px solid var(--gelb); animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+  .win .place { font-size: 2rem; }
+  .win .who { font-size: 2.2rem; font-weight: 800; overflow-wrap: anywhere; }
+  .win .prize { margin-left: auto; text-align: right; color: var(--leise); font-size: 1.2rem; }
+  .wait { text-align: center; font-size: 1.4rem; color: var(--leise); text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .win { animation: none; } }
+</style>
+</head>
+<body>
+<main id="main"></main>
+<script>
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  let shown = '';
+  async function tick() {
+    try {
+      const d = await (await fetch('/api/giveaway', { cache: 'no-store' })).json();
+      const w = d.draw?.winners ?? [];
+      const sig = d.giveaway ? `${d.draw?.at}|${w.length}` : 'none';
+      if (sig === shown) return;
+      shown = sig;
+      if (!d.giveaway || !w.length) { document.getElementById('main').innerHTML = ''; return; }
+      document.getElementById('main').innerHTML = `<h1>🎁 ${esc(d.giveaway.name)}</h1>` + w.map((x) =>
+        `<div class="win"><span class="place">${MEDALS[x.place - 1] ?? x.place + '.'}</span><span class="who">${esc(x.name)}</span><span class="prize">${esc(x.prize)}</span></div>`).join('')
+        + (d.draw.done ? '' : '<div class="wait">Nächster Platz wird gleich gezogen …</div>');
+    } catch { /* nächster Versuch */ }
+  }
+  tick(); setInterval(tick, 2000);
+</script>
+</body>
+</html>

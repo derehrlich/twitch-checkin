@@ -39,6 +39,7 @@ const fn = {
   sound: (await import(root + '/netlify/functions/sound.mjs')).default, image: (await import(root + '/netlify/functions/image.mjs')).default,
   soundboard: (await import(root + '/netlify/functions/soundboard.mjs')).default,
   credits: (await import(root + '/netlify/functions/credits.mjs')).default, leaderboard: (await import(root + '/netlify/functions/leaderboard.mjs')).default,
+  giveaway: (await import(root + '/netlify/functions/giveaway.mjs')).default,
 };
 await db.set('config/tokens', { access_token: 'a', refresh_token: 'r', expires_at: Date.now() + 3_600_000, user_id: '999', login: 'streamerin', scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'] });
 await db.set('user/1', { name: 'Stammgast', count: 2, first: '2030-01-01T10:00:00Z', last: '2030-01-02T10:00:00Z', days: ['2030-01-01', '2030-01-02'], sessions: { '2030-01-01': { in: 'x', out: 'y', minutes: 90 } } });
@@ -46,19 +47,19 @@ await db.set('user/1', { name: 'Stammgast', count: 2, first: '2030-01-01T10:00:0
 const types = { css: 'text/css', js: 'text/javascript', html: 'text/html', png: 'image/png', woff2: 'font/woff2' };
 const srv = http.createServer(async (q, r) => {
   const u = new URL(q.url, 'http://localhost:8092');
-  const route = { '/api/overlay': fn.overlay, '/api/sound': fn.sound, '/api/image': fn.image, '/api/soundboard': fn.soundboard, '/api/credits': fn.credits, '/api/leaderboard': fn.leaderboard };
+  const route = { '/api/overlay': fn.overlay, '/api/sound': fn.sound, '/api/image': fn.image, '/api/soundboard': fn.soundboard, '/api/credits': fn.credits, '/api/leaderboard': fn.leaderboard, '/api/giveaway': fn.giveaway };
   const handler = u.pathname.startsWith('/api/admin/') ? fn.admin : route[u.pathname];
   if (handler) {
     const chunks = []; for await (const c of q) chunks.push(c);
     const res = await handler(new Request(u, { method: q.method, headers: q.headers, body: ['GET', 'HEAD'].includes(q.method) ? undefined : Buffer.concat(chunks) }));
     r.writeHead(res.status, Object.fromEntries(res.headers)); return r.end(Buffer.from(await res.arrayBuffer()));
   }
-  let p = u.pathname === '/' ? '/admin/' : ['/abspann', '/rangliste', '/overlay'].includes(u.pathname) ? u.pathname + '.html' : u.pathname; if (p.endsWith('/')) p += 'index.html'; // /abspann und Co. wie die Weiterleitungen in netlify.toml
+  let p = u.pathname === '/' ? '/admin/' : ['/abspann', '/rangliste', '/overlay', '/gewinnspiel'].includes(u.pathname) ? u.pathname + '.html' : u.pathname; if (p.endsWith('/')) p += 'index.html'; // /abspann und Co. wie die Weiterleitungen in netlify.toml
   fs.readFile(path.join(root, 'public', p), (e, d) => { if (e) { r.statusCode = 404; return r.end(); } r.setHeader('content-type', types[p.split('.').pop()] ?? 'application/octet-stream'); r.end(d); });
 }).listen(8092);
 
 const b = await chromium.launch(); const page = await b.newPage({ viewport: { width: 1280, height: 900 } });
-const errs = []; page.on('pageerror', (e) => errs.push('pageerror: ' + e.message)); page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('401')) errs.push('console: ' + m.text()); });
+const errs = []; page.on('pageerror', (e) => errs.push('pageerror: ' + e.message)); page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('401') && !m.text().includes('409')) errs.push('console: ' + m.text()); });
 let step = 0; const ok = (m) => console.log(`✓ ${++step}. ${m}`);
 const toastText = async () => (await page.locator('#toast').textContent()) ?? '';
 
@@ -71,7 +72,7 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button').count(), 12);
+assert.equal(await page.locator('.tabs button').count(), 13);
 const visiblePanels = async () => page.locator('.tab-panel:visible').evaluateAll((els) => els.map((e) => e.dataset.panel));
 assert.deepEqual(await visiblePanels(), ['start']);
 await page.waitForFunction(() => document.querySelectorAll('#checks .check').length >= 5);
@@ -173,6 +174,24 @@ assert.equal(await abs.locator('#roll h1').innerText(), 'Bis bald!', 'Überschri
 await abs.goto('http://localhost:8092/rangliste'); await abs.waitForSelector('#grid section');
 assert.equal(await abs.locator('#grid section').count(), 5); assert.deepEqual(absErrs, []);
 await abs.close(); ok('Chat & Abspann: Einstellungen, Abspann und Rangliste laden');
+
+// Gewinnspiele: anlegen, Formular, Rangliste, Auswertung, Ziehung ohne Teilnehmer
+await page.click('.tabs button[data-tab="gewinnspiele"]'); await page.waitForSelector('#gwNew:visible');
+assert.equal(await page.locator('#gwBody').isHidden(), true, 'ohne Gewinnspiel ist nur die Auswahl sichtbar');
+await page.click('#gwNew'); await page.waitForSelector('#gwBody:visible');
+assert.equal(await page.locator('#gwPrizes [data-i]').count(), 3); assert.match(await page.inputValue('#gwPrizes [data-i="0"] [data-f=title]'), /Enshrouded/);
+assert.equal(await page.inputValue('#gwMinStreams'), '6'); assert.equal(await page.inputValue('#gwMinWeeks'), '3');
+assert.equal(await page.locator('#gwFixed input:checked').count(), 2);
+assert.match(await page.inputValue('#gwAnnouncement'), /Abos und Bits haben keinen Einfluss/); assert.match(await page.locator('#gwAnnWarn').innerText(), /Enthält den Hinweis/);
+await page.fill('#gwAnnouncement', 'Nur ein Text.'); await page.fill('#gwName', 'Test-Lotterie'); await page.click('#gwSave');
+await page.waitForFunction(() => document.getElementById('toast').innerText.includes('Gespeichert'));
+assert.match(await page.locator('#gwAnnWarn').innerText(), /fehlt der Hinweis/, 'Warnung, wenn der Pflichttext fehlt');
+assert.match(await page.locator('#gwSelect option:checked').innerText(), /Test-Lotterie/);
+assert.match(await page.locator('#gwEval').innerText(), /Ø Zuschauer/); assert.match(await page.locator('#gwCosts').innerText(), /10 €/);
+await page.click('#gwDraw'); await page.waitForFunction(() => document.getElementById('toast').className.includes('err'));
+assert.match(await toastText(), /Niemand ist qualifiziert/);
+const obs = await b.newPage(); await obs.goto('http://localhost:8092/gewinnspiel'); await obs.waitForTimeout(300); assert.equal(await obs.locator('.win').count(), 0); await obs.close();
+ok('Gewinnspiele: anlegen, Formular, Hinweis auf den Pflichttext, Auswertung, Ziehung ohne Teilnehmer');
 
 // 9. Abmelden
 await page.click('#logout'); await page.waitForSelector('#login:visible'); ok('Abmelden zeigt wieder die Anmeldung');

@@ -117,6 +117,22 @@ export const SCHEMA = {
     ] },
   ],
 
+  gewinnspiele: [
+    { title: 'Gewinnspiele: Technik und Chat', hint: `Chat und Zuschauer werden immer mitgezählt, damit für die Auswertung Daten da sind (braucht den Chat-Webhook und den geplanten Statistik-Job; nach dem Einschalten die Webhooks abgleichen). Platzhalter für die Regeln: ${code('name')} ${code('start')} ${code('end')} ${code('minStreams')} ${code('minWeeks')} ${code('prize')}. Für den Punktestand: ${code('user')} ${code('points')} ${code('checkins')} ${code('weeks')} ${code('missing')} (was zur Teilnahme noch fehlt) ${code('minStreams')} ${code('minWeeks')}. Für die Ziehung: ${code('place')} ${code('user')} ${code('prize')}.`, items: [
+      c('giveawayEnabled', 'Gewinnspiel-Daten mitzählen und Befehle aktivieren'),
+      n('giveawayMsgGap', 'Pro Person zählt höchstens eine Nachricht in diesem Abstand (Sekunden)', { min: 0, max: 3600 }),
+      t('giveawayCommand', 'Befehl für die Regeln', { maxlength: 26, placeholder: '!gewinnspiel' }), t('giveawayPointsCommand', 'Befehl für den eigenen Punktestand', { maxlength: 26, placeholder: '!punkte' }),
+      n('giveawayRemindMinutes', 'Erinnerung im Chat alle … Minuten, während du live bist (0 = aus)', { min: 0, max: 1440 }),
+      c('giveawayDrawChat', 'Gewinner bei der Ziehung im Chat verkünden'),
+      a('giveawayRulesTemplate', 'Regeln kurz (Antwort auf den Befehl und Erinnerung)', { name: 'Novemberlos', start: '01.11.2026', end: '30.11.2026', minStreams: 6, minWeeks: 3, prize: 'Enshrouded' }),
+      a('giveawayPointsTemplate', 'Punktestand, qualifiziert', { user: 'Max', points: 9, checkins: 7, weeks: 3 }),
+      a('giveawayPointsOpenTemplate', 'Punktestand, noch nicht qualifiziert', { user: 'Max', points: 3, checkins: 3, weeks: 2, missing: '3 Streams und 1 Woche' }),
+      a('giveawayPointsNoneTemplate', 'Noch keine Punkte', { user: 'Max', minStreams: 6, minWeeks: 3 }),
+      a('giveawayNoneTemplate', 'Kein Gewinnspiel aktiv', { user: 'Max' }),
+      a('giveawayDrawTemplate', 'Gewinner-Verkündung bei der Ziehung', { place: 1, user: 'Max', prize: 'Enshrouded' }),
+    ] },
+  ],
+
   abspann: [
     { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
       c('chatCommands', 'Chat-Befehle aktivieren'),
@@ -154,4 +170,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'giveawayEnabled'];

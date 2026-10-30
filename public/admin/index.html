@@ -41,6 +41,7 @@
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
       <button data-tab="community" role="tab">Community</button>
+      <button data-tab="gewinnspiele" role="tab">Gewinnspiele</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="besucher" role="tab">Besucher</button>
       <button data-tab="tests" role="tab">Tests</button>
@@ -184,6 +185,101 @@
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards &amp; Webhooks abgleichen</button></div>
       </section>
       <div data-schema="community" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Gewinnspiele -->
+    <div class="tab-panel hidden" data-panel="gewinnspiele">
+      <section class="card">
+        <h2>Gewinnspiel</h2>
+        <div class="row">
+          <div><label for="gwSelect">Gewinnspiel wählen</label><select id="gwSelect"></select></div>
+          <button id="gwNew" class="ghost">Neues Gewinnspiel</button>
+        </div>
+        <p class="muted">Die Teilnahme ist immer kostenlos. Abos, Bits und andere bezahlte Aktionen geben keine Punkte und keine Lose – das ist Absicht (in Deutschland sonst rechtlich heikel) und im Bot nicht vorgesehen.</p>
+      </section>
+
+      <div id="gwBody" class="hidden" style="display:grid; gap:22px;">
+      <section class="card">
+        <h2>Einstellungen</h2>
+        <div class="grid2">
+          <div><label for="gwName">Name</label><input id="gwName" maxlength="80"></div>
+          <div class="row"><div><label for="gwStart">Beginn</label><input id="gwStart" type="date"></div><div><label for="gwEnd">Ende (einschließlich)</label><input id="gwEnd" type="date"></div></div>
+        </div>
+        <h3>Preise und Kosten</h3>
+        <div id="gwPrizes"></div>
+        <div class="row"><button id="gwAddPrize" class="ghost">Platz hinzufügen</button></div>
+        <h3>Teilnahmebedingung</h3>
+        <div class="grid2">
+          <div><label for="gwMinStreams">Mindestens so viele verschiedene Streams eingecheckt</label><input id="gwMinStreams" type="number" min="1" max="100"></div>
+          <div><label for="gwMinWeeks">… verteilt auf mindestens so viele Kalenderwochen</label><input id="gwMinWeeks" type="number" min="1" max="60"></div>
+        </div>
+        <h3>Punkte pro Stream</h3>
+        <div class="grid2">
+          <div><label for="gwCheckinPts">Check-in (einmal pro Stream)</label><input id="gwCheckinPts" type="number" min="0" max="100"></div>
+          <div><label for="gwChatPts">Chat aktiv</label><input id="gwChatPts" type="number" min="0" max="100"></div>
+          <div><label for="gwChatMinMsgs">… ab so vielen gezählten Nachrichten</label><input id="gwChatMinMsgs" type="number" min="1"></div>
+          <div><label for="gwChatMinSpanMin">… mit mindestens so vielen Minuten zwischen erster und letzter</label><input id="gwChatMinSpanMin" type="number" min="0" max="600"></div>
+          <div><label for="gwHighPts">Chat sehr aktiv (zusätzlich)</label><input id="gwHighPts" type="number" min="0" max="100"></div>
+          <div><label for="gwChatHighMsgs">… ab so vielen gezählten Nachrichten</label><input id="gwChatHighMsgs" type="number" min="1"></div>
+          <div><label for="gwStreakBonus">Streak-Bonus pro Woche (alle festen Streams besucht)</label><input id="gwStreakBonus" type="number" min="0" max="100"></div>
+          <div><label>Feste Streams</label><div id="gwFixed" class="row"></div></div>
+        </div>
+        <label class="check big"><input id="gwNeedsCheckin" type="checkbox"> Chatpunkte nur in Streams, in denen die Person auch eingecheckt war</label>
+        <p class="muted">Gezählt wird höchstens eine Nachricht je Person im Mindestabstand (Einstellung unten), ohne Befehle mit „!“, ohne dich und ohne Bots. Bots trägst du unter „Chat &amp; Abspann → Abspann“ bei „Bots“ ein. Änderungen an den Regeln gelten rückwirkend für den ganzen Zeitraum.</p>
+        <h3>Vergleichszeitraum für die Auswertung</h3>
+        <div class="grid2">
+          <div><label for="gwCmpFrom">Von (leer = Vormonat bzw. gleich langer Zeitraum davor)</label><input id="gwCmpFrom" type="date"></div>
+          <div><label for="gwCmpTo">Bis</label><input id="gwCmpTo" type="date"></div>
+        </div>
+        <h3>Ankündigungstext (Chat und Discord)</h3>
+        <textarea id="gwAnnouncement" rows="6" maxlength="1500"></textarea>
+        <p id="gwAnnWarn" class="muted"></p>
+        <div class="row"><button id="gwAnnReset" class="ghost">Vorlage neu erzeugen</button><button id="gwAnnChat" class="ghost">Im Chat posten</button></div>
+        <div class="row" style="margin-top:12px"><button id="gwSave">Gewinnspiel speichern</button><button id="gwDelete" class="danger">Löschen</button></div>
+      </section>
+
+      <section class="card">
+        <h2>Live-Rangliste</h2>
+        <div class="stats" id="gwStats"></div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>#</th><th>Name</th><th>Punkte</th><th>Check-ins</th><th>Wochen</th><th>Chat</th><th>Streak</th><th>Status</th><th>Chance</th></tr></thead>
+          <tbody id="gwRows"></tbody>
+        </table></div>
+        <p class="muted">Punkte = Check-ins + Chat + Streak. Die Gewinnchance für Platz 1 ist der Anteil der Punkte an allen Punkten der Qualifizierten.</p>
+      </section>
+
+      <section class="card">
+        <h2>Streams im Zeitraum</h2>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Tag</th><th>Status</th><th>Fester Stream</th><th>Check-ins</th><th>Ø Zuschauer</th><th>Spitze</th><th></th></tr></thead>
+          <tbody id="gwStreams"></tbody>
+        </table></div>
+        <p class="muted">Ein Stream zählt, sobald jemand eingecheckt oder der Bot dich live gesehen hat. Fällt ein fester Stream aus, markiere ihn als ausgefallen: Er gibt dann keine Punkte und wird für den Streak-Bonus nicht verlangt. Findet an einem festen Tag gar kein Stream statt, wird er automatisch nicht verlangt.</p>
+      </section>
+
+      <section class="card">
+        <h2>Ziehung</h2>
+        <p class="muted">Jeder Punkt ist ein Los. Gezogen wird nacheinander Platz 1, 2, 3 …, wer schon gewonnen hat, scheidet aus. Beim Start wird der Punktestand eingefroren und mit Zeitstempel protokolliert.</p>
+        <div class="row"><button id="gwDraw">Nächsten Platz ziehen</button><button id="gwDrawFresh" class="ghost">Neue Ziehung</button></div>
+        <div id="gwWinners"></div>
+        <p class="muted">OBS-Browserquelle für die Anzeige (Breite 1000, Höhe 700, transparent): <code id="gwObsUrl"></code></p>
+        <h3>Protokoll</h3>
+        <div id="gwLog"></div>
+      </section>
+
+      <section class="card">
+        <h2>Auswertung</h2>
+        <p class="muted" id="gwEvalInfo"></p>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Kennzahl</th><th id="gwEvalNow">Gewinnspiel</th><th id="gwEvalBefore">Vergleich</th><th>Veränderung</th></tr></thead>
+          <tbody id="gwEval"></tbody>
+        </table></div>
+        <div class="stats" id="gwCosts" style="margin-top:12px"></div>
+        <p class="muted"><b>So liest du die Zahlen:</b> Der Nutzen eines Gewinnspiels ist größtenteils indirekt (Bindung, Aktivität, Reichweite). Die Zahlen sind eine Entscheidungshilfe, ob du es im nächsten Monat fortsetzt oder anpasst, keine Gewinn-Verlust-Rechnung. Ein „–“ heißt: dafür liegen keine Daten vor, zum Beispiel weil der Bot Zuschauer, Chat je Stream und Follower erst seit der Einführung mitzählt (Twitch liefert keinen Verlauf nachträglich). Check-ins sind dagegen auch für frühere Monate da.</p>
+      </section>
+      </div>
+
+      <div data-schema="gewinnspiele" style="display:grid; gap:22px;"></div>
     </div>
 
     <!-- Medien -->

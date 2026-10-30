@@ -96,6 +96,35 @@ Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. *
 - **Anzeige:** `/rangliste` und der Panel-Reiter „Monat“ zeigen die Top-Plätze mit Hinweis, wie man mitmacht. Der Chat-Befehl `!verknuepfen` erklärt es, und wer eincheckt und noch nicht verknüpft ist, bekommt einmal im Monat einen kurzen Tipp.
 - **Bot-Schnittstelle:** `GET /api/community/board`, `POST /api/community/sync`, `POST /api/community/unlink` (Bearer `LINK_SECRET`).
 
+## Gewinnspiele
+
+Monatliches Gewinnspiel, das Stammzuschauer und aktive Chatter belohnt, ohne Lurker auszuschließen. Alles steuerst du im Admin-Reiter **Gewinnspiele**.
+
+**Punkte pro Stream** (nicht pro Woche, ausfallende Zusatzstreams benachteiligen niemanden):
+
+| Punkt | Bedingung |
+|---|---|
+| Check-in | 1, höchstens einmal pro Stream |
+| Chat aktiv | +1 bei mindestens 3 gezählten Nachrichten, zwischen erster und letzter gezählter mindestens 30 Minuten |
+| Chat sehr aktiv | +1 weiter ab 10 gezählten Nachrichten (zusätzlich zu den Bedingungen von „Chat aktiv“) |
+| Streak-Bonus | +2 je Kalenderwoche, in der alle festen Streams (Mo, Fr) besucht wurden, sofern sie stattgefunden haben |
+
+Alle Zahlen sind je Gewinnspiel einstellbar. Maximal 3 Punkte pro Stream. Chatpunkte gibt es nur in Streams, in denen die Person auch eingecheckt war (abschaltbar).
+
+- **Gezählte Nachrichten:** höchstens eine je Person in 30 Sekunden (Einstellung „Abstand“), keine Befehle mit „!“, nicht der Streamer, keine Bots (Liste unter „Chat & Abspann → Abspann → Bots“).
+- **Teilnahme:** mindestens 6 verschiedene Streams in mindestens 3 verschiedenen Kalenderwochen (einstellbar).
+- **Ausgefallene Streams:** im Dashboard markieren. Ein ausgefallener Stream gibt keine Punkte und wird für den Streak-Bonus nicht verlangt. Findet an einem festen Tag gar kein Stream statt (kein Check-in und nicht live gesehen), wird er automatisch nicht verlangt.
+- **Ziehung:** jeder Punkt ist ein Los. Knopf „Platz ziehen“ zieht nacheinander Platz 1, 2, 3 …, wer gewonnen hat, scheidet aus. Beim Start wird der Punktestand eingefroren; Zeitstempel, Teilnehmer mit Punkten und Gewinner stehen im Protokoll (`gwdraw/…`). Die Gewinner erscheinen im Chat (abschaltbar) und in der OBS-Browserquelle `/gewinnspiel` (transparent).
+- **Keine Kopplung an Abos oder Bits.** Weder Abos noch Bits noch andere bezahlte Aktionen geben Punkte oder Lose. Der Ankündigungstext sagt das ausdrücklich; fehlt der Hinweis nach einer Änderung, warnt das Dashboard.
+- **Chat-Befehle:** `!gewinnspiel` (Regeln und Zeitraum), `!punkte` (eigener Stand und Qualifikation), optional eine Erinnerung im Chat in einstellbarem Abstand, solange du live bist.
+- **Discord:** `GET /api/giveaway/ranking` (Bearer `LINK_SECRET`, wie bei der Community-Schnittstelle) liefert Regeln, Ankündigungstext und Rangliste ohne Gewinnchancen; je Zeile steht `linked`, ob die Person ihr Discord freiwillig verknüpft hat. Der Befehl im VerwirrBot selbst ist nicht Teil dieses Repos.
+
+**Auswertung:** Kosten (Summe der Preise) gegenüber Wirkung im Zeitraum und im Vergleichszeitraum (Standard: Vormonat; frei wählbar): Ø und Spitze der Zuschauer, Chatnachrichten, verschiedene Chatter, Check-ins, wiederkehrende Zuschauer (mind. 3 Streams), Follower-Zuwachs, dazu Kosten pro neuem Follower und pro zusätzlichem wiederkehrendem Zuschauer. Der Nutzen ist größtenteils indirekt, die Zahlen sind eine Entscheidungshilfe, keine Gewinn-Verlust-Rechnung.
+
+Zuschauer und Follower erfasst ein geplanter Job (`netlify/functions/stats-poll.mjs`, alle 5 Minuten, nur live Zuschauer, Follower einmal täglich bzw. stündlich im Stream). Chat je Stream und Zuschauer zählt der Bot **ab dem Einschalten**, Twitch liefert keinen Verlauf nachträglich. Für Zeiträume davor zeigt die Auswertung „–“; Check-ins gibt es auch rückwirkend. Nach dem Aktualisieren einmal „Rewards & Webhooks abgleichen“ klicken, damit der Chat-Webhook abonniert ist.
+
+Gespeichert wird (und im Backup enthalten ist): `gwstream/<tag>/<id>` (gezählte und alle Nachrichten, Zeit der ersten und letzten gezählten), `gwstats/<tag>`, `giveaway/<id>`, `gwdraw/<id>/<zeit>`. Die Check-ins je Stream stehen schon in `user/<id>.days`, daraus lassen sich die Punkte jederzeit nachrechnen (`netlify/lib/giveaway.mjs`, `computeStandings`).
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).

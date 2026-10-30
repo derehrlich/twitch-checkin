@@ -6,6 +6,8 @@ import { sendChat } from './twitch.mjs';
 import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkReply } from './community.mjs';
+import { activeGiveaway, recordGiveawayChat } from './giveaway.mjs';
+import { pointsReply, rulesText } from './gwstats.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -39,7 +41,7 @@ async function cooling(cmd, seconds) {
   return false;
 }
 
-export async function handleChat(e, settings) {
+export async function handleChat(e, settings, now = new Date()) {
   const id = e.chatter_user_id, name = e.chatter_user_name;
   if (!id) return { ok: false };
   const ignore = String(settings.creditsIgnore ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean);
@@ -52,15 +54,25 @@ export async function handleChat(e, settings) {
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
+  // Gewinnspiel: Befehle und leere Nachrichten zählen nicht
+  if (counted && settings.giveawayEnabled && text && !text.startsWith('!')) await recordGiveawayChat(streamDay(settings, now), id, name, settings, now).catch((err) => console.warn('Gewinnspiel-Zählung fehlgeschlagen:', err.message));
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   const cmd = text.split(/\s+/)[0].toLowerCase();
-  if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && cmd === settings.communityCommand)) return { ok: true };
+  const gwCmd = settings.giveawayEnabled && (cmd === settings.giveawayCommand || cmd === settings.giveawayPointsCommand);
+  if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && cmd === settings.communityCommand) && !gwCmd) return { ok: true };
   // Twitch kann Nachrichten doppelt zustellen
   if (e.message_id && !(await db.setIfNew(`seen/chat-${e.message_id}`, Date.now()))) return { ok: true };
-  if (await cooling(cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
+  // Der Punktestand ist persönlich: die Abklingzeit gilt je Person, nicht für den ganzen Chat
+  if (await cooling(cmd === settings.giveawayPointsCommand ? `${cmd}:${id}` : cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
   if (!settings.chatEnabled) return { ok: true };
 
   if (cmd === settings.communityCommand) { const reply = linkReply(settings, name); await sendChat(reply); return { ok: true, reply }; }
+  if (gwCmd) {
+    const g = cmd === settings.giveawayCommand ? await activeGiveaway(settings, now) : null;
+    const reply = cmd === settings.giveawayPointsCommand ? await pointsReply(settings, id, name, now) : g ? rulesText(settings, g) : fill(settings.giveawayNoneTemplate, { user: name });
+    await sendChat(reply);
+    return { ok: true, reply };
+  }
   const users = await allUsers();
   const reply = cmd === settings.streakCommand ? await streakReply(id, name, settings, users) : topReply(settings, users);
   await sendChat(reply);

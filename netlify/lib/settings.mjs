@@ -135,6 +135,23 @@ export const DEFAULTS = {
   communityLinkTemplate: '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}',
   communityTipTemplate: '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.',
   communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
+  // Gewinnspiele: Regeln, Zeitraum und Preise stehen im Reiter „Gewinnspiele“ je Gewinnspiel. Hier nur Technik und Chattexte.
+  // Das Mitzählen (Chat je Stream, Zuschauer, Follower) läuft immer, damit für die Auswertung Daten da sind; keine Kopplung an Abos oder Bits.
+  giveawayEnabled: true,
+  giveawayMsgGap: 30, // Sekunden: pro Person zählt höchstens eine Nachricht in diesem Abstand
+  giveawayCommand: '!gewinnspiel',
+  giveawayPointsCommand: '!punkte',
+  giveawayRemindMinutes: 0, // 0 = keine Erinnerung im Chat
+  giveawayDrawChat: true,
+  // Platzhalter: {name} {start} {end} {minStreams} {minWeeks} {prize}
+  giveawayRulesTemplate: '🎁 {name} ({start}–{end}): Check-in = 1 Punkt pro Stream, Chat-Aktivität und alle festen Streams geben Bonuspunkte. Teilnehmen darf, wer an {minStreams} Streams in {minWeeks} Wochen eingecheckt war. Teilnahme kostenlos – Abos und Bits haben keinen Einfluss auf die Gewinnchance. Dein Stand: !punkte',
+  giveawayNoneTemplate: '{user}, gerade läuft kein Gewinnspiel.',
+  // Platzhalter: {user} {points} {checkins} {weeks} {missing} (was zur Teilnahme noch fehlt) {minStreams} {minWeeks}
+  giveawayPointsTemplate: '🎟️ {user}: {points} Punkte ({checkins} Check-ins in {weeks} Wochen) – du bist qualifiziert ✅',
+  giveawayPointsOpenTemplate: '🎟️ {user}: {points} Punkte ({checkins} Check-ins in {weeks} Wochen). Zur Teilnahme fehlt noch: {missing}.',
+  giveawayPointsNoneTemplate: '🎟️ {user}, du hast noch keine Punkte. Check dich im Stream per Kanalpunkte ein (mindestens {minStreams} Streams in {minWeeks} Wochen zur Teilnahme).',
+  // Platzhalter: {place} {user} {prize}
+  giveawayDrawTemplate: '🎉 Platz {place}: {user} gewinnt {prize}! Herzlichen Glückwunsch!',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -142,7 +159,7 @@ export const DEFAULTS = {
 };
 
 // Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
-export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled);
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.giveawayEnabled);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -181,6 +198,11 @@ function sanitize(input) {
   num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
   num('communityMsgCap', 1, 500); num('communityMsgGap', 0, 3600);
   if (typeof input.communityCommand === 'string') { const v = input.communityCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityCommand = v; }
+  for (const k of ['giveawayRulesTemplate', 'giveawayNoneTemplate', 'giveawayPointsTemplate', 'giveawayPointsOpenTemplate', 'giveawayPointsNoneTemplate', 'giveawayDrawTemplate']) str(k, 500);
+  for (const k of ['giveawayCommand', 'giveawayPointsCommand']) {
+    if (typeof input[k] === 'string') { const v = input[k].trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out[k] = v; }
+  }
+  num('giveawayMsgGap', 0, 3600); num('giveawayRemindMinutes', 0, 1440);
   num('commandCooldown', 0, 600); num('topSize', 1, 10); num('creditsSpeed', 20, 300); num('leaderboardSize', 3, 25);
   num('alertDuration', 2000, 30_000);
   num('raidDuration', 2000, 30_000);
@@ -203,7 +225,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats', 'giveawayEnabled', 'giveawayDrawChat']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }
