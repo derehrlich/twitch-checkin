@@ -68,12 +68,21 @@ export function rewardPrompts(s) {
 export const isActive = (rec, now = new Date()) => Boolean(rec?.soundVersion && rec.validUntil && Date.parse(rec.validUntil) > now);
 const isKept = (rec, s, now) => Boolean(rec?.soundVersion && rec.validUntil && addMonths(rec.validUntil, s.entrySoundKeepMonths) > now);
 
-/** Sound für den Check-in dieser Person: { url, max } oder null (dann gilt der normale Ton). */
+/** Sound für den Check-in dieser Person: { url, max } oder null (dann gilt der normale Ton).
+ *  Ein gekaufter Einlaufsound hat Vorrang vor dem Katalog-Sound der Top des Monats. */
 export async function activeSoundFor(userId, settings, now = new Date()) {
-  if (!settings.entrySoundEnabled) return null;
-  const rec = await getEntry(userId);
-  if (!isActive(rec, now)) return null;
-  return { url: `/api/einlaufsound/audio?id=${userId}&v=${rec.soundVersion}`, max: settings.entrySoundMaxSeconds };
+  if (settings.entrySoundEnabled) {
+    const rec = await getEntry(userId);
+    if (isActive(rec, now)) return { url: `/api/einlaufsound/audio?id=${userId}&v=${rec.soundVersion}`, max: settings.entrySoundMaxSeconds };
+  }
+  if (settings.awardEnabled) {
+    const won = await db.get(`awardsound/${userId}`);
+    if (won && Date.parse(won.validUntil) > now) {
+      const cat = ((await db.get('config/catalog')) ?? []).find((c) => c.id === won.catalogId);
+      if (cat?.soundVersion) return { url: `/api/einlaufsound/catalog-audio?id=${cat.id}&v=${cat.soundVersion}`, max: settings.entrySoundMaxSeconds };
+    }
+  }
+  return null;
 }
 
 const say = async (settings, template, vars) => {

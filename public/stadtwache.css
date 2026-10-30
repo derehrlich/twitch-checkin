@@ -104,4 +104,5 @@ th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--ran
 th { color: var(--leise); font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
 tbody tr:hover td { background: color-mix(in srgb, var(--leise) 7%, transparent); }
 
+@media (max-width: 480px) { .brand h1 { font-size: 1rem; } .topbar { gap: 8px; padding: 10px 12px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

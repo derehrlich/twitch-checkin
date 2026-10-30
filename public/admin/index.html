@@ -132,7 +132,7 @@
       </section>
       <section class="card">
         <h2>Twitch-Panel mit Rangliste</h2>
-        <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://twitch-checkin.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
+        <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://stadtwache.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
         <div class="row">
           <a class="btn" href="/stadtwache-panel.zip" download>Extension-Zip herunterladen</a>
           <a class="btn ghost" href="https://dev.twitch.tv/console/extensions" target="_blank" rel="noopener">Twitch-Entwicklerkonsole</a>
@@ -166,6 +166,19 @@
         <div id="entryRows"></div>
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards mit Twitch abgleichen</button></div>
         <p class="muted">Zuschauer melden sich auf <code id="entryUrl"></code> mit Twitch an und laden dort ihre Datei hoch. Bei einem Kauf bleibt die Einlösung bis zu deiner Freigabe offen. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Die Länge prüfst du beim Anhören, das Overlay schneidet zu lange Sounds ohnehin ab.</p>
+      </section>
+      <section class="card">
+        <h2>Katalog für die Top des Monats</h2>
+        <p class="muted">Aus diesen Sounds suchen sich die Besten des Vormonats einen aus. Höchstens <span id="catMax">15</span> Plätze, je Sound eine Datei (MP3, WAV oder OGG, bis 1,5 MB, kurz halten).</p>
+        <div id="catRows"></div>
+        <div class="row" style="margin-top:14px">
+          <div><label for="newCatName">Neuer Sound: Name</label><input id="newCatName" maxlength="40" placeholder="z. B. Fanfare"></div>
+          <button id="addCat">Anlegen</button>
+        </div>
+        <h3>Gewinner der letzten Monate</h3>
+        <div id="awardRows"></div>
+        <div class="row" style="margin-top:12px"><button id="closeAward" class="ghost">Vormonat jetzt abschließen</button></div>
+        <p class="muted">Der Abschluss passiert ab dem 2. des Monats von selbst, sobald im Chat etwas los ist oder jemand die Seite öffnet. Der Knopf macht es sofort, falls der Vormonat noch nicht abgeschlossen ist.</p>
       </section>
       <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
     </div>

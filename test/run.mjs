@@ -1341,6 +1341,27 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.ok(!JSON.stringify(data.month).includes('111111111'), 'keine Discord-ID öffentlich');
   });
 
+  await test('Chat: !rangliste zeigt die Top-Plätze des Monats und den eigenen Platz, ohne Punkte eine Aufforderung', async () => {
+    await admin(adminReq('PUT', 'settings', { commandCooldown: 0, communityRankSize: 1 }, cookie));
+    const month = com.monthOf(await getSettings());
+    await com.saveLink({ discordId: '444444444', discordName: 'DoraDC', twitchId: '5010', twitchName: 'Dora' });
+    await db.set(`dmonth/${month}/444444444`, { msgs: 1, days: 1 });
+    await chatMsg('5001', 'Anna', '!rangliste');
+    assert.match(chats().at(-1), /Dorf-Rangliste .*: 1\. Anna \(\d+\)/);
+    assert.ok(!/Du: Platz/.test(chats().at(-1)), 'wer oben steht, braucht keine Extrazeile');
+    assert.match(chats().at(-1), /beispiel\.netlify\.app\/rangliste/);
+    await chatMsg('5010', 'Dora', '!rangliste');
+    assert.match(chats().at(-1), /1\. Anna .* · Du: Platz 2 \(\d+\)/);
+    await chatMsg('5555', 'Fremd', '!rangliste');
+    assert.ok(!/Du: Platz/.test(chats().at(-1)), 'Unverknüpfte bekommen keine Platzangabe');
+    await com.removeLink({ discordId: '444444444' });
+    const zero = { communityWeightMsg: 0, communityWeightDay: 0, communityWeightCheckin: 0 };
+    await admin(adminReq('PUT', 'settings', { communityRankSize: 5, ...zero }, cookie)); // ohne Gewichte hat niemand Punkte
+    await chatMsg('5555', 'Fremd', '!rangliste');
+    assert.match(chats().at(-1), /noch keine Punkte/, 'leere Rangliste');
+    await admin(adminReq('PUT', 'settings', { communityWeightMsg: 1, communityWeightDay: 10, communityWeightCheckin: 20 }, cookie));
+  });
+
   await test('Chat: !verknuepfen erklärt es, Check-in-Tipp nur einmal im Monat und nur für Unverknüpfte', async () => {
     await chatMsg('5002', 'Ben', '!verknuepfen');
     assert.match(chats().at(-1), /verknüpfe dein Twitch- und Discord-Konto/);
@@ -1374,6 +1395,138 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.ok(Object.keys(b.entries).some((k) => k.startsWith('link/')));
     assert.ok(Object.keys(b.entries).some((k) => k.startsWith('cmonth/')));
     assert.ok(Object.keys(b.entries).some((k) => k.startsWith('dmonth/')));
+  });
+  delete process.env.LINK_SECRET;
+}
+
+
+// ---- Top des Monats: Katalog, Monatsabschluss, Auswahl
+{
+  const aw = await import('../netlify/lib/award.mjs');
+  const es = await import('../netlify/lib/entrysound.mjs');
+  const com = await import('../netlify/lib/community.mjs');
+  const entryFn = (await import('../netlify/functions/einlaufsound.mjs')).default;
+  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(200)]).toString('base64');
+  const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
+  const vReq = (method, p, body, ck) => new Request(BASE + '/api/einlaufsound/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const api = (method, p, body) => admin(adminReq(method, p, body, cookie));
+  const JUNE = new Date(Date.UTC(2030, 5, 3, 12)); // 3. Juni 2030: Vormonat ist 2030-05
+  let fanfare, gong;
+
+  await test('Top des Monats: Gewinner mit Gleichstand auf dem letzten Platz, alle mit derselben Punktzahl', async () => {
+    const row = (name, points) => ({ twitchId: name, name, points });
+    assert.deepEqual(aw.winnersOf([row('a', 100), row('b', 80), row('c', 60), row('d', 60), row('e', 10)], 3).map((w) => [w.name, w.place]), [['a', 1], ['b', 2], ['c', 3], ['d', 3]]);
+    assert.deepEqual(aw.winnersOf([row('a', 100), row('b', 50), row('c', 50), row('d', 50), row('e', 1)], 3).map((w) => [w.name, w.place]), [['a', 1], ['b', 2], ['c', 2], ['d', 2]]);
+    assert.equal(aw.winnersOf([row('a', 5), row('b', 5), row('c', 5), row('d', 5)], 3).length, 4, 'alle gleich');
+    assert.equal(aw.winnersOf([row('a', 5), row('b', 4)], 3).length, 2, 'weniger Leute als Plätze');
+    assert.deepEqual(aw.winnersOf([], 3), []);
+    assert.equal(aw.prevMonthKey('2030-01'), '2029-12'); assert.equal(aw.prevMonthKey('2030-06'), '2030-05');
+  });
+
+  await test('Katalog: höchstens 15 Plätze, Namen eindeutig, Sound hochladen, nur Sounds mit Datei werden ausgeliefert', async () => {
+    fanfare = await (await api('POST', 'catalog', { name: 'Fanfare' })).json();
+    gong = await (await api('POST', 'catalog', { name: 'Gong' })).json();
+    assert.equal((await api('POST', 'catalog', { name: 'Fanfare' })).status, 400, 'doppelter Name');
+    assert.equal((await api('POST', 'catalog', { name: '  ' })).status, 400);
+    assert.equal((await api('PUT', `catalog/${gong.id}`, { name: 'Fanfare' })).status, 400, 'Umbenennen auf vergebenen Namen');
+    for (let i = 0; i < 13; i++) assert.equal((await api('POST', 'catalog', { name: 'Platz ' + i })).status, 200);
+    assert.equal((await api('POST', 'catalog', { name: 'zu viel' })).status, 400, 'höchstens 15');
+    const list = await (await api('GET', 'catalog')).json();
+    assert.equal(list.entries.length, 15); assert.equal(list.max, 15);
+    for (const e of list.entries.filter((x) => x.name.startsWith('Platz'))) await api('DELETE', `catalog/${e.id}`);
+    assert.equal((await api('POST', `catalog/${fanfare.id}/sound`, { name: 'fanfare.wav', data: Buffer.from('kein Ton').toString('base64') })).status, 400, 'nur Audio');
+    const up = await (await api('POST', `catalog/${fanfare.id}/sound`, { name: 'fanfare.wav', data: wav })).json();
+    fanfare = up; assert.ok(up.soundVersion);
+    assert.equal((await entryFn(vReq('GET', `catalog-audio?id=${fanfare.id}&v=1`))).status, 200);
+    assert.equal((await entryFn(vReq('GET', `catalog-audio?id=${gong.id}&v=1`))).status, 404, 'ohne Datei nichts zum Ausliefern');
+    assert.equal((await entryFn(vReq('GET', 'catalog-audio?id=../../x'))).status, 404);
+  });
+
+  await test('Monatsabschluss: erst ab dem 2., einmalig, Top 3 mit Gleichstand, Ankündigung im Chat', async () => {
+    await api('PUT', 'settings', { awardEnabled: true, communityEnabled: true, chatEnabled: true, awardSize: 3 });
+    const s = await getSettings();
+    // vier Verknüpfte im Mai 2030: Uli 100, Vera 80, Wim und Xaver je 60 Punkte (nur Twitch-Nachrichten, Gewichte × 1)
+    const people = [['6001', 'Uli', 100], ['6002', 'Vera', 80], ['6003', 'Wim', 60], ['6004', 'Xaver', 60], ['6005', 'Yara', 10]];
+    for (const [id, name, pts] of people) {
+      await com.saveLink({ discordId: `70000000${id}`, discordName: name + 'DC', twitchId: id, twitchName: name });
+      await db.set(`cmonth/2030-05/${id}`, { name, msgs: pts, days: 0, lastDay: null, dayMsgs: 0, lastAt: 0 });
+    }
+    assert.equal(await aw.ensureAward(s, new Date(Date.UTC(2030, 5, 1, 12))), null, 'am 1. noch nicht (Discord-Zahlen sind noch nicht abgeschlossen)');
+    assert.equal(await db.get('award/2030-05'), null);
+    const rec = await aw.ensureAward(s, JUNE);
+    assert.equal(rec.month, '2030-05'); assert.deepEqual(rec.winners.map((w) => [w.name, w.place]), [['Uli', 1], ['Vera', 2], ['Wim', 3], ['Xaver', 3]]);
+    assert.ok(Math.abs((Date.parse(rec.deadline) - JUNE) / 86_400_000 - 7) < 0.01, '7 Tage Zeit');
+    assert.match(chats().at(-1), /Top 4 im .*2030: 1\. Uli · 2\. Vera · 3\. Wim · 3\. Xaver.*07\.06\.2030|Top 4 im .*2030: 1\. Uli · 2\. Vera · 3\. Wim · 3\. Xaver/);
+    const before = chats().length;
+    assert.equal(await aw.ensureAward(s, JUNE), null, 'nur einmal'); assert.equal(chats().length, before);
+  });
+
+  await test('Auswahl: nur Gewinner, nur Sounds mit Datei, Laufzeit 1 Monat ab der ersten Wahl, Ändern behält die Laufzeit', async () => {
+    const s = await getSettings();
+    const me = await (await entryFn(vReq('GET', 'me', null, viewer('6001', 'Uli')))).json();
+    assert.equal(me.awardEnabled, true); assert.equal(me.award.open.place, 1);
+    assert.deepEqual(me.award.catalog.map((c) => c.name), ['Fanfare'], 'Sounds ohne Datei erscheinen nicht');
+    const stranger = await (await entryFn(vReq('GET', 'me', null, viewer('6999', 'Fremd')))).json();
+    assert.equal(stranger.award.open, null);
+    assert.equal((await entryFn(vReq('POST', 'choose', { catalogId: fanfare.id }, viewer('6999', 'Fremd')))).status, 403, 'kein Gewinner');
+    assert.equal((await entryFn(vReq('POST', 'choose', { catalogId: fanfare.id }))).status, 401, 'nicht angemeldet');
+    assert.equal((await entryFn(vReq('POST', 'choose', { catalogId: gong.id }, viewer('6001', 'Uli')))).status, 400, 'Sound ohne Datei');
+    assert.equal((await entryFn(vReq('POST', 'choose', { catalogId: 'unbekannt' }, viewer('6001', 'Uli')))).status, 400);
+    const ok = await (await entryFn(vReq('POST', 'choose', { catalogId: fanfare.id }, viewer('6001', 'Uli')))).json();
+    assert.equal(ok.ok, true); assert.match(chats().at(-1), /Uli hat sich den Einlaufsound „Fanfare“ ausgesucht/);
+    const won = await db.get('awardsound/6001');
+    assert.ok(Math.abs((Date.parse(won.validUntil) - Date.now()) / (30.4375 * 86_400_000) - 1) < 0.1, '1 Monat ab jetzt');
+    // zweiten Sound hochladen, ändern: Laufzeit bleibt, keine zweite Chat-Nachricht
+    gong = await (await api('POST', `catalog/${gong.id}/sound`, { name: 'gong.wav', data: wav })).json();
+    const count = chats().length;
+    assert.equal((await entryFn(vReq('POST', 'choose', { catalogId: gong.id }, viewer('6001', 'Uli')))).status, 200);
+    const changed = await db.get('awardsound/6001');
+    assert.equal(changed.catalogId, gong.id); assert.equal(changed.validUntil, won.validUntil); assert.equal(chats().length, count);
+    assert.equal((await aw.awardView('6001', s)).current.name, 'Gong');
+  });
+
+  await test('Check-in: Katalog-Sound der Gewinner, gekaufter Sound hat Vorrang, abgelaufen und nicht gewählt gilt der normale Ton', async () => {
+    const s = await getSettings();
+    const a = await es.activeSoundFor('6001', s);
+    assert.match(a.url, new RegExp(`^/api/einlaufsound/catalog-audio\\?id=${gong.id}&v=\\d+$`)); assert.equal(a.max, 5);
+    assert.equal(await es.activeSoundFor('6003', s), null, 'Wim hat nicht gewählt: normaler Ton');
+    assert.equal(await es.activeSoundFor('6001', s, new Date(Date.now() + 40 * 86_400_000)), null, 'nach einem Monat vorbei');
+    await db.set('entrysound/6001', { id: '6001', name: 'Uli', soundVersion: 9, validUntil: new Date(Date.now() + 86_400_000).toISOString(), uploadsLeft: 0 });
+    await api('PUT', 'settings', { entrySoundEnabled: true });
+    assert.match((await es.activeSoundFor('6001', await getSettings())).url, /^\/api\/einlaufsound\/audio\?id=6001/, 'gekaufter Sound zuerst');
+    await api('PUT', 'settings', { entrySoundEnabled: false }); await db.delete('entrysound/6001');
+    await api('PUT', 'settings', { awardEnabled: false });
+    assert.equal(await es.activeSoundFor('6001', await getSettings()), null, 'ausgeschaltet');
+    await api('PUT', 'settings', { awardEnabled: true });
+  });
+
+  await test('Frist: nach 7 Tagen keine Wahl mehr, Erinnerung beim Check-in nur für Gewinner ohne Wahl', async () => {
+    const s = await getSettings();
+    assert.equal((await aw.choose('6003', 'Wim', fanfare.id, s, new Date(Date.UTC(2030, 5, 11)))).status, 403, 'Frist vorbei');
+    assert.match(await aw.awardTip('6003', 'Wim', s, new Date(Date.UTC(2030, 5, 4))), /Wim, du warst im .* unter den Top 4.*noch bis 10\.06\.2030/);
+    assert.equal(await aw.awardTip('6001', 'Uli', s, new Date(Date.UTC(2030, 5, 4))), null, 'hat schon gewählt');
+    assert.equal(await aw.awardTip('6999', 'Fremd', s, new Date(Date.UTC(2030, 5, 4))), null, 'kein Gewinner');
+    assert.equal(await aw.awardTip('6003', 'Wim', s, new Date(Date.UTC(2030, 5, 11))), null, 'Frist vorbei');
+    // beim echten Check-in (die Frist läuft laut Datenstand bis 2030) erscheint die Erinnerung im Chat
+    const state = await db.get('config/state');
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption('aw-ci-1', '6003', 'Wim', state.rewardId) }));
+    assert.match(chats().at(-1), /Wim, du warst im .* unter den Top 4/);
+  });
+
+  await test('Admin: Gewinner mit Wahl in der Übersicht, Vormonat ist schon abgeschlossen, Backup enthält Katalog und Gewinner', async () => {
+    const list = await (await api('GET', 'catalog')).json();
+    const may = list.awards.find((x) => x.month === '2030-05');
+    assert.deepEqual(may.winners.map((w) => [w.name, w.choice]), [['Uli', 'Gong'], ['Vera', null], ['Wim', null], ['Xaver', null]]);
+    const closed = await (await api('POST', 'catalog/close', {})).json();
+    assert.equal(closed.ok, true);
+    await api('DELETE', `catalog/${gong.id}`);
+    assert.equal(await es.activeSoundFor('6001', await getSettings()), null, 'gelöschter Katalog-Sound: normaler Ton');
+    const b = await (await admin(adminReq('GET', 'backup?media=1', null, cookie))).json();
+    for (const prefix of ['award/', 'awardsound/', 'catalog/', 'config/catalog']) assert.ok(Object.keys(b.entries).some((k) => k.startsWith(prefix)), prefix);
+    await api('PUT', 'settings', { awardEnabled: false });
+    assert.equal((await api('POST', 'catalog/close', {})).status, 400, 'ausgeschaltet');
   });
   delete process.env.LINK_SECRET;
 }

@@ -13,12 +13,12 @@ Du kannst beides kombinieren: erst das Link-Panel anlegen, später die Extension
 ## Weg 1: Link-Panel (sofort)
 
 1. Auf deiner Kanalseite **Info → Panel bearbeiten → Panel hinzufügen → Text oder Bild hinzufügen**.
-2. Titel „Rangliste“, ein Bild hochladen (z. B. ein Screenshot von `/rangliste`) und als **Bildlink** `https://twitch-checkin.netlify.app/rangliste` eintragen.
+2. Titel „Rangliste“, ein Bild hochladen (z. B. ein Screenshot von `/rangliste`) und als **Bildlink** `https://stadtwache.netlify.app/rangliste` eintragen.
 3. Die Seite zeigt Anwesende (Besuche), Chatter (Nachrichten), aktuelle Streaks, Rekorde und Zeit im Stream und aktualisiert sich jede Minute.
 
 ## Weg 2: Panel-Extension (Live im Panel)
 
-Die Extension liegt als Zip bereit: im Admin unter *Chat & Abspann → Extension-Zip herunterladen* oder unter `https://twitch-checkin.netlify.app/stadtwache-panel.zip`. Sie ist auf `https://twitch-checkin.netlify.app` eingestellt. Bei eigener Adresse neu bauen:
+Die Extension liegt als Zip bereit: im Admin unter *Chat & Abspann → Extension-Zip herunterladen* oder unter `https://stadtwache.netlify.app/stadtwache-panel.zip`. Sie ist auf `https://stadtwache.netlify.app` eingestellt. Bei eigener Adresse neu bauen:
 
 ```bash
 npm run build:extension -- https://deine-adresse.de
@@ -31,7 +31,7 @@ npm run build:extension -- https://deine-adresse.de
 1. In der [Twitch-Entwicklerkonsole](https://dev.twitch.tv/console/extensions) anmelden (Zwei-Faktor-Anmeldung muss aktiv sein) und **Erweiterung erstellen**. Name z. B. „Stadtwache Rangliste“.
 2. **Typ: Panel.** Bei der Version einstellen: Anzeigepfad `panel.html`, Panel-Höhe z. B. `400`.
 3. **Asset-Hosting:** das Zip hochladen.
-4. **Fähigkeiten / URL-Abrufe:** unter „Allowlist for URL Fetching Domains“ `https://twitch-checkin.netlify.app` eintragen (deine Seite, ohne Pfad). Ohne das darf die Extension die Daten nicht laden.
+4. **Fähigkeiten / URL-Abrufe:** unter „Allowlist for URL Fetching Domains“ `https://stadtwache.netlify.app` eintragen (deine Seite, ohne Pfad). Ohne das darf die Extension die Daten nicht laden.
 5. **Zugriff:** unter „Testing Account Allowlist“ deine eigene Twitch-Konto-ID (nicht den Namen) eintragen, damit du die Extension im Test siehst. Änderungen daran greifen erst nach einem Statuswechsel (aus „Hosted Test“ nehmen und wieder hineinschieben).
 6. Status auf **Hosted Test** setzen, dann **Installieren** und im Creator-Dashboard unter *Erweiterungen → Meine Erweiterungen* als **Panel** aktivieren.
 

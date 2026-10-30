@@ -6,6 +6,7 @@ import { initMedia, renderMedia } from './media.js';
 import { initSoundboard, loadBoard } from './soundboard.js';
 import { initEntrySound, loadEntrySounds } from './entrysound.js';
 import { initCommunity, loadCommunity } from './community.js';
+import { initCatalog, loadCatalog } from './catalog.js';
 import { initVisitors, loadUsers } from './visitors.js';
 import { initTests } from './tests.js';
 import { initRaids, loadRaids } from './raids.js';
@@ -28,7 +29,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadRaids(), loadEntrySounds(), loadCommunity()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -36,7 +37,7 @@ async function init() {
 }
 
 renderForms();
-initSettings(); initStatus(); initMedia(); initSoundboard(); initEntrySound(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 

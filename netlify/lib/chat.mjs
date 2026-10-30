@@ -5,7 +5,8 @@ import { computeStreak, getStreamDays } from './streak.mjs';
 import { sendChat } from './twitch.mjs';
 import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
-import { countCommunityChat, linkReply } from './community.mjs';
+import { countCommunityChat, linkReply, rankReply } from './community.mjs';
+import { ensureAward } from './award.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -49,18 +50,20 @@ export async function handleChat(e, settings) {
     await recordChatter(day, id, name);
     if (settings.chatStats) await countChat(id, name, day);
   }
+  if (settings.awardEnabled) await ensureAward(settings).catch((err) => console.warn('Monatsabschluss fehlgeschlagen:', err.message)); // schließt den Vormonat einmalig ab
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   const cmd = text.split(/\s+/)[0].toLowerCase();
-  if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && cmd === settings.communityCommand)) return { ok: true };
+  if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && (cmd === settings.communityCommand || cmd === settings.communityRankCommand))) return { ok: true };
   // Twitch kann Nachrichten doppelt zustellen
   if (e.message_id && !(await db.setIfNew(`seen/chat-${e.message_id}`, Date.now()))) return { ok: true };
   if (await cooling(cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
   if (!settings.chatEnabled) return { ok: true };
 
   if (cmd === settings.communityCommand) { const reply = linkReply(settings, name); await sendChat(reply); return { ok: true, reply }; }
+  if (cmd === settings.communityRankCommand) { const reply = await rankReply(settings, id); await sendChat(reply); return { ok: true, reply }; }
   const users = await allUsers();
   const reply = cmd === settings.streakCommand ? await streakReply(id, name, settings, users) : topReply(settings, users);
   await sendChat(reply);

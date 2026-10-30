@@ -80,7 +80,7 @@ export async function allLinks() {
 
 // ---- Zählen
 
-const dayOf = (settings, date) => new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date(date.getTime() - settings.dayRolloverHour * 3_600_000));
+export const dayOf = (settings, date) => new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date(date.getTime() - settings.dayRolloverHour * 3_600_000));
 export const monthOf = (settings, date = new Date()) => dayOf(settings, date).slice(0, 7);
 
 export function monthLabel(month) {
@@ -146,3 +146,15 @@ export async function linkTip(userId, userName, settings) {
 }
 
 export const linkReply = (settings, userName) => fill(settings.communityLinkTemplate, { user: userName, url: linkUrl() });
+
+/** Antwort auf !rangliste: Top-Plätze des Monats, bei verknüpften Chattern außerhalb der Liste auch der eigene Platz. */
+export async function rankReply(settings, chatterId) {
+  const board = await monthBoard(settings);
+  const url = `${siteUrl()}/rangliste`;
+  if (!board.rows.length) return fill(settings.communityRankEmpty, { month: board.label, url });
+  const n = settings.communityRankSize;
+  const list = board.rows.slice(0, n).map((r, i) => `${i + 1}. ${r.name} (${r.points})`).join(' · ');
+  const i = board.rows.findIndex((r) => r.twitchId === chatterId);
+  const me = i >= n ? ` · Du: Platz ${i + 1} (${board.rows[i].points})` : '';
+  return fill(settings.communityRankTemplate, { month: board.label, list, me, n, url });
+}

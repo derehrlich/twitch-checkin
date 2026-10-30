@@ -134,7 +134,22 @@ export const DEFAULTS = {
   // Platzhalter: {user} {url}
   communityLinkTemplate: '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}',
   communityTipTemplate: '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.',
+  communityRankCommand: '!rangliste', // zeigt die Top-Plätze des Monats im Chat
+  communityRankSize: 5,
+  // Platzhalter: {month} Monat, {list} "1. Anna (120) · 2. Ben (80)", {me} eigener Platz (nur wenn verknüpft und nicht in der Liste), {url} Rangliste-Seite
+  communityRankTemplate: '🏆 Dorf-Rangliste {month}: {list}{me} · Alle Plätze: {url}',
+  communityRankEmpty: '🏆 In der Dorf-Rangliste {month} stehen noch keine Punkte. Verknüpfe dich mit !verknuepfen und leg los! {url}',
   communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
+  // Top des Monats: Die Besten des Vormonats suchen sich einen Sound aus dem Katalog (Admin, 15 Plätze) aus.
+  // Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl dürfen. Wer nicht wählt, behält den normalen Ton.
+  awardEnabled: false,
+  awardSize: 3,
+  awardDays: 7, // so lange kann man wählen
+  awardMonths: 1, // so lange gilt der gewählte Sound, ab der ersten Auswahl
+  // Platzhalter: {user} {n} {month} {list} {url} {until} {sound}
+  awardAnnounceTemplate: '🏆 Die Top {n} im {month}: {list}! Ihr dürft euch einen Einlaufsound aussuchen: {url} (bis {until})',
+  awardTipTemplate: '🏆 {user}, du warst im {month} unter den Top {n}! Such dir deinen Einlaufsound aus: {url} (noch bis {until})',
+  awardChosenTemplate: '🔊 {user} hat sich den Einlaufsound „{sound}“ ausgesucht, gültig bis {until}!',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -178,6 +193,11 @@ function sanitize(input) {
   num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
   num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
   for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint']) str(k, 400);
+  for (const k of ['communityRankTemplate', 'communityRankEmpty']) str(k, 400);
+  num('communityRankSize', 1, 10);
+  if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
+  for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate']) str(k, 400);
+  num('awardSize', 1, 10); num('awardDays', 1, 30); num('awardMonths', 1, 12);
   num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
   num('communityMsgCap', 1, 500); num('communityMsgGap', 0, 3600);
   if (typeof input.communityCommand === 'string') { const v = input.communityCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityCommand = v; }
@@ -203,7 +223,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['awardEnabled', 'communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

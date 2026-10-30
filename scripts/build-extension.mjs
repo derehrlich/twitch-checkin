@@ -1,5 +1,5 @@
 // Baut das Zip für die Twitch-Panel-Extension (Hosted Test): node scripts/build-extension.mjs [SITE_URL] [Zieldatei]
-// Standard: SITE_URL aus der Umgebung oder https://twitch-checkin.netlify.app, Ziel public/stadtwache-panel.zip
+// Standard: SITE_URL aus der Umgebung oder https://stadtwache.netlify.app, Ziel public/stadtwache-panel.zip
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -48,7 +48,7 @@ export function buildExtension(siteUrl) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const site = process.argv[2] || process.env.SITE_URL || 'https://twitch-checkin.netlify.app';
+  const site = process.argv[2] || process.env.SITE_URL || 'https://stadtwache.netlify.app';
   const out = path.resolve(process.argv[3] || path.join(root, 'public/stadtwache-panel.zip'));
   fs.writeFileSync(out, buildExtension(site));
   console.log(`${out} gebaut für ${site}`);

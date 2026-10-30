@@ -85,6 +85,14 @@ export const SCHEMA = {
       n('entrySoundMaxSeconds', 'Längster Sound in Sekunden (das Overlay schneidet längere ab)', { min: 1, max: 30 }),
       n('entrySoundUploadDays', 'Frist für den Upload nach dem Kauf in Tagen (danach Punkte zurück)', { min: 1, max: 90 }),
     ] },
+    { title: 'Top des Monats: Sound aus dem Katalog', hint: `Die Besten des Vormonats (Monatsrangliste, nur Verknüpfte) suchen sich einen Sound aus dem Katalog aus (unten pflegen). Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl. Wer nicht wählt, behält den normalen Ton, ein gekaufter Sound hat Vorrang. Der Monat wird ab dem 2. des Folgemonats von selbst abgeschlossen. Platzhalter: ${code('user')} ${code('n')} ${code('month')} ${code('list')} ${code('url')} ${code('until')} ${code('sound')}.`, items: [
+      c('awardEnabled', 'Auswahl der Top des Monats aktivieren (braucht die aktive Community-Rangliste)'),
+      n('awardSize', 'Wie viele Plätze (bei Gleichstand mehr)', { min: 1, max: 10 }), n('awardDays', 'Frist zum Wählen in Tagen', { min: 1, max: 30 }),
+      n('awardMonths', 'Der Sound gilt so viele Monate ab der ersten Auswahl', { min: 1, max: 12 }),
+      a('awardAnnounceTemplate', 'Chat-Nachricht beim Monatsabschluss', { n: 3, month: 'Oktober 2026', list: '1. Anna · 2. Ben · 3. Cleo', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardTipTemplate', 'Erinnerung beim Check-in, solange nicht gewählt', { user: 'Max', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardChosenTemplate', 'Nachricht, wenn gewählt wurde', { user: 'Max', sound: 'Fanfare', until: '07.12.2026' }),
+    ] },
     { title: 'Einlaufsound: Chat-Texte', hint: `Platzhalter: ${code('user')} Name, ${code('months')} Monate, ${code('until')} gültig bis, ${code('url')} Upload-Seite, ${code('days')} Frist, ${code('rest')} Restlaufzeit, ${code('max')} Obergrenze, ${code('reason')} Ablehnungsgrund. Nachrichten mit „Punkte zurück“ erstatten die Einlösung.`, items: [
       a('entrySoundBuyTemplate', 'Nach dem Kauf', { user: 'Max', months: '6 Monate', url: 'https://…/einlaufsound', days: 14 }),
       a('entrySoundHasTemplate', 'Kauf, obwohl schon ein Sound gilt', { user: 'Max', until: '14.04.2027' }),
@@ -108,12 +116,15 @@ export const SCHEMA = {
       n('communityMsgCap', 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
       n('communityMsgGap', 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
       t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
+      t('communityRankCommand', 'Chat-Befehl für die Monatsrangliste', { maxlength: 26, placeholder: '!rangliste' }), n('communityRankSize', 'Wie viele Plätze im Chat zeigen', { min: 1, max: 10 }),
       t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
     ] },
-    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Verknüpfungsseite. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
+    { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
       c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
       a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
       a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityRankTemplate', 'Antwort auf den Rangliste-Befehl', { month: 'Oktober 2026', list: '1. Anna (120) · 2. Ben (80)', me: ' · Du: Platz 7 (45)', url: 'https://…/rangliste' }),
+      a('communityRankEmpty', 'Antwort, wenn noch niemand Punkte hat', { month: 'Oktober 2026', url: 'https://…/rangliste' }),
     ] },
   ],
 
