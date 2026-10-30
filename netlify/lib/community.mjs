@@ -80,7 +80,7 @@ export async function allLinks() {
 
 // ---- Zählen
 
-const dayOf = (settings, date) => new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date(date.getTime() - settings.dayRolloverHour * 3_600_000));
+export const dayOf = (settings, date) => new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date(date.getTime() - settings.dayRolloverHour * 3_600_000));
 export const monthOf = (settings, date = new Date()) => dayOf(settings, date).slice(0, 7);
 
 export function monthLabel(month) {

@@ -6,6 +6,7 @@ import { sendChat } from './twitch.mjs';
 import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkReply, rankReply } from './community.mjs';
+import { ensureAward } from './award.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -49,6 +50,7 @@ export async function handleChat(e, settings) {
     await recordChatter(day, id, name);
     if (settings.chatStats) await countChat(id, name, day);
   }
+  if (settings.awardEnabled) await ensureAward(settings).catch((err) => console.warn('Monatsabschluss fehlgeschlagen:', err.message)); // schließt den Vormonat einmalig ab
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();

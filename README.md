@@ -86,6 +86,16 @@ Zwei Stufen, beide ohne zweite Währung (nur Kanalpunkte). Einschalten im Admin 
 - Das **Overlay** spielt den Sound beim Check-in und schneidet ihn nach 5 Sekunden ab (einstellbar). Die Länge wird auf dem Server nicht ausgelesen, deshalb prüfst du beim Anhören.
 - Die Anmeldung der Zuschauer nutzt dieselbe Redirect-URL wie der Admin (`/api/auth/callback`), in der Twitch-App ist nichts Neues einzutragen. Sie braucht `ADMIN_PASSWORD` oder `SESSION_SECRET`, um den Cookie zu signieren.
 
+## Top des Monats: Katalog-Sound (Einlaufsound)
+
+Die Besten der Monatsrangliste suchen sich einen Sound aus deinem Katalog aus. Einschalten im Admin unter *Einlaufsound → Top des Monats* (braucht die aktive Community-Rangliste).
+
+- **Katalog:** Im Admin (*Einlaufsound → Katalog*) legst du höchstens 15 Sounds an (Name und Datei). Sounds ohne Datei erscheinen nicht in der Auswahl.
+- **Monatsabschluss:** Ab dem 2. des Folgemonats wird der Vormonat einmalig abgeschlossen, sobald im Chat etwas los ist, jemand eincheckt oder die Seite öffnet (der Admin-Knopf „Vormonat jetzt abschließen“ macht es sofort). Die Top 3 kommen in die Gewinnerliste, **bei Gleichstand auf dem letzten Platz alle mit derselben Punktzahl**. Es erscheinen nur verknüpfte Konten.
+- **Auswahl:** Die Gewinner bekommen eine Chat-Nachricht und beim Check-in eine Erinnerung, solange sie nicht gewählt haben. Auf `/einlaufsound` (Twitch-Anmeldung) hören sie die Sounds an und wählen. **7 Tage** Zeit, bis dahin ist Ändern möglich.
+- **Laufzeit:** **1 Monat ab der ersten Auswahl**, Ändern verlängert nichts. Wer nicht wählt, behält den normalen Ton (kein Nachrücken).
+- **Vorrang:** Ein gekaufter Einlaufsound geht vor dem Katalog-Sound. Das Overlay schneidet auch Katalog-Sounds nach 5 Sekunden ab.
+
 ## Community-Rangliste des Monats und Verknüpfung
 
 Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. **Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.** Einschalten im Admin unter *Community*, danach die Webhooks abgleichen.
@@ -159,7 +169,7 @@ Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch 
 
 ```
 netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, einlaufsound, verknuepfen, community, credits, leaderboard, twitch-webhook
-netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, entrysound, settings, twitch, store, http …
+netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, entrysound, award, community, settings, twitch, store, http …
 netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, entrysound, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
 public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste, public/einlaufsound.html Upload-Seite, public/verknuepfen.html Verknüpfung

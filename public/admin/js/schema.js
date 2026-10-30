@@ -85,6 +85,14 @@ export const SCHEMA = {
       n('entrySoundMaxSeconds', 'Längster Sound in Sekunden (das Overlay schneidet längere ab)', { min: 1, max: 30 }),
       n('entrySoundUploadDays', 'Frist für den Upload nach dem Kauf in Tagen (danach Punkte zurück)', { min: 1, max: 90 }),
     ] },
+    { title: 'Top des Monats: Sound aus dem Katalog', hint: `Die Besten des Vormonats (Monatsrangliste, nur Verknüpfte) suchen sich einen Sound aus dem Katalog aus (unten pflegen). Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl. Wer nicht wählt, behält den normalen Ton, ein gekaufter Sound hat Vorrang. Der Monat wird ab dem 2. des Folgemonats von selbst abgeschlossen. Platzhalter: ${code('user')} ${code('n')} ${code('month')} ${code('list')} ${code('url')} ${code('until')} ${code('sound')}.`, items: [
+      c('awardEnabled', 'Auswahl der Top des Monats aktivieren (braucht die aktive Community-Rangliste)'),
+      n('awardSize', 'Wie viele Plätze (bei Gleichstand mehr)', { min: 1, max: 10 }), n('awardDays', 'Frist zum Wählen in Tagen', { min: 1, max: 30 }),
+      n('awardMonths', 'Der Sound gilt so viele Monate ab der ersten Auswahl', { min: 1, max: 12 }),
+      a('awardAnnounceTemplate', 'Chat-Nachricht beim Monatsabschluss', { n: 3, month: 'Oktober 2026', list: '1. Anna · 2. Ben · 3. Cleo', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardTipTemplate', 'Erinnerung beim Check-in, solange nicht gewählt', { user: 'Max', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardChosenTemplate', 'Nachricht, wenn gewählt wurde', { user: 'Max', sound: 'Fanfare', until: '07.12.2026' }),
+    ] },
     { title: 'Einlaufsound: Chat-Texte', hint: `Platzhalter: ${code('user')} Name, ${code('months')} Monate, ${code('until')} gültig bis, ${code('url')} Upload-Seite, ${code('days')} Frist, ${code('rest')} Restlaufzeit, ${code('max')} Obergrenze, ${code('reason')} Ablehnungsgrund. Nachrichten mit „Punkte zurück“ erstatten die Einlösung.`, items: [
       a('entrySoundBuyTemplate', 'Nach dem Kauf', { user: 'Max', months: '6 Monate', url: 'https://…/einlaufsound', days: 14 }),
       a('entrySoundHasTemplate', 'Kauf, obwohl schon ein Sound gilt', { user: 'Max', until: '14.04.2027' }),

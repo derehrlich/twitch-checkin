@@ -49,6 +49,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (iso) => new Date(iso).toLocaleDateString('de-DE');
 let me = null, chosen = null;
 
+function el(tag, cls, text, parent) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; parent?.append(e); return e; }
 function line(parent, cls, text) { const p = document.createElement('p'); if (cls) p.className = cls; p.textContent = text; parent.append(p); return p; }
 
 async function load() {
@@ -57,26 +58,55 @@ async function load() {
   $('logout').classList.toggle('hidden', !me.loggedIn);
   $('uploadCard').classList.add('hidden');
   if (new URLSearchParams(location.search).has('abgebrochen')) line(st, 'warn', 'Die Anmeldung wurde abgebrochen.');
-  if (!me.enabled) { line(st, 'muted', 'Der Einlaufsound ist gerade nicht aktiv.'); return rules(); }
+  if (!me.enabled && !me.awardEnabled) { line(st, 'muted', 'Der Einlaufsound ist gerade nicht aktiv.'); return rules(); }
   if (!me.loggedIn) {
     line(st, '', 'Melde dich mit Twitch an, damit wir wissen, wer du bist. Es werden keine Berechtigungen für dein Konto angefragt.');
     const a = document.createElement('a'); a.className = 'btn'; a.href = '/api/auth/viewer'; a.textContent = 'Mit Twitch anmelden'; st.append(a);
     return rules();
   }
   line(st, '', `Hallo ${me.name}!`);
-  const t = me.titles;
-  if (me.status === 'none') line(st, '', `Du hast noch keinen Einlaufsound. Löse im Twitch-Kanal den Reward „${t.buy}“ ein, danach kannst du hier deine Datei hochladen.`);
-  if (me.status === 'awaiting') line(st, 'warn', 'Dein Kauf wartet auf deinen Upload. Lade unten deine Datei hoch.');
-  if (me.status === 'pending') line(st, 'warn', `„${me.pending.name}“ wird geprüft. Du bekommst Bescheid im Chat.`);
-  if (me.status === 'active') {
-    line(st, 'ok', `Dein Einlaufsound ist aktiv und gilt bis ${fmt(me.validUntil)}.`);
-    const audio = document.createElement('audio'); audio.controls = true; audio.src = `/api/einlaufsound/audio?id=${me.id}&v=${me.soundVersion}`; audio.style.width = '100%'; st.append(audio);
-    line(st, 'muted', `Verlängern: Reward „${t.extend}“. Damit kannst du auch einen neuen Sound hochladen.`);
+  if (me.enabled) {
+    const t = me.titles;
+    if (me.status === 'none') line(st, '', `Du hast noch keinen Einlaufsound. Löse im Twitch-Kanal den Reward „${t.buy}“ ein, danach kannst du hier deine Datei hochladen.`);
+    if (me.status === 'awaiting') line(st, 'warn', 'Dein Kauf wartet auf deinen Upload. Lade unten deine Datei hoch.');
+    if (me.status === 'pending') line(st, 'warn', `„${me.pending.name}“ wird geprüft. Du bekommst Bescheid im Chat.`);
+    if (me.status === 'active') {
+      line(st, 'ok', `Dein Einlaufsound ist aktiv und gilt bis ${fmt(me.validUntil)}.`);
+      const audio = document.createElement('audio'); audio.controls = true; audio.src = `/api/einlaufsound/audio?id=${me.id}&v=${me.soundVersion}`; audio.style.width = '100%'; st.append(audio);
+      line(st, 'muted', `Verlängern: Reward „${t.extend}“. Damit kannst du auch einen neuen Sound hochladen.`);
+    }
+    if (me.status === 'expired') line(st, 'warn', `Dein Einlaufsound ist am ${fmt(me.validUntil)} abgelaufen und noch eine Weile gespeichert. Mit dem Reward „${t.extend}“ wird er wieder aktiv.`);
+    if (me.rejected) line(st, 'bad', `Dein letzter Sound wurde abgelehnt: ${me.rejected.reason}`);
   }
-  if (me.status === 'expired') line(st, 'warn', `Dein Einlaufsound ist am ${fmt(me.validUntil)} abgelaufen und noch eine Weile gespeichert. Mit dem Reward „${t.extend}“ wird er wieder aktiv.`);
-  if (me.rejected) line(st, 'bad', `Dein letzter Sound wurde abgelehnt: ${me.rejected.reason}`);
+  if (me.award) renderAward(st);
   if (me.uploadsLeft > 0 && !me.pending) $('uploadCard').classList.remove('hidden');
   rules();
+}
+
+function renderAward(st) {
+  const a = me.award;
+  if (a.current) line(st, 'ok', `Dein Top-Sound „${a.current.name}“ gilt bis ${fmt(a.current.validUntil)}.`);
+  if (!a.open) return;
+  const box = el('div', '', null, st); box.style.marginTop = '14px';
+  el('h3', '', `🏆 Du warst im ${a.open.label} unter den Besten (Platz ${a.open.place})!`, box);
+  el('p', 'muted', `Such dir einen Einlaufsound aus dem Katalog aus. Du kannst bis ${fmt(a.open.deadline)} wählen und bis dahin noch ändern. Er gilt ab deiner ersten Wahl einen Monat lang. Wer nicht wählt, behält den normalen Ton.`, box);
+  const msg = el('p', 'muted', '', box); msg.setAttribute('role', 'status');
+  if (!a.catalog.length) el('p', 'warn', 'Der Katalog ist gerade leer. Schau später noch einmal vorbei.', box);
+  let player = null;
+  for (const c of a.catalog) {
+    const row = el('div', 'row', null, box);
+    const name = el('span', a.open.choice === c.id ? 'ok' : '', (a.open.choice === c.id ? '✓ ' : '') + c.name, row); name.style.flex = '1 1 160px';
+    const play = el('button', 'ghost', '▶ Anhören', row);
+    play.addEventListener('click', () => { player?.pause(); player = new Audio(c.url); player.play(); });
+    const pick = el('button', '', a.open.choice === c.id ? 'Gewählt' : 'Wählen', row); pick.disabled = a.open.choice === c.id;
+    pick.addEventListener('click', async () => {
+      pick.disabled = true;
+      const r = await fetch('/api/einlaufsound/choose', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ catalogId: c.id }) });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) { msg.textContent = body.error || 'Das hat nicht geklappt.'; msg.className = 'bad'; pick.disabled = false; return; }
+      await load();
+    });
+  }
 }
 
 function rules() {

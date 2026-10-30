@@ -167,6 +167,19 @@
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards mit Twitch abgleichen</button></div>
         <p class="muted">Zuschauer melden sich auf <code id="entryUrl"></code> mit Twitch an und laden dort ihre Datei hoch. Bei einem Kauf bleibt die Einlösung bis zu deiner Freigabe offen. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Die Länge prüfst du beim Anhören, das Overlay schneidet zu lange Sounds ohnehin ab.</p>
       </section>
+      <section class="card">
+        <h2>Katalog für die Top des Monats</h2>
+        <p class="muted">Aus diesen Sounds suchen sich die Besten des Vormonats einen aus. Höchstens <span id="catMax">15</span> Plätze, je Sound eine Datei (MP3, WAV oder OGG, bis 1,5 MB, kurz halten).</p>
+        <div id="catRows"></div>
+        <div class="row" style="margin-top:14px">
+          <div><label for="newCatName">Neuer Sound: Name</label><input id="newCatName" maxlength="40" placeholder="z. B. Fanfare"></div>
+          <button id="addCat">Anlegen</button>
+        </div>
+        <h3>Gewinner der letzten Monate</h3>
+        <div id="awardRows"></div>
+        <div class="row" style="margin-top:12px"><button id="closeAward" class="ghost">Vormonat jetzt abschließen</button></div>
+        <p class="muted">Der Abschluss passiert ab dem 2. des Monats von selbst, sobald im Chat etwas los ist oder jemand die Seite öffnet. Der Knopf macht es sofort, falls der Vormonat noch nicht abgeschlossen ist.</p>
+      </section>
       <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
     </div>
 
