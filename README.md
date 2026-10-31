@@ -108,12 +108,13 @@ Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. *
 
 ## Getrennte Overlays (eigene Lautstärke in OBS)
 
-Neben `/overlay` (alles in einer Quelle) gibt es zwei getrennte Browserquellen, damit du Soundboard und Alerts im OBS-Mixer einzeln regeln kannst:
+Neben `/overlay` (alles in einer Quelle) gibt es drei getrennte Browserquellen, damit du Alerts, Soundboard und Einlaufsounds im OBS-Mixer einzeln regeln kannst:
 
-- `/overlay-alerts`: Check-in/-out, Meilenstein, Raid, Follow, Sub, Bits … samt Eigenton und Einlaufsound
+- `/overlay-alerts`: Check-in/-out, Meilenstein, Raid, Follow, Sub, Bits … samt Eigenton; ein Check-in mit Einlaufsound zeigt die Karte, bleibt aber stumm
 - `/overlay-sounds`: nur die Kanalpunkte-Sounds des Soundboards (mit kleinem Schild)
+- `/overlay-entry`: nur die Einlaufsounds (gekauft oder aus dem Katalog), nacheinander und nach der eingestellten Länge abgeschnitten, ohne Anzeige. Ohne diese Quelle hört man den Einlaufsound nicht.
 
-Beide je als Browserquelle 1920×1080 mit „Audio über OBS steuern“ anlegen, die Adresse `/overlay` dann entfernen (sonst läuft alles doppelt). Die Pegel stellst du im OBS-Audiomixer ein. Alternativ geht `?mode=alerts` bzw. `?mode=sounds` an `/overlay`.
+Alle je als Browserquelle 1920×1080 mit „Audio über OBS steuern“ anlegen, die Adresse `/overlay` dann entfernen (sonst läuft alles doppelt). Die Pegel stellst du im OBS-Audiomixer ein. Alternativ geht `?mode=alerts`, `?mode=sounds` bzw. `?mode=entry` an `/overlay`.
 
 ## Overlay aktualisiert sich selbst
 

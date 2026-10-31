@@ -125,10 +125,11 @@ let volume = Number(params.get('volume') ?? 0.6);
 let duration = Number(params.get('duration') ?? 5000);
 let alertDuration = 8000, raidDuration = 11000;
 const pollMs = Math.max(1000, Number(params.get('poll') ?? 3000));
-// Getrennte Quellen für OBS: /overlay-alerts (Check-in, Raid, Follow, Sub, Bits … mit Eigenton) und /overlay-sounds
-// (Kanalpunkte-Soundboard). /overlay (oder ?mode=all) macht wie bisher beides. Jede Quelle hat in OBS ihren eigenen Regler.
-const mode = /overlay-alerts/.test(location.pathname) ? 'alerts' : /overlay-sounds/.test(location.pathname) ? 'sounds' : (params.get('mode') ?? 'all');
-const wantAlerts = mode !== 'sounds', wantSounds = mode !== 'alerts';
+// Getrennte Quellen für OBS: /overlay-alerts (Check-in, Raid, Follow, Sub, Bits … mit Eigenton), /overlay-sounds
+// (Kanalpunkte-Soundboard) und /overlay-entry (nur die Einlaufsounds). /overlay (oder ?mode=all) macht wie bisher alles.
+// Jede Quelle hat in OBS ihren eigenen Regler. Ohne /overlay-entry bleibt ein Check-in mit Einlaufsound in /overlay-alerts stumm.
+const mode = ['alerts', 'sounds', 'entry'].find((m) => location.pathname.includes('overlay-' + m)) ?? params.get('mode') ?? 'all';
+const wantAlerts = mode === 'all' || mode === 'alerts', wantSounds = mode === 'all' || mode === 'sounds', onlyEntry = mode === 'entry';
 
 // ---------- Ton ----------
 // Jeder Alert hat einen Ton-Platz (checkin, raid, follow, ...). Reihenfolge je Platz: im Admin hochgeladener Ton,
@@ -184,6 +185,7 @@ function pickSound(slot = 'checkin') {
 const soundMs = (pick) => (pick.audio && Number.isFinite(pick.audio.duration) ? Math.min(pick.maxMs ?? 30_000, Math.ceil(pick.audio.duration * 1000) + 200) : 0);
 let currentAudio = null;
 function startSound(pick) {
+  if (pick.silent) return;
   if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch { /* egal */ } currentAudio = null; } // nichts überlappt
   if (!pick.audio) return playChime(volume, pick.slot);
   currentAudio = pick.audio;
@@ -323,7 +325,8 @@ function checkView(ev) {
 // Check-in, Check-out und Meilenstein: Karte mit Münze
 async function showCard(ev) {
   const v = checkView(ev);
-  const pick = ev.entrySound ? personalPick(ev.entrySound) : pickSound(slotFor(ev));
+  // Mit Einlaufsound: in /overlay spielt ihn die Karte, in /overlay-alerts bleibt sie stumm (Ton kommt aus /overlay-entry)
+  const pick = ev.entrySound ? (mode === 'all' ? personalPick(ev.entrySound) : { slot: 'checkin', audio: null, silent: true }) : pickSound(slotFor(ev));
   const dur = Math.max(ev.milestone ? Math.round(duration * 1.7) : duration, soundMs(pick)); // Meilensteine bleiben länger stehen
   stage.innerHTML = `<div class="wrap${ev.milestone ? ' milestone' : ''}" style="animation-duration:${dur}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
@@ -380,12 +383,34 @@ async function poll() {
     useUploadedSounds(data.sounds ?? {});
     setSoundVolume();
     for (const ev of data.events) {
-      if (ev.type === 'sound') { if (wantSounds) playBoard(ev); }
+      if (onlyEntry) { if (ev.type === 'checkin' && ev.entrySound) { if (entryQueue.length < 5) entryQueue.push(ev.entrySound); runEntry(); } }
+      else if (ev.type === 'sound') { if (wantSounds) playBoard(ev); }
       else if (wantAlerts && ['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) enqueue(ev);
     }
     next();
   } catch { /* Netzwerkfehler: beim nächsten Durchlauf erneut */ }
   setTimeout(poll, pollMs);
+}
+
+// ---------- Nur Einlaufsounds (/overlay-entry) ----------
+// Spielt die Töne nacheinander ab und schneidet jeden nach der eingestellten Länge ab. Nichts wird angezeigt.
+const entryQueue = [];
+let entryBusy = false;
+async function runEntry() {
+  if (entryBusy) return;
+  entryBusy = true;
+  while (entryQueue.length) {
+    const { audio, maxMs } = personalPick(entryQueue.shift());
+    audio.currentTime = 0;
+    await new Promise((resolve) => {
+      const done = () => { try { audio.pause(); } catch { /* egal */ } clearTimeout(t); audio.removeEventListener('ended', done); resolve(); };
+      const t = setTimeout(done, maxMs);
+      audio.addEventListener('ended', done);
+      audio.play().catch(done);
+    });
+    await sleep(300);
+  }
+  entryBusy = false;
 }
 
 // ---------- Kanalpunkte-Soundboard ----------

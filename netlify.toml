@@ -26,6 +26,11 @@
   status = 200
 
 [[redirects]]
+  from = "/overlay-entry"
+  to = "/overlay.html"
+  status = 200
+
+[[redirects]]
   from = "/abspann"
   to = "/abspann.html"
   status = 200
