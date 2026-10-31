@@ -7,6 +7,7 @@ import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from './community.mjs';
 import { ensureAward } from './award.mjs';
+import { handleCustom, recordPulse } from './commands.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -75,6 +76,11 @@ export async function handleChat(e, settings) {
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
+  if (settings.chatCommands) {
+    // Eigene Commands, Stichwörter und die Aktivität für zeitgesteuerte Regeln (siehe commands.mjs)
+    if (counted) await recordPulse().catch(() => {});
+    await handleCustom(e, text, settings, { ignored: ignore.includes(String(name).toLowerCase()) }).catch((err) => console.warn('Command fehlgeschlagen:', err.message));
+  }
   if (counted) await clipHint(e, settings, text).catch((err) => console.warn('Clip-Hinweis fehlgeschlagen:', err.message));
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   const cmd = text.split(/\s+/)[0].toLowerCase();

@@ -2,7 +2,7 @@
 import { $, api, esc, onAct, previewVolume, readUpload, run, toast } from './core.js';
 
 let entries = [];
-export async function loadBoard() { entries = await api('GET', 'soundboard'); renderBoard(); }
+export async function loadBoard() { entries = await api('GET', 'soundboard'); renderBoard(); document.dispatchEvent(new Event('admin:board')); }
 
 function renderBoard() {
   $('boardRows').innerHTML = entries.length ? entries.map((e) => `
