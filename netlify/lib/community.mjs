@@ -122,7 +122,7 @@ export async function saveDiscordMonth(settings, month, rows, now = new Date()) 
   return { ok: true, saved };
 }
 
-// ---- Bonuspunkte (z. B. 100 Punkte für den Clip der Woche, vom VerwirrBot vergeben)
+// ---- Bonuspunkte (z. B. 40 Punkte für den Clip der Woche, vom VerwirrBot vergeben)
 
 /** Schreibt einem verknüpften Konto Bonuspunkte für den Monat gut. Jeder `key` zählt nur einmal (der Bot kann also nichts doppelt buchen). */
 export async function addBonus(settings, { key, link, points, reason }, now = new Date()) {
