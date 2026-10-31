@@ -139,6 +139,11 @@ export const DEFAULTS = {
   // Platzhalter: {month} Monat, {list} "1. Anna (120) · 2. Ben (80)", {me} eigener Platz (nur wenn verknüpft und nicht in der Liste), {url} Rangliste-Seite
   communityRankTemplate: '🏆 Dorf-Rangliste {month}: {list}{me} · Alle Plätze: {url}',
   communityRankEmpty: '🏆 In der Dorf-Rangliste {month} stehen noch keine Punkte. Verknüpfe dich mit !verknuepfen und leg los! {url}',
+  // Clip-Hinweis: Wird im Chat ein Clip des Kanals geteilt und der Ersteller ist nicht verknüpft, schreibt der Bot einmal pro Clip
+  // einen Hinweis. Platzhalter: {creator} Ersteller, {user} wer den Link geschickt hat, {discord} Einladungslink
+  clipHintEnabled: true,
+  discordInvite: 'https://discord.gg/qxPqqhYwtJ',
+  clipHintTemplate: '🎬 Starker Clip, {creator}! Komm ins Dorf ({discord}) und tippe hier !verknuepfen: Dann kannst du im Discord ClipMaster werden und bekommst Bonuspunkte für die Rangliste. 🏆',
   communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
   // Top des Monats: Die Besten des Vormonats suchen sich einen Sound aus dem Katalog (Admin, 15 Plätze) aus.
   // Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl dürfen. Wer nicht wählt, behält den normalen Ton.
@@ -193,7 +198,8 @@ function sanitize(input) {
   num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
   num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
   for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint']) str(k, 400);
-  for (const k of ['communityRankTemplate', 'communityRankEmpty']) str(k, 400);
+  for (const k of ['communityRankTemplate', 'communityRankEmpty', 'clipHintTemplate']) str(k, 400);
+  str('discordInvite', 200);
   num('communityRankSize', 1, 10);
   if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
   for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate']) str(k, 400);
@@ -223,7 +229,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['awardEnabled', 'communityEnabled', 'communityTip', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

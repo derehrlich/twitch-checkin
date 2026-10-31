@@ -21,6 +21,7 @@ let clips = [
   { id: 'LangClip', title: 'zu lang', duration: 55, creator_name: 'x' },
   { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
 ];
+let clipDb = []; // Clips, die der simulierte Twitch einzeln (per id) herausgibt
 let subs = []; // aktive Webhook-Subscriptions
 const failSubTypes = new Set(); // Typen, deren Abo der simulierte Twitch mit 403 ablehnt
 globalThis.fetch = async (url, init = {}) => {
@@ -35,6 +36,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
   if (u.pathname.endsWith('/helix/channels') && channelsFail) return ok({ error: 'boom' }, 500);
+  if (u.pathname.endsWith('/helix/clips') && entry.query.id) return ok({ data: clipDb.filter((c) => c.id === entry.query.id) });
   if (u.pathname.endsWith('/helix/clips') && clipsFail) return ok({ error: 'boom' }, 500);
   if (u.pathname.endsWith('/helix/channels')) return ok({ data: [{ broadcaster_name: 'RaiderIn', broadcaster_login: 'raiderin', game_name: 'Hades' }] });
   if (u.pathname.endsWith('/helix/clips')) return ok({ data: clips });
@@ -1388,6 +1390,70 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5002', twitchName: 'Ben' });
     await com.saveLink({ discordId: '333333333', discordName: 'BenDC', twitchId: '5003', twitchName: 'Cleo' });
     assert.equal(await com.linkByTwitch('5002'), null); assert.equal((await com.linkByDiscord('333333333')).twitchId, '5003');
+  });
+
+  await test('Bot-Schnittstelle: Discord-Konto zu einem Twitch-Namen nachschlagen', async () => {
+    await com.saveLink({ discordId: '444444444', discordName: 'FanDC', twitchId: '7002', twitchName: 'FanLinks' });
+    assert.deepEqual(await (await bot('GET', 'link?twitch=fanlinks')).json(), { linked: true, discordId: '444444444', twitchName: 'FanLinks' }, 'Groß-/Kleinschreibung egal');
+    assert.deepEqual(await (await bot('GET', 'link?twitch=%40FANLINKS')).json(), { linked: true, discordId: '444444444', twitchName: 'FanLinks' }, 'mit @');
+    assert.deepEqual(await (await bot('GET', 'link?twitch=Unbekannt')).json(), { linked: false, discordId: null, twitchName: null });
+    assert.equal((await bot('GET', 'link?twitch=FanLinks', null, 'falsch')).status, 401);
+  });
+
+  await test('Bot-Schnittstelle: Bonuspunkte zählen einmal pro Schlüssel und erscheinen in der Rangliste', async () => {
+    const s = await getSettings(); const m = com.monthOf(s);
+    const before = (await com.monthBoard(s)).rows.find((r) => r.twitchId === '7002')?.points ?? 0;
+    const unlinked = await (await bot('POST', 'bonus', { key: 'clip-x', twitch: 'NiemandVerknuepft', points: 100 })).json();
+    assert.deepEqual(unlinked, { ok: false, linked: false });
+    assert.equal(await db.get('bonuskey/clip-x'), null, 'ohne Verknüpfung wird nichts gebucht');
+    const ok1 = await (await bot('POST', 'bonus', { key: 'clipwoche-1', discordId: '444444444', points: 100, reason: 'Clip der Woche' })).json();
+    assert.equal(ok1.ok, true); assert.equal(ok1.points, 100); assert.equal(ok1.total, 100); assert.equal(ok1.month, m);
+    const dup = await (await bot('POST', 'bonus', { key: 'clipwoche-1', discordId: '444444444', points: 100 })).json();
+    assert.deepEqual(dup, { ok: true, duplicate: true });
+    const ok2 = await (await bot('POST', 'bonus', { key: 'clipwoche-2', twitch: 'fanlinks', points: 50 })).json();
+    assert.equal(ok2.total, 150, 'zweiter Schlüssel zählt dazu, Suche über den Twitch-Namen');
+    const row = (await com.monthBoard(s)).rows.find((r) => r.twitchId === '7002');
+    assert.equal(row.points, before + 150); assert.equal(row.bonus, 150);
+    const api = await (await bot('GET', 'board')).json();
+    assert.equal(api.rows.find((r) => r.discordId === '444444444').points, before + 150, 'der Bot sieht die Bonuspunkte in der Rangliste');
+    for (const bad of [{ key: '', points: 10, twitch: 'fanlinks' }, { key: 'k', points: 0, twitch: 'fanlinks' }, { key: 'k', points: 5000, twitch: 'fanlinks' }, { key: 'k', points: 'viel', twitch: 'fanlinks' }])
+      assert.equal((await bot('POST', 'bonus', bad)).status, 400, JSON.stringify(bad));
+    assert.equal((await bot('POST', 'bonus', { key: 'k9', twitch: 'fanlinks', points: 5 }, 'falsch')).status, 401);
+  });
+
+  await test('Chat: unter einem geteilten Clip steht der Hinweis, nur einmal pro Clip und nur wenn der Ersteller nicht verknüpft ist', async () => {
+    await admin(adminReq('PUT', 'settings', { communityEnabled: true, chatEnabled: true, clipHintEnabled: true }, cookie));
+    clipDb = [
+      { id: 'GrossartigerClip-abc', title: 'Krass', creator_id: '7001', creator_name: 'FanOhne', broadcaster_id: '999' },
+      { id: 'VerknuepfterClip-def', title: 'Auch krass', creator_id: '7002', creator_name: 'FanLinks', broadcaster_id: '999' },
+      { id: 'FremderKanalClip-ghi', title: 'Woanders', creator_id: '7003', creator_name: 'Fremd', broadcaster_id: '12345' },
+    ];
+    const frei = () => db.delete('cooldown/cliphint');
+    const n0 = chats().length;
+    await frei(); await chatMsg('5050', 'Max', 'schaut mal https://clips.twitch.tv/GrossartigerClip-abc');
+    assert.equal(chats().length, n0 + 1);
+    const hint = chats().at(-1);
+    assert.match(hint, /FanOhne/); assert.match(hint, /https:\/\/discord\.gg\/qxPqqhYwtJ/); assert.match(hint, /!verknuepfen/); assert.match(hint, /ClipMaster/);
+    await frei(); await chatMsg('5051', 'Eva', 'https://clips.twitch.tv/GrossartigerClip-abc');
+    assert.equal(chats().length, n0 + 1, 'derselbe Clip noch einmal: kein zweiter Hinweis');
+    await frei(); await chatMsg('5050', 'Max', 'https://www.twitch.tv/streamerin/clip/VerknuepfterClip-def');
+    assert.equal(chats().length, n0 + 1, 'Ersteller ist verknüpft: kein Hinweis');
+    await frei(); await chatMsg('5050', 'Max', 'https://clips.twitch.tv/FremderKanalClip-ghi');
+    assert.equal(chats().length, n0 + 1, 'Clip eines anderen Kanals: kein Hinweis');
+    await frei(); await chatMsg('5050', 'Max', 'https://clips.twitch.tv/GibtEsNichtClip-xyz');
+    assert.equal(chats().length, n0 + 1, 'unbekannter Clip: kein Hinweis');
+    clipDb.push({ id: 'ZweiterFreierClip-jkl', title: 'Noch einer', creator_id: '7004', creator_name: 'NochEiner', broadcaster_id: '999' });
+    await chatMsg('5050', 'Max', 'https://www.twitch.tv/streamerin/clip/ZweiterFreierClip-jkl');
+    assert.equal(chats().length, n0 + 1, 'Abklingzeit: zwei Clips direkt hintereinander füllen nicht den Chat');
+    await frei();
+    await admin(adminReq('PUT', 'settings', { clipHintEnabled: false }, cookie));
+    await chatMsg('5050', 'Max', 'https://www.twitch.tv/streamerin/clip/ZweiterFreierClip-jkl');
+    assert.equal(chats().length, n0 + 1, 'ausgeschaltet');
+    await admin(adminReq('PUT', 'settings', { clipHintEnabled: true }, cookie));
+    const msg = (await (await admin(adminReq('GET', 'settings', null, cookie))).json());
+    assert.ok(JSON.stringify(msg).includes('discord.gg/qxPqqhYwtJ'), 'Einladungslink steht in den Einstellungen');
+    await com.removeLink({ discordId: '444444444' });
+    await db.delete(`bonus/${com.monthOf(await getSettings())}/7002`);
   });
 
   await test('Backup enthält Einlaufsounds, Verknüpfungen und Monatszahlen', async () => {

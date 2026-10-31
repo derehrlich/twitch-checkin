@@ -121,6 +121,9 @@ export const SCHEMA = {
     ] },
     { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
       c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
+      c('clipHintEnabled', 'Unter geteilten Clips einen Hinweis schreiben (nur wenn der Ersteller noch nicht verknüpft ist)'),
+      t('discordInvite', 'Discord-Einladungslink für den Clip-Hinweis', { maxlength: 200, placeholder: 'https://discord.gg/…' }),
+      a('clipHintTemplate', 'Hinweis unter einem Clip', { creator: 'Fan', user: 'Max', discord: 'https://discord.gg/…' }),
       a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
       a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
       a('communityRankTemplate', 'Antwort auf den Rangliste-Befehl', { month: 'Oktober 2026', list: '1. Anna (120) · 2. Ben (80)', me: ' · Du: Platz 7 (45)', url: 'https://…/rangliste' }),
