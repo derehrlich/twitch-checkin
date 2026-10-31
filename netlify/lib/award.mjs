@@ -12,7 +12,7 @@
 //   awardsound/<twitchId>     gültiger Katalog-Sound { catalogId, validUntil, month }
 import crypto from 'node:crypto';
 import { db } from './store.mjs';
-import { dayOf, monthBoard, monthOf, secretSet } from './community.mjs';
+import { dayOf, linkByTwitch, monthBoard, monthOf, secretSet } from './community.mjs';
 import { addMonths, fmtDate } from './entrysound.mjs';
 import { sendChat, siteUrl } from './twitch.mjs';
 
@@ -133,4 +133,20 @@ export async function recentAwards(settings) {
       winners: a.winners.map((w) => ({ name: w.name, place: w.place, points: w.points, choice: catalog.find((c) => c.id === w.choice)?.name ?? null })) });
   }
   return out;
+}
+
+/** Für den VerwirrBot (Hall of Fame): die jüngste Auswahl mit Discord-IDs und Stand der Wahl. Gewinner ohne Verknüpfung haben discordId null.
+ *  Schließt den Vormonat vorher ab, falls das fällig ist, damit der Bot am 2. nicht ins Leere fragt. */
+export async function awardForBot(settings, now = new Date()) {
+  if (!settings.awardEnabled) return { enabled: false, award: null };
+  await ensureAward(settings, now).catch((e) => console.warn('Monatsabschluss fehlgeschlagen:', e.message));
+  const key = (await db.list('award/')).slice(-1)[0];
+  const award = key ? await db.get(key) : null;
+  if (!award) return { enabled: true, award: null };
+  const catalog = await getCatalog();
+  const winners = await Promise.all(award.winners.map(async (w) => ({
+    discordId: (await linkByTwitch(w.twitchId))?.discordId ?? null, name: w.name, place: w.place, points: w.points,
+    chosen: Boolean(w.choice), sound: catalog.find((c) => c.id === w.choice)?.name ?? null,
+  })));
+  return { enabled: true, award: { month: award.month, label: award.label, closedAt: award.closedAt, deadline: award.deadline, open: Date.parse(award.deadline) > now, url: awardUrl(), winners } };
 }

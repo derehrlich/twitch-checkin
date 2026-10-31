@@ -1583,6 +1583,22 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.match(chats().at(-1), /Wim, du warst im .* unter den Top 4/);
   });
 
+  await test('Bot-Schnittstelle /api/community/award: Gewinner mit Discord-ID und Stand der Wahl, nur mit Geheimwort', async () => {
+    const community = (await import('../netlify/functions/community.mjs')).default;
+    const get = (secret) => community(new Request(BASE + '/api/community/award', { headers: secret ? { authorization: `Bearer ${secret}` } : {} }));
+    assert.equal((await get()).status, 401); assert.equal((await get('falsch')).status, 401);
+    const res = await (await get('geheimwort-12345')).json();
+    assert.equal(res.enabled, true); assert.equal(res.award.month, '2030-05'); assert.equal(res.award.open, true);
+    assert.match(res.award.url, /\/einlaufsound$/);
+    assert.deepEqual(res.award.winners.map((w) => [w.name, w.discordId, w.chosen, w.sound]), [
+      ['Uli', '700000006001', true, 'Gong'], ['Vera', '700000006002', false, null], ['Wim', '700000006003', false, null], ['Xaver', '700000006004', false, null]]);
+    await com.removeLink({ twitchId: '6002' });
+    assert.equal((await (await get('geheimwort-12345')).json()).award.winners[1].discordId, null, 'ohne Verknüpfung keine Discord-ID');
+    await api('PUT', 'settings', { awardEnabled: false });
+    assert.deepEqual(await (await get('geheimwort-12345')).json(), { enabled: false, award: null });
+    await api('PUT', 'settings', { awardEnabled: true });
+  });
+
   await test('Admin: Gewinner mit Wahl in der Übersicht, Vormonat ist schon abgeschlossen, Backup enthält Katalog und Gewinner', async () => {
     const list = await (await api('GET', 'catalog')).json();
     const may = list.awards.find((x) => x.month === '2030-05');
