@@ -7,7 +7,7 @@ import { json } from '../http.mjs';
 
 const FORMAT = 'stadtwache-backup';
 const DATA_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/', 'entrysound/', 'link/', 'cmonth/', 'dmonth/', 'award/', 'awardsound/'];
-const DATA_KEYS = ['config/settings', 'config/soundboard', 'config/state', 'config/catalog'];
+const DATA_KEYS = ['config/settings', 'config/soundboard', 'config/state', 'config/catalog', 'config/commands'];
 const MEDIA_PREFIXES = ['sound/', 'image/', 'soundboard/', 'entrysound-file/', 'catalog/'];
 const inScope = (key, media) => DATA_KEYS.includes(key) || [...DATA_PREFIXES, ...(media ? MEDIA_PREFIXES : [])].some((p) => key.startsWith(p));
 

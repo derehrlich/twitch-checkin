@@ -1558,5 +1558,102 @@ await test('Abspiel-Reihenfolge: nacheinander in der Reihenfolge des Eintreffens
   assert.deepEqual(await (await fn(new Request(BASE + '/api/playlock', { method: 'POST', body: JSON.stringify({ id: 'x', ms: 100 }) }))).json(), { wait: 0 });
 });
 
+await test('Commands: anlegen, Befehl mit Rolle und Abklingzeit, Stichwort, mehrere Aktionen nacheinander', async () => {
+  await db.delete('config/commands');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0 }, cookie));
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const cmdMsg = async (text, { id = 'c7', name = 'Chatty', badges = [], mid } = {}) => {
+    const before = chats().length;
+    const ev = { subscription: { type: 'channel.chat.message' }, event: { broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges, message_id: mid ?? 'cm-' + chatN, message: { text } } };
+    assert.equal((await webhook(signed('notification', ev, { id: 'cm-' + chatN++ }))).status, 204);
+    return chats().slice(before);
+  };
+  assert.equal((await api('POST', 'commands', { trigger: { type: 'command', word: '' }, actions: [{ type: 'chat', text: 'x' }] })).status, 400, 'Befehl fehlt');
+  assert.equal((await api('POST', 'commands', { trigger: { type: 'command', word: 'ant' }, actions: [{ type: 'chat', text: '' }] })).status, 400, 'Aktion ohne Inhalt');
+  const made = await (await api('POST', 'commands', {
+    name: 'Ant', trigger: { type: 'command', word: 'Ant' }, role: 'all', cooldown: 30,
+    actions: [{ type: 'chat', text: 'Hallo {user}, du sagst: {args}' }, { type: 'alert', title: 'Ant!', message: '{user} fragt {args}' }],
+  })).json();
+  assert.equal(made.trigger.word, '!ant', 'Ausrufezeichen und Kleinschreibung ergänzt');
+  assert.equal((await api('POST', 'commands', { trigger: { type: 'command', word: '!ANT' }, actions: [{ type: 'chat', text: 'y' }] })).status, 400, 'Befehl doppelt');
+
+  const cur = await cursor();
+  assert.deepEqual(await cmdMsg('!ant ob das klappt'), ['Hallo Chatty, du sagst: ob das klappt']);
+  const ev = await eventsSince(cur);
+  assert.deepEqual(ev, [{ type: 'alert', kind: 'command', user: 'Chatty', title: 'Ant!', message: 'Chatty fragt ob das klappt' }]);
+  assert.deepEqual(await cmdMsg('!ant nochmal', { id: 'c8', name: 'Zweiter' }), [], 'Abklingzeit gilt für alle');
+  await db.delete(`cooldown/cmd-${made.id}`);
+
+  // Rolle: nur Mods (Abzeichen), der Kanalinhaber zählt immer
+  await api('PUT', `commands/${made.id}`, { role: 'mod', cooldown: 0 });
+  assert.deepEqual(await cmdMsg('!ant x'), [], 'ohne Abzeichen');
+  assert.equal((await cmdMsg('!ant x', { badges: [{ set_id: 'moderator', id: '1' }] })).length, 1);
+  assert.equal((await cmdMsg('!ant x', { id: '999', name: 'Boss' })).length, 1, 'Kanalinhaber');
+  assert.deepEqual(await cmdMsg('!ant x', { id: 'c9', name: 'Sub', badges: [{ set_id: 'subscriber', id: '0' }] }), [], 'Sub ist kein Mod');
+
+  // Stichwort: ganzes Wort, nie auf den Kanalinhaber (der Bot schreibt als Kanalinhaber)
+  await api('PUT', `commands/${made.id}`, { enabled: false });
+  const kw = await (await api('POST', 'commands', { trigger: { type: 'keyword', word: 'Lurk' }, cooldown: 0, actions: [{ type: 'chat', text: 'Viel Spaß, {user}!' }] })).json();
+  assert.deepEqual(await cmdMsg('ich lurke nur'), [], 'nur ganze Wörter');
+  assert.deepEqual(await cmdMsg('Ich gehe lurk, bis später!'), ['Viel Spaß, Chatty!']);
+  assert.deepEqual(await cmdMsg('lurk', { id: '999', name: 'Boss' }), [], 'Kanalinhaber löst kein Stichwort aus');
+  await admin(adminReq('PUT', 'settings', { creditsIgnore: 'chatty' }, cookie));
+  assert.deepEqual(await cmdMsg('lurk'), [], 'ignorierte Namen (Bots) lösen nichts aus');
+  await admin(adminReq('PUT', 'settings', { creditsIgnore: 'nightbot' }, cookie));
+  const dupMsg = await cmdMsg('lurk', { mid: 'gleich' }); const again = await cmdMsg('lurk', { mid: 'gleich' });
+  assert.equal(dupMsg.length, 1); assert.deepEqual(again, [], 'doppelt zugestellt, nur einmal');
+
+  // Chat-Befehle aus: alles schweigt; Chat aus: nur der Alert
+  await api('PUT', `commands/${kw.id}`, { cooldown: 0 });
+  await admin(adminReq('PUT', 'settings', { chatCommands: false }, cookie));
+  assert.deepEqual(await cmdMsg('lurk'), []);
+  await admin(adminReq('PUT', 'settings', { chatCommands: true }, cookie));
+
+  // Test-Knopf, Liste, Löschen
+  const cur2 = await cursor();
+  await api('PUT', `commands/${made.id}`, { enabled: true });
+  assert.equal((await api('POST', `commands/${made.id}/test`, { user: 'Probe' })).status, 200);
+  assert.equal((await eventsSince(cur2))[0].message, 'Probe fragt Beispiel');
+  const all = await (await api('GET', 'commands')).json();
+  assert.equal(all.commands.length, 2);
+  assert.equal((await api('DELETE', `commands/${kw.id}`)).status, 200);
+  assert.equal((await api('PUT', 'commands/zzzzzzzz', {})).status, 404);
+  assert.equal((await admin(adminReq('GET', 'commands'))).status, 401, 'ohne Login');
+});
+
+await test('Commands: Timer läuft nur bei Chat-Aktivität, nie doppelt ohne neue Nachrichten, Sound-Aktion nur mit Ton', async () => {
+  const { tickTimers, recordPulse } = await import('../netlify/lib/commands.mjs');
+  await db.delete('config/commands'); await db.delete('state/chatpulse');
+  const settings = await getSettings();
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const timer = await (await api('POST', 'commands', { trigger: { type: 'timer', minutes: 10, minMessages: 2 }, actions: [{ type: 'alert', title: 'Ping', message: 'Schön, dass ihr da seid' }] })).json();
+  assert.deepEqual(timer.trigger, { type: 'timer', minutes: 10, minMessages: 2 });
+  const T = Date.now();
+  const alerts = async (cur) => (await eventsSince(cur)).filter((e) => e.kind === 'command');
+  let cur = await cursor();
+  assert.equal(await tickTimers(settings, T), 0, 'ohne Chat nichts');
+  await recordPulse(T - 1000);
+  assert.equal(await tickTimers(settings, T), 0, 'eine Nachricht reicht nicht');
+  await recordPulse(T - 500);
+  assert.equal(await tickTimers(settings, T), 1);
+  assert.equal((await alerts(cur)).length, 1);
+  cur = await cursor();
+  assert.equal(await tickTimers(settings, T + 11 * 60_000), 0, 'Zeit vorbei, aber seit dem letzten Mal niemand geschrieben');
+  await recordPulse(T + 11 * 60_000 - 200); await recordPulse(T + 11 * 60_000 - 100);
+  assert.equal(await tickTimers(settings, T + 5 * 60_000), 0, 'Intervall noch nicht vorbei');
+  assert.equal(await tickTimers(settings, T + 11 * 60_000), 1);
+  assert.equal((await alerts(cur)).length, 1);
+  await api('PUT', `commands/${timer.id}`, { enabled: false });
+  await recordPulse(T + 30 * 60_000); await recordPulse(T + 30 * 60_000);
+  assert.equal(await tickTimers(settings, T + 31 * 60_000), 0, 'ausgeschaltet');
+
+  // Sound-Aktion: nur Einträge mit Ton
+  const snd = await (await api('POST', 'commands', { trigger: { type: 'command', word: '!horn' }, actions: [{ type: 'sound', soundId: 'deadbeef' }] })).json();
+  const cur3 = await cursor();
+  await api('POST', `commands/${snd.id}/test`, {});
+  assert.deepEqual(await eventsSince(cur3), [], 'unbekannter oder tonloser Sound wird übersprungen');
+  await db.delete('config/commands'); await db.delete('state/chatpulse');
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

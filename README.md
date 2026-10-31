@@ -118,6 +118,18 @@ Alle je als Browserquelle 1920×1080 mit „Audio über OBS steuern“ anlegen, 
 
 **Nacheinander statt übereinander:** Die Quellen wissen nichts voneinander, deshalb fragen sie vor jedem Ton beim Server an (`/api/playlock`). Es spielt immer nur eine Quelle, die anderen warten in der Reihenfolge, in der ihr Ereignis eingetroffen ist. Kommt also ein Follow-Alert und kurz danach ein Kanalpunkte-Sound, startet der Sound erst, wenn der Alert fertig ist. Sobald ein Ton zu Ende ist, wird die Sperre sofort freigegeben. Ist der Server nicht erreichbar, spielt das Overlay nach spätestens 60 Sekunden trotzdem. Die stumme Karte in `/overlay-alerts` (Check-in mit Einlaufsound) braucht keine Sperre, der Einlaufsound reiht sich dafür selbst ein. Das gilt auch für die Sammel-Adresse `/overlay`.
 
+## Commands und Regeln
+
+Im Admin unter *Commands* legst du eigene Commands an. Jeder hat einen **Auslöser**, eine **Rolle**, eine **Abklingzeit** (für alle zusammen) und **bis zu 6 Aktionen**, die nacheinander laufen:
+
+- **Chat-Text** (Platzhalter `{user}`, `{args}` = Text nach dem Befehl, `{channel}`)
+- **Overlay-Alert** (Titel und Text, als Holz-Schild mit dem Alert-Ton der Standardwerte)
+- **Sound** aus dem Kanalpunkte-Soundboard (nur Einträge mit Ton)
+
+Auslöser: **Chat-Befehl** (z. B. `!ant`, Rolle: alle, Abonnenten, VIPs, Mods oder nur du; höhere Rollen dürfen auch), **Stichwort** (ganzes Wort irgendwo im Chat; reagiert nie auf deine eigenen Nachrichten, weil der Bot als du schreibt, und nicht auf die Namen aus der Bot-Liste unter *Chat & Abspann*) und **zeitgesteuert**: alle X Minuten, aber nur, wenn seit dem letzten Mal mindestens N Chat-Nachrichten kamen (Bots und du zählen nicht). Ohne neue Nachrichten wird derselbe Alert nicht wiederholt.
+
+Voraussetzungen: *Chat-Befehle* an (sie halten den Chat-Webhook offen), für Chat-Antworten *Chat-Nachrichten* unter *Allgemein*. Der Takt der Timer wird vom Overlay angestoßen (es fragt ohnehin alle 3 Sekunden nach), sie laufen also nur, solange eine Overlay-Quelle in OBS offen ist, und kosten keine zusätzlichen Function-Aufrufe. Mit dem Knopf *Testen* läuft ein Command sofort, ohne Rolle, Abklingzeit und Aktivität. Die Commands stehen auch in der Sicherung.
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).

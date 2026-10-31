@@ -5,6 +5,7 @@ import { getSettings } from '../lib/settings.mjs';
 import { json } from '../lib/http.mjs';
 import { SLOTS } from '../lib/sounds.mjs';
 import { IMAGE_SLOTS } from '../lib/images.mjs';
+import { tickTimersThrottled } from '../lib/commands.mjs';
 
 export const config = { path: '/api/overlay' };
 
@@ -26,6 +27,9 @@ export default async (req) => {
       return v ? [[slot, `/api/sound?slot=${slot}&v=${v}`]] : [];
     })),
   };
+
+  // Zeitgesteuerte Commands anstoßen (ihre Ereignisse kommen beim nächsten Abruf)
+  if (settings.chatCommands) await tickTimersThrottled(settings).catch((e) => console.warn('Timer fehlgeschlagen:', e.message));
 
   if (!since) return json({ cursor, events: [], ...view });
 

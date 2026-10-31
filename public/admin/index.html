@@ -39,6 +39,7 @@
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
+      <button data-tab="commands" role="tab">Commands</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
       <button data-tab="community" role="tab">Community</button>
       <button data-tab="medien" role="tab">Medien</button>
@@ -164,6 +165,26 @@
         <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ die Rewards abgleichen. Höchstens 20 Einträge, Sounds bis 1,5 MB, ein Ton endet nach spätestens 20 Sekunden.</p>
       </section>
       <div data-schema="soundboard" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Commands -->
+    <div class="tab-panel hidden" data-panel="commands">
+      <section class="card">
+        <h2>Commands und Regeln</h2>
+        <p>Eigene Chat-Befehle, Stichwörter und Zeitsteuerung. Jeder Command löst eine oder mehrere <b>Aktionen nacheinander</b> aus: Chat-Text, Overlay-Alert oder ein Sound aus dem Soundboard (Sounds und Alerts spielen nach der gemeinsamen Reihenfolge, nichts überlagert sich).</p>
+        <ul class="muted">
+          <li><b>Chat-Befehl</b>, z. B. <code>!ant</code> mit Rolle (alle, Abonnenten, VIPs, Mods, nur du) und Abklingzeit.</li>
+          <li><b>Stichwort</b>: reagiert, wenn jemand ein bestimmtes Wort schreibt (nie auf deine eigenen Nachrichten).</li>
+          <li><b>Zeitgesteuert</b>: z. B. alle 20 Minuten ein Alert oder Hinweis, aber nur, wenn seit dem letzten Mal mindestens so viele Chat-Nachrichten kamen (Bots und du zählen nicht). Der Takt läuft nur, solange das Overlay in OBS offen ist.</li>
+        </ul>
+        <p class="muted">Braucht „Chat-Befehle“ (Reiter Chat &amp; Abspann). Die Chat-Antworten brauchen außerdem „Chat-Nachrichten“ unter Allgemein.</p>
+        <div id="cmdRows"></div>
+        <div class="row" style="margin-top:18px">
+          <div style="flex:0 1 280px"><label for="newCmdType">Neuer Command: Auslöser</label><select id="newCmdType"><option value="command">Chat-Befehl</option><option value="keyword">Stichwort im Chat</option><option value="timer">Zeitgesteuert</option></select></div>
+          <div><label for="newCmdWord">Befehl bzw. Stichwort</label><input id="newCmdWord" maxlength="40" placeholder="!ant"></div>
+          <button id="addCommand">Command anlegen</button>
+        </div>
+      </section>
     </div>
 
     <!-- Einlaufsound -->
