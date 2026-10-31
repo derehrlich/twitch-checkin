@@ -194,6 +194,28 @@ function startSound(pick) {
   if (pick.maxMs) { const a = pick.audio; setTimeout(() => { if (currentAudio === a) { try { a.pause(); } catch { /* egal */ } } }, pick.maxMs); }
 }
 
+// ---------- Gemeinsame Reihenfolge der Quellen ----------
+// Alerts, Soundboard und Einlaufsound laufen in getrennten OBS-Quellen. Damit sich nichts überlagert, fragt jede Quelle vor
+// einem Ton beim Server (/api/playlock) an und wartet, bis die davor fertig ist (wer sich zuerst meldet, spielt zuerst).
+// Ist der Server nicht erreichbar, wird nach spätestens 60 s trotzdem gespielt. Im ?demo-Modus gibt es keine Sperre.
+const clientId = Math.random().toString(36).slice(2, 8);
+let lockSeq = 0, arrivalSeq = 0;
+const lockCall = (body) => fetch('/api/playlock', { method: 'POST', body: JSON.stringify(body) }).then((r) => r.json());
+async function acquire(ms, at = Date.now()) {
+  const id = `${clientId}-${++lockSeq}`;
+  if (params.has('demo')) return id;
+  const t0 = Date.now();
+  try {
+    for (;;) {
+      const r = await lockCall({ id, at, ms });
+      if (!r.wait || Date.now() - t0 > 60_000) break;
+      await sleep(r.wait);
+    }
+  } catch { /* Server nicht erreichbar: trotzdem spielen */ }
+  return id;
+}
+const releaseLock = (id) => { if (!params.has('demo')) lockCall({ id, release: true }).catch(() => {}); };
+
 // ---------- Bilder/GIFs über den Schildern (Platz wie beim Ton; Resub nimmt ohne eigenes Bild das Sub-Bild) ----------
 let images = {};
 const IMAGE_FALLBACK = { resub: 'sub' };
@@ -281,6 +303,7 @@ async function showSign(ev) {
   const slot = slotFor(ev);
   const pick = pickSound(slot);
   const cardMs = Math.max(isRaid ? raidDuration : alertDuration, soundMs(pick));
+  const lock = await acquire(cardMs + (isRaid && ev.clip ? (Number(ev.clip.duration) || 15) * 1000 + 3000 : 500), ev._at);
   const img = imageFor(slot);
   const name = String(isRaid ? ev.raider : ev.user);
   const clipMs = isRaid && ev.clip ? (Number(ev.clip.duration) || 15) * 1000 : 0;
@@ -312,6 +335,7 @@ async function showSign(ev) {
   // Schild mindestens so lange stehen lassen, wie seine Animation dauert (auch ohne Clip)
   await sleep(Math.max(0, cardMs - (Date.now() - started)) + 300);
   stage.innerHTML = '';
+  releaseLock(lock);
 }
 
 function checkView(ev) {
@@ -328,6 +352,7 @@ async function showCard(ev) {
   // Mit Einlaufsound: in /overlay spielt ihn die Karte, in /overlay-alerts bleibt sie stumm (Ton kommt aus /overlay-entry)
   const pick = ev.entrySound ? (mode === 'all' ? personalPick(ev.entrySound) : { slot: 'checkin', audio: null, silent: true }) : pickSound(slotFor(ev));
   const dur = Math.max(ev.milestone ? Math.round(duration * 1.7) : duration, soundMs(pick)); // Meilensteine bleiben länger stehen
+  const lock = pick.silent ? null : await acquire(dur + 300, ev._at); // eine stumme Karte (Ton kommt aus /overlay-entry) braucht keine Sperre
   stage.innerHTML = `<div class="wrap${ev.milestone ? ' milestone' : ''}" style="animation-duration:${dur}ms">
     <img class="mascot" src="/img/lama.png" alt="" onerror="this.remove()">
     <div class="lantern l"><i></i></div><div class="lantern r"><i></i></div>
@@ -349,6 +374,7 @@ async function showCard(ev) {
   } else setTimeout(burst, dur * 0.14); // Funken, wenn die Karte aufsetzt
   await sleep(dur + 300);
   stage.innerHTML = '';
+  if (lock) releaseLock(lock);
 }
 
 async function next() {
@@ -383,7 +409,8 @@ async function poll() {
     useUploadedSounds(data.sounds ?? {});
     setSoundVolume();
     for (const ev of data.events) {
-      if (onlyEntry) { if (ev.type === 'checkin' && ev.entrySound) { if (entryQueue.length < 5) entryQueue.push(ev.entrySound); runEntry(); } }
+      ev._at = Date.now() + ++arrivalSeq / 1000; // Reihenfolge des Eintreffens (auch innerhalb eines Abrufs)
+      if (onlyEntry) { if (ev.type === 'checkin' && ev.entrySound) { if (entryQueue.length < 5) entryQueue.push({ ...ev.entrySound, _at: ev._at }); runEntry(); } }
       else if (ev.type === 'sound') { if (wantSounds) playBoard(ev); }
       else if (wantAlerts && ['checkin', 'checkout', 'raid', 'alert'].includes(ev.type)) enqueue(ev);
     }
@@ -400,7 +427,9 @@ async function runEntry() {
   if (entryBusy) return;
   entryBusy = true;
   while (entryQueue.length) {
-    const { audio, maxMs } = personalPick(entryQueue.shift());
+    const entry = entryQueue.shift();
+    const { audio, maxMs } = personalPick(entry);
+    const lock = await acquire(maxMs + 300, entry._at);
     audio.currentTime = 0;
     await new Promise((resolve) => {
       const done = () => { try { audio.pause(); } catch { /* egal */ } clearTimeout(t); audio.removeEventListener('ended', done); resolve(); };
@@ -408,6 +437,7 @@ async function runEntry() {
       audio.addEventListener('ended', done);
       audio.play().catch(done);
     });
+    releaseLock(lock);
     await sleep(300);
   }
   entryBusy = false;
@@ -430,12 +460,14 @@ async function loadBoard() {
   setTimeout(loadBoard, 60_000);
 }
 let sbTimer = null;
-function playBoard(ev) {
+async function playBoard(ev) {
+  const lock = await acquire(20_300, ev._at);
   const a = new Audio(ev.src);
   a.volume = Math.max(0, Math.min(1, volume * (Number(ev.volume) || 1)));
   a.play().catch(() => {});
   const stop = setTimeout(() => { try { a.pause(); } catch { /* egal */ } }, 20_000);
-  a.addEventListener('ended', () => clearTimeout(stop), { once: true });
+  a.addEventListener('ended', () => { clearTimeout(stop); releaseLock(lock); }, { once: true });
+  setTimeout(() => releaseLock(lock), 20_100);
   const el = document.getElementById('sbtoast');
   el.innerHTML = `<i>🔊</i><span><b>${esc(ev.user)}</b><small>${esc(ev.title)}</small></span>`;
   el.classList.add('show');

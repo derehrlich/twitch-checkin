@@ -116,6 +116,8 @@ Neben `/overlay` (alles in einer Quelle) gibt es drei getrennte Browserquellen, 
 
 Alle je als Browserquelle 1920×1080 mit „Audio über OBS steuern“ anlegen, die Adresse `/overlay` dann entfernen (sonst läuft alles doppelt). Die Pegel stellst du im OBS-Audiomixer ein. Alternativ geht `?mode=alerts`, `?mode=sounds` bzw. `?mode=entry` an `/overlay`.
 
+**Nacheinander statt übereinander:** Die Quellen wissen nichts voneinander, deshalb fragen sie vor jedem Ton beim Server an (`/api/playlock`). Es spielt immer nur eine Quelle, die anderen warten in der Reihenfolge, in der ihr Ereignis eingetroffen ist. Kommt also ein Follow-Alert und kurz danach ein Kanalpunkte-Sound, startet der Sound erst, wenn der Alert fertig ist. Sobald ein Ton zu Ende ist, wird die Sperre sofort freigegeben. Ist der Server nicht erreichbar, spielt das Overlay nach spätestens 60 Sekunden trotzdem. Die stumme Karte in `/overlay-alerts` (Check-in mit Einlaufsound) braucht keine Sperre, der Einlaufsound reiht sich dafür selbst ein. Das gilt auch für die Sammel-Adresse `/overlay`.
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).

@@ -1531,5 +1531,32 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   delete process.env.LINK_SECRET;
 }
 
+await test('Abspiel-Reihenfolge: nacheinander in der Reihenfolge des Eintreffens, Freigabe, abgelaufene Wartende', async () => {
+  const { claim, release } = await import('../netlify/lib/playlock.mjs');
+  await db.delete('config/playlock');
+  const T = 1_000_000;
+  assert.deepEqual(await claim({ id: 'alert', at: T, ms: 5000 }, T), { wait: 0 });
+  // Soundboard meldet sich als Zweites, Einlaufsound als Drittes: beide müssen warten
+  assert.ok((await claim({ id: 'sound', at: T + 10, ms: 3000 }, T + 100)).wait > 0);
+  assert.ok((await claim({ id: 'entry', at: T + 20, ms: 3000 }, T + 150)).wait > 0);
+  // Alert ist früh fertig: der Einlaufsound darf nicht vor dem Soundboard dran sein
+  await release({ id: 'alert' }, T + 1000);
+  assert.ok((await claim({ id: 'entry', at: T + 20, ms: 3000 }, T + 1100)).wait > 0, 'Soundboard war zuerst');
+  assert.deepEqual(await claim({ id: 'sound', at: T + 10, ms: 3000 }, T + 1200), { wait: 0 });
+  assert.ok((await claim({ id: 'entry', at: T + 20, ms: 3000 }, T + 1300)).wait > 0);
+  // Ohne Freigabe endet die Sperre nach der angegebenen Länge
+  assert.deepEqual(await claim({ id: 'entry', at: T + 20, ms: 3000 }, T + 1200 + 3001), { wait: 0 });
+  // Ein Wartender, der verschwindet (Seite neu geladen), blockiert nicht ewig
+  await release({ id: 'entry' }, T + 5000);
+  assert.ok((await claim({ id: 'weg', at: T + 6000, ms: 1000 }, T + 6000)).wait === 0);
+  assert.ok((await claim({ id: 'gone', at: T + 6001, ms: 1000 }, T + 6100)).wait > 0);
+  assert.deepEqual(await claim({ id: 'spaet', at: T + 20000, ms: 1000 }, T + 20000), { wait: 0 }, 'Wartender nach Ablauf entfernt');
+  await db.delete('config/playlock');
+  const fn = (await import('../netlify/functions/playlock.mjs')).default;
+  assert.equal((await fn(new Request(BASE + '/api/playlock', { method: 'GET' }))).status, 405);
+  assert.equal((await fn(new Request(BASE + '/api/playlock', { method: 'POST', body: '{}' }))).status, 400);
+  assert.deepEqual(await (await fn(new Request(BASE + '/api/playlock', { method: 'POST', body: JSON.stringify({ id: 'x', ms: 100 }) }))).json(), { wait: 0 });
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);
