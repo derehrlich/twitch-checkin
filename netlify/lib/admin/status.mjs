@@ -45,7 +45,7 @@ export async function status({ req, route, method }) {
     checkoutEnabled: settings.checkoutEnabled,
     revoked: state.revoked ?? null,
     subscription, subscriptionError,
-    urls: { site: siteUrl(req), redirect: `${siteUrl(req)}/api/auth/callback`, webhook: webhookUrl, overlay: `${siteUrl(req)}/overlay` },
+    urls: { site: siteUrl(req), redirect: `${siteUrl(req)}/api/auth/callback`, webhook: webhookUrl, overlay: `${siteUrl(req)}/overlay`, overlayAlerts: `${siteUrl(req)}/overlay-alerts`, overlaySounds: `${siteUrl(req)}/overlay-sounds` },
     totals: { users: users.length, today: users.filter((u) => u.days.includes(today)).length, checkins: users.reduce((s, u) => s + u.days.length, 0) },
     today,
   });

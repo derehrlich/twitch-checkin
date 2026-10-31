@@ -75,6 +75,11 @@
         <h2>OBS-Overlay</h2>
         <p>Browser-Quelle in OBS mit dieser Adresse (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
         <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
+        <p class="muted">Diese Adresse zeigt alles in einer Quelle. Für getrennte Lautstärken in OBS nimmst du stattdessen zwei Quellen (nicht zusammen mit der Adresse oben verwenden, sonst läuft alles doppelt):</p>
+        <label>Alerts (Check-in, Raid, Follow, Sub, Bits …)</label>
+        <div class="row"><input id="overlayAlertsUrl" readonly><button id="copyOverlayAlerts" class="ghost">Kopieren</button></div>
+        <label>Soundboard (Kanalpunkte-Sounds)</label>
+        <div class="row"><input id="overlaySoundsUrl" readonly><button id="copyOverlaySounds" class="ghost">Kopieren</button></div>
         <p class="muted">Das Overlay lädt sich nach einem Update selbst neu, sobald gerade kein Alert läuft. Töne und Bilder gelten nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig.</p>
       </section>
     </div>

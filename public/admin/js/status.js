@@ -19,7 +19,7 @@ export async function loadStatus() {
       : sub === 'enabled' ? 'Webhooks aktiv – Ereignisse werden empfangen'
       : sub ? `Webhook-Status: ${esc(sub)}` + (sub.includes('pending') ? ' (Twitch prüft gerade, kurz neu laden)' : '')
       : s.subscriptionError ? `Webhook nicht abfragbar: ${esc(s.subscriptionError)}` : 'Webhooks noch nicht eingerichtet');
-  $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay;
+  $('uRedirect').textContent = s.urls.redirect; $('uWebhook').textContent = s.urls.webhook; $('overlayUrl').value = s.urls.overlay; $('overlayAlertsUrl').value = s.urls.overlayAlerts; $('overlaySoundsUrl').value = s.urls.overlaySounds;
   $('boardUrl2').textContent = s.urls.site + '/rangliste'; $('creditsUrl').textContent = s.urls.site + '/abspann'; $('boardUrl').textContent = s.urls.site + '/rangliste'; $('boardOverlayUrl').textContent = s.urls.site + '/rangliste?overlay';
   $('startStats').innerHTML = [[s.totals.users, 'Besucher gesamt'], [s.totals.today, `Heute (${esc(s.today)})`], [s.totals.checkins, 'Check-ins gesamt']]
     .map(([v, l]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
@@ -43,5 +43,6 @@ async function syncRewards() {
 
 export function initStatus() {
   document.addEventListener('click', (e) => { if (e.target.closest('.js-sync')) run(syncRewards)(); });
+  for (const [btn, input] of [['copyOverlayAlerts', 'overlayAlertsUrl'], ['copyOverlaySounds', 'overlaySoundsUrl']]) $(btn).addEventListener('click', () => navigator.clipboard.writeText($(input).value).then(() => toast('Kopiert ✓')));
   $('copyOverlay').addEventListener('click', () => navigator.clipboard.writeText($('overlayUrl').value).then(() => toast('Kopiert ✓')));
 }

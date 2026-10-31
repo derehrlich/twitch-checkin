@@ -106,6 +106,15 @@ Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. *
 - **Anzeige:** `/rangliste` und der Panel-Reiter „Monat“ zeigen die Top-Plätze mit Hinweis, wie man mitmacht. Der Chat-Befehl `!rangliste` zeigt die Top 5 des Monats (und den eigenen Platz, wenn man verknüpft ist), `!verknuepfen` erklärt die Verknüpfung, und wer eincheckt und noch nicht verknüpft ist, bekommt einmal im Monat einen kurzen Tipp.
 - **Bot-Schnittstelle:** `GET /api/community/board`, `POST /api/community/sync`, `POST /api/community/unlink` (Bearer `LINK_SECRET`).
 
+## Getrennte Overlays (eigene Lautstärke in OBS)
+
+Neben `/overlay` (alles in einer Quelle) gibt es zwei getrennte Browserquellen, damit du Soundboard und Alerts im OBS-Mixer einzeln regeln kannst:
+
+- `/overlay-alerts`: Check-in/-out, Meilenstein, Raid, Follow, Sub, Bits … samt Eigenton und Einlaufsound
+- `/overlay-sounds`: nur die Kanalpunkte-Sounds des Soundboards (mit kleinem Schild)
+
+Beide je als Browserquelle 1920×1080 mit „Audio über OBS steuern“ anlegen, die Adresse `/overlay` dann entfernen (sonst läuft alles doppelt). Die Pegel stellst du im OBS-Audiomixer ein. Alternativ geht `?mode=alerts` bzw. `?mode=sounds` an `/overlay`.
+
 ## Overlay aktualisiert sich selbst
 
 OBS lädt eine Browserquelle nach einem Deploy nicht von selbst neu und zeigt sonst weiter die alte Version. Deshalb vergleicht das Overlay alle 2 Minuten die ausgelieferte Seite mit der geladenen und lädt sich neu, sobald gerade kein Alert läuft. Ein laufender Alert wird nie unterbrochen. Bei der allerersten Version mit dieser Funktion muss die Quelle in OBS einmal von Hand aktualisiert werden (Eigenschaften → „Cache der aktuellen Seite aktualisieren“). Der Abstand lässt sich über `?updatecheck=<ms>` ändern (mindestens 5000).
