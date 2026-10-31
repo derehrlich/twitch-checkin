@@ -252,6 +252,13 @@ export async function pickClip(broadcasterId, maxSeconds) {
   return { id: c.id, title: c.title, duration: Math.ceil(c.duration), creator: c.creator_name };
 }
 
+// Ein einzelner Clip über seine Kennung (Slug aus dem Link): Ersteller und Kanal
+export async function clipById(id) {
+  const { data } = await helix('GET', 'clips', { as: 'app', query: { id } });
+  const c = data?.[0];
+  return c ? { id: c.id, title: c.title, creatorId: c.creator_id, creator: c.creator_name, broadcasterId: c.broadcaster_id } : null;
+}
+
 // Offizieller Twitch-Shoutout (Karte im Chat). Twitch erlaubt höchstens einen alle 2 Minuten.
 export async function shoutout(toBroadcasterId) {
   const { user_id } = await userToken();

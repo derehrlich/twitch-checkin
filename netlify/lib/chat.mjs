@@ -2,10 +2,10 @@
 import { db } from './store.mjs';
 import { fill, fmtDuration, streamDay } from './checkin.mjs';
 import { computeStreak, getStreamDays } from './streak.mjs';
-import { sendChat } from './twitch.mjs';
+import { clipById, sendChat } from './twitch.mjs';
 import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
-import { countCommunityChat, linkReply, rankReply } from './community.mjs';
+import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from './community.mjs';
 import { ensureAward } from './award.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -40,6 +40,27 @@ async function cooling(cmd, seconds) {
   return false;
 }
 
+// Links zu Clips: clips.twitch.tv/<Kennung> oder twitch.tv/<Kanal>/clip/<Kennung>
+const CLIP_LINK = /(?:clips\.twitch\.tv\/|twitch\.tv\/\w+\/clip\/)([A-Za-z0-9_-]{8,100})/i;
+
+/**
+ * Wird im Chat ein Clip des Kanals geteilt und der Ersteller ist noch nicht mit dem Discord verknüpft, schreibt der Bot einmal pro
+ * Clip einen Hinweis (Discord-Einladung und !verknuepfen). So kann der Ersteller im Discord ClipMaster werden.
+ */
+export async function clipHint(e, settings, text) {
+  if (!settings.clipHintEnabled || !settings.communityEnabled || !settings.chatEnabled || !secretSet()) return null;
+  const slug = CLIP_LINK.exec(text)?.[1];
+  if (!slug) return null;
+  if (!(await db.setIfNew(`cliphint/${slug}`, Date.now()))) return null; // jeder Clip nur einmal
+  if (await cooling('cliphint', 20)) return null; // viele Links hintereinander: nicht den Chat füllen
+  const clip = await clipById(slug).catch((err) => { console.warn('Clip-Abfrage fehlgeschlagen:', err.message); return null; });
+  if (!clip || clip.broadcasterId !== e.broadcaster_user_id) return null; // nur Clips dieses Kanals
+  if (clip.creatorId && (await linkByTwitch(clip.creatorId))) return null; // schon verknüpft: kein Hinweis nötig
+  const reply = fill(settings.clipHintTemplate, { creator: clip.creator || e.chatter_user_name, user: e.chatter_user_name, discord: settings.discordInvite });
+  await sendChat(reply);
+  return reply;
+}
+
 export async function handleChat(e, settings) {
   const id = e.chatter_user_id, name = e.chatter_user_name;
   if (!id) return { ok: false };
@@ -54,6 +75,7 @@ export async function handleChat(e, settings) {
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
+  if (counted) await clipHint(e, settings, text).catch((err) => console.warn('Clip-Hinweis fehlgeschlagen:', err.message));
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   const cmd = text.split(/\s+/)[0].toLowerCase();
   if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && (cmd === settings.communityCommand || cmd === settings.communityRankCommand))) return { ok: true };

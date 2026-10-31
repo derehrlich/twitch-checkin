@@ -71,6 +71,13 @@ export async function removeLink({ discordId, twitchId }) {
   return true;
 }
 
+/** Verknüpfung zu einem Twitch-Namen (Groß-/Kleinschreibung egal), z. B. für den Ersteller eines Clips. */
+export async function linkByTwitchName(name) {
+  const wanted = String(name ?? '').trim().replace(/^@/, '').toLowerCase();
+  if (!wanted) return null;
+  return (await allLinks()).find((l) => String(l.twitchName ?? '').toLowerCase() === wanted) ?? null;
+}
+
 export async function allLinks() {
   const out = [];
   const keys = await db.list('link/twitch/');
@@ -115,6 +122,22 @@ export async function saveDiscordMonth(settings, month, rows, now = new Date()) 
   return { ok: true, saved };
 }
 
+// ---- Bonuspunkte (z. B. 100 Punkte für den Clip der Woche, vom VerwirrBot vergeben)
+
+/** Schreibt einem verknüpften Konto Bonuspunkte für den Monat gut. Jeder `key` zählt nur einmal (der Bot kann also nichts doppelt buchen). */
+export async function addBonus(settings, { key, link, points, reason }, now = new Date()) {
+  const clean = String(key ?? '').trim().slice(0, 80);
+  const pts = Math.round(Number(points));
+  if (!clean || !Number.isFinite(pts) || pts < 1 || pts > 1000) return { error: 'Schlüssel und Punkte (1 bis 1000) werden gebraucht' };
+  if (!link) return { ok: false, linked: false };
+  if (!(await db.setIfNew(`bonuskey/${clean}`, { at: now.toISOString(), twitchId: link.twitchId, points: pts }))) return { ok: true, duplicate: true };
+  const month = monthOf(settings, now);
+  const k = `bonus/${month}/${link.twitchId}`;
+  const rec = (await db.get(k)) ?? { points: 0, items: [] };
+  await db.set(k, { points: rec.points + pts, items: [...rec.items, { key: clean, points: pts, reason: String(reason ?? '').slice(0, 80), at: now.toISOString() }].slice(-50) });
+  return { ok: true, month, points: pts, total: rec.points + pts, twitchName: link.twitchName };
+}
+
 // ---- Rangliste
 
 export const weights = (s) => ({ msg: s.communityWeightMsg, day: s.communityWeightDay, checkin: s.communityWeightCheckin });
@@ -126,8 +149,9 @@ export async function monthBoard(settings, month = monthOf(settings)) {
   for (const l of (await allLinks()).slice(0, 1000)) {
     const [tw, dc, user] = await Promise.all([db.get(`cmonth/${month}/${l.twitchId}`), db.get(`dmonth/${month}/${l.discordId}`), db.get(`user/${l.twitchId}`)]);
     const checkins = (user?.days ?? []).filter((d) => d.startsWith(month)).length;
-    const points = pointsOf(settings, { msgs: (tw?.msgs ?? 0) + (dc?.msgs ?? 0), days: (tw?.days ?? 0) + (dc?.days ?? 0), checkins });
-    if (points > 0) rows.push({ discordId: l.discordId, twitchId: l.twitchId, name: l.twitchName, points, twitchMsgs: tw?.msgs ?? 0, discordMsgs: dc?.msgs ?? 0, checkins });
+    const bonus = (await db.get(`bonus/${month}/${l.twitchId}`))?.points ?? 0;
+    const points = pointsOf(settings, { msgs: (tw?.msgs ?? 0) + (dc?.msgs ?? 0), days: (tw?.days ?? 0) + (dc?.days ?? 0), checkins }) + bonus;
+    if (points > 0) rows.push({ discordId: l.discordId, twitchId: l.twitchId, name: l.twitchName, points, twitchMsgs: tw?.msgs ?? 0, discordMsgs: dc?.msgs ?? 0, checkins, bonus });
   }
   rows.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'de'));
   return { month, label: monthLabel(month), rows };
