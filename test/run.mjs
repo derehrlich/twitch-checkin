@@ -1340,6 +1340,8 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.equal(data.month.rows.length, 1);
     assert.deepEqual(Object.keys(data.month.rows[0]).sort(), ['name', 'value']);
     assert.match(data.month.hint, /verknüpft/);
+    assert.deepEqual(data.month.rules, { msg: 1, day: 10, checkin: 20, msgCap: 30, msgGap: 60, bonusNote: (await getSettings()).communityBonusNote }, 'Legende nennt die echten Werte');
+    assert.match(data.month.rules.bonusNote, /Clip der Woche/);
     assert.ok(!JSON.stringify(data.month).includes('111111111'), 'keine Discord-ID öffentlich');
   });
 

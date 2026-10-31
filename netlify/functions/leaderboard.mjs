@@ -5,7 +5,7 @@ import { computeStreak, getStreamDays } from '../lib/streak.mjs';
 import { allUsers } from '../lib/admin/common.mjs';
 import { db } from '../lib/store.mjs';
 import { json } from '../lib/http.mjs';
-import { monthBoard, secretSet } from '../lib/community.mjs';
+import { monthBoard, secretSet, weights } from '../lib/community.mjs';
 
 export const config = { path: '/api/leaderboard' };
 
@@ -32,7 +32,11 @@ export default async () => {
   let month = null;
   if (settings.communityEnabled && secretSet()) {
     const board = await monthBoard(settings);
-    month = { label: board.label, rows: board.rows.slice(0, n).map((r) => ({ name: r.name, value: r.points })), hint: settings.communityHint };
+    month = {
+      label: board.label, rows: board.rows.slice(0, n).map((r) => ({ name: r.name, value: r.points })), hint: settings.communityHint,
+      // Legende: wie viele Punkte was bringt und ab wann gedeckelt wird (gleiche Werte wie in der Berechnung)
+      rules: { ...weights(settings), msgCap: settings.communityMsgCap, msgGap: settings.communityMsgGap, bonusNote: settings.communityBonusNote },
+    };
   }
   return json(
     { updated: new Date().toISOString(), visitors: rows.length, month, visits: top('count'), chatters: top('messages', chatRows), streaks: top('streak'), records: top('record'), minutes: top('minutes') },

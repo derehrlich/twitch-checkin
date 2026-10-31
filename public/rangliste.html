@@ -25,6 +25,11 @@
   li b { margin-left: auto; font-weight: 700; white-space: nowrap; color: var(--gelb); }
   li span { overflow-wrap: anywhere; }
   section.month { grid-column: 1 / -1; }
+  details.legend { margin-top: 14px; border-top: 1px solid var(--rand); padding-top: 12px; }
+  details.legend summary { cursor: pointer; font-weight: 700; color: var(--leise); }
+  details.legend ul { margin: 10px 0 0; padding-left: 1.2em; display: grid; gap: 6px; }
+  details.legend li { display: list-item; counter-increment: none; border: 0; padding: 0; list-style: none; margin-left: -1.2em; padding-left: 1.2em; }
+  details.legend li::before { content: none; }
   .foot { text-align: center; color: var(--leise); font-size: .9rem; margin: 0; }
   body.overlay .foot { display: none; }
   @media (max-width: 640px) { main { padding: 18px 14px 40px; } .brand img { display: none; } }
@@ -51,6 +56,25 @@ const BOARDS = [
   ['minutes', 'Meiste Zeit im Stream', fmtMin],
 ];
 const grid = document.getElementById('grid');
+// Legende zur Monatsrangliste: was wie viele Punkte bringt und ab wann gedeckelt wird
+function legend(r) {
+  const gap = r.msgGap % 60 === 0 && r.msgGap >= 60 ? `${r.msgGap / 60} Minute${r.msgGap === 60 ? '' : 'n'}` : `${r.msgGap} Sekunden`;
+  const perDay = 2 * (r.msgCap * r.msg + r.day) + r.checkin;
+  const det = document.createElement('details'); det.className = 'legend';
+  const sum = document.createElement('summary'); sum.textContent = 'So werden die Punkte gezählt'; det.append(sum);
+  const ul = document.createElement('ul');
+  const items = [
+    `💬 Nachricht: ${r.msg} Punkt${r.msg === 1 ? '' : 'e'}. Twitch-Chat und Discord zählen getrennt. Eine Nachricht zählt höchstens alle ${gap}.`,
+    `🛑 Deckel: pro Tag und Plattform zählen höchstens ${r.msgCap} Nachrichten, also höchstens ${r.msgCap * r.msg} Punkte. Mehr schreiben bringt an dem Tag keine weiteren Punkte.`,
+    `📅 Aktiver Tag: ${r.day} Punkte für jeden Tag, an dem du geschrieben hast (Twitch und Discord je einmal).`,
+    `✅ Check-in im Stream: ${r.checkin} Punkte für jeden Stream-Tag.`,
+  ];
+  if (r.bonusNote) items.push(`🎁 ${r.bonusNote}`);
+  items.push(`📈 Ohne Bonus sind etwa ${perDay} Punkte pro Tag das Höchste (aktiv auf beiden Plattformen und eingecheckt).`);
+  items.push('🔄 Am Monatsanfang beginnt die Wertung neu. Wer vorne liegt, kommt in die Hall of Fame im Discord.');
+  for (const t of items) { const li = document.createElement('li'); li.textContent = t; ul.append(li); }
+  det.append(ul); return det;
+}
 async function load() {
   try {
     const res = await fetch('/api/leaderboard', { cache: 'no-store' });
@@ -71,6 +95,7 @@ async function load() {
         sec.append(ol);
       } else { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Noch keine Punkte in diesem Monat.'; sec.append(p); }
       if (data.month.hint) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = data.month.hint; const a = document.createElement('a'); a.href = '/verknuepfen'; a.textContent = ' Mehr dazu'; p.append(a); sec.append(p); }
+      if (data.month.rules) sec.append(legend(data.month.rules));
       grid.append(sec);
     }
     for (const [key, title, fmt] of BOARDS) {

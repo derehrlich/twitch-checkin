@@ -118,6 +118,7 @@ export const SCHEMA = {
       t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
       t('communityRankCommand', 'Chat-Befehl für die Monatsrangliste', { maxlength: 26, placeholder: '!rangliste' }), n('communityRankSize', 'Wie viele Plätze im Chat zeigen', { min: 1, max: 10 }),
       t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
+      t('communityBonusNote', 'Zeile zu Bonuspunkten in der Legende der Rangliste', { maxlength: 400 }),
     ] },
     { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
       c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),

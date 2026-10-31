@@ -144,6 +144,7 @@ export const DEFAULTS = {
   clipHintEnabled: true,
   discordInvite: 'https://discord.gg/qxPqqhYwtJ',
   clipHintTemplate: '🎬 Starker Clip, {creator}! Komm ins Dorf ({discord}) und tippe hier !verknuepfen: Dann kannst du im Discord ClipMaster werden und bekommst Bonuspunkte für die Rangliste. 🏆',
+  communityBonusNote: 'Bonuspunkte gibt es für besondere Taten, zum Beispiel +100 Punkte für den Clip der Woche im Discord.', // Zeile in der Legende der Rangliste
   communityHint: 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.',
   // Top des Monats: Die Besten des Vormonats suchen sich einen Sound aus dem Katalog (Admin, 15 Plätze) aus.
   // Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl dürfen. Wer nicht wählt, behält den normalen Ton.
@@ -197,7 +198,7 @@ function sanitize(input) {
   num('entrySoundBuyCost', 1, 1_000_000); num('entrySoundExtendCost', 1, 1_000_000);
   num('entrySoundBuyMonths', 1, 36); num('entrySoundMaxMonths', 1, 60); num('entrySoundKeepMonths', 0, 24);
   num('entrySoundMaxSeconds', 1, 30); num('entrySoundUploadDays', 1, 90);
-  for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint']) str(k, 400);
+  for (const k of ['communityLinkTemplate', 'communityTipTemplate', 'communityHint', 'communityBonusNote']) str(k, 400);
   for (const k of ['communityRankTemplate', 'communityRankEmpty', 'clipHintTemplate']) str(k, 400);
   str('discordInvite', 200);
   num('communityRankSize', 1, 10);
