@@ -106,7 +106,7 @@ export const DEFAULTS = {
   entrySoundExtendCost: 25_000,
   entrySoundMaxMonths: 12,
   entrySoundKeepMonths: 3,
-  entrySoundMaxSeconds: 5, // das Overlay schneidet längere Sounds nach so vielen Sekunden ab
+  entrySoundMaxSeconds: 10, // das Overlay schneidet längere Sounds nach so vielen Sekunden ab
   entrySoundUploadDays: 14, // so lange hat man nach dem Kauf Zeit für den Upload, danach gibt es die Punkte zurück
   // Platzhalter: {user} {months} {until} {url} {days} {rest} {max} {reason}
   entrySoundBuyTemplate: '🔊 {user}, danke! Lade deinen Einlaufsound hier hoch: {url} (innerhalb von {days} Tagen). Nach der Prüfung gilt er {months}. Gefällt er nicht, bekommst du deine Punkte zurück.',

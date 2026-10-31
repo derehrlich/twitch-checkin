@@ -260,4 +260,4 @@ export async function viewFor(userId, settings, now = new Date()) {
   };
 }
 
-export const UPLOAD_MAX = 600_000; // Bytes, reicht für gut 5 Sekunden in guter Qualität
+export const UPLOAD_MAX = 1_200_000; // Bytes, reicht für 10 Sekunden WAV in Mono/CD-Qualität und deutlich mehr als 10 Sekunden MP3

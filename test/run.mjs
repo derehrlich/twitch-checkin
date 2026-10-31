@@ -1136,7 +1136,7 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     const me = await (await entryFn(viewerReq('GET', 'me', null, ck))).json();
     assert.equal(me.status, 'awaiting'); assert.equal(me.uploadsLeft, 1); assert.equal(me.id, '5001');
     assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'a.txt', data: Buffer.from('kein Ton').toString('base64') }, ck))).status, 400);
-    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'gross.wav', data: Buffer.concat([wav, Buffer.alloc(700_000)]).toString('base64') }, ck))).status, 413);
+    assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'gross.wav', data: Buffer.concat([wav, Buffer.alloc(1_300_000)]).toString('base64') }, ck))).status, 413);
     assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'ohne.wav', data: wav.toString('base64') }, viewer('6000', 'Fremd')))).status, 403, 'ohne Kauf kein Upload');
     assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'anna.wav', data: wav.toString('base64') }, ck))).status, 200);
     assert.equal((await entryFn(viewerReq('POST', 'upload', { name: 'zwei.wav', data: wav.toString('base64') }, ck))).status, 409);
@@ -1160,7 +1160,7 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     const ev = await db.get((await db.list('event/')).at(-1));
     assert.equal(ev.type, 'checkin');
     assert.equal(ev.entrySound.url, `/api/einlaufsound/audio?id=5001&v=${rec.soundVersion}`);
-    assert.equal(ev.entrySound.max, 5);
+    assert.equal(ev.entrySound.max, 10);
   });
 
   await test('Einlaufsound: Kauf bei gültigem Sound wird erstattet', async () => {
@@ -1558,7 +1558,7 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   await test('Check-in: Katalog-Sound der Gewinner, gekaufter Sound hat Vorrang, abgelaufen und nicht gewählt gilt der normale Ton', async () => {
     const s = await getSettings();
     const a = await es.activeSoundFor('6001', s);
-    assert.match(a.url, new RegExp(`^/api/einlaufsound/catalog-audio\\?id=${gong.id}&v=\\d+$`)); assert.equal(a.max, 5);
+    assert.match(a.url, new RegExp(`^/api/einlaufsound/catalog-audio\\?id=${gong.id}&v=\\d+$`)); assert.equal(a.max, 10);
     assert.equal(await es.activeSoundFor('6003', s), null, 'Wim hat nicht gewählt: normaler Ton');
     assert.equal(await es.activeSoundFor('6001', s, new Date(Date.now() + 40 * 86_400_000)), null, 'nach einem Monat vorbei');
     await db.set('entrysound/6001', { id: '6001', name: 'Uli', soundVersion: 9, validUntil: new Date(Date.now() + 86_400_000).toISOString(), uploadsLeft: 0 });

@@ -111,7 +111,7 @@ function renderAward(st) {
 
 function rules() {
   const l = $('rules'); l.replaceChildren();
-  const s = me?.limits ?? { seconds: 5, bytes: 600000 };
+  const s = me?.limits ?? { seconds: 10, bytes: 1200000 };
   for (const text of [`Höchstens ${s.seconds} Sekunden, längere Sounds werden abgeschnitten.`, `Dateigröße höchstens ${Math.round(s.bytes / 1000)} KB.`, 'Keine Musik und keine urheberrechtlich geschützten Songs, sonst droht dem Kanal Ärger mit Twitch.', 'Nicht zu laut und nichts Beleidigendes. Alles wird vor der Freigabe angehört.']) {
     const li = document.createElement('li'); li.textContent = text; l.append(li);
   }
