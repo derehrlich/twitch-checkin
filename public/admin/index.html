@@ -38,6 +38,7 @@
       <button data-tab="alerts" role="tab">Alerts</button>
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
+      <button data-tab="sport" role="tab">Sport</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="commands" role="tab">Commands</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
@@ -148,6 +149,40 @@
         </div>
       </section>
       <div data-schema="abspann" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Sport -->
+    <div class="tab-panel hidden" data-panel="sport">
+      <section class="card">
+        <h2>Sport-Scoreboard</h2>
+        <p class="muted">Das Scoreboard zeigt die unten eingetragenen Einheiten aufbereitet: Gesamtzeit, Ø Herzfrequenz, Strecke und Kalorien, dazu die letzten Einheiten. In OBS eine Browserquelle (1920×1080) auf <code id="sportUrl"></code> anlegen. Es bleibt unsichtbar, bis du auf „Einblenden“ klickst. Mit <code>?pos=top</code> hinter der Adresse steht es oben statt unten.</p>
+        <div class="grid2">
+          <div><label for="sportTitle">Überschrift</label><input id="sportTitle" maxlength="40"></div>
+          <div><label for="sportPeriod">Zeitraum, der gezählt wird</label><select id="sportPeriod"><option value="all">Gesamt</option><option value="month">Dieser Monat</option><option value="week">Diese Woche</option></select></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button id="sportShow">Einblenden</button>
+          <button id="sportCfg" class="ghost">Überschrift &amp; Zeitraum speichern</button>
+          <a class="btn ghost" href="/sport?demo" target="_blank" rel="noopener">Vorschau mit Beispielzahlen</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Einheit eintragen</h2>
+        <div class="grid2">
+          <div><label for="sportDay">Datum</label><input id="sportDay" type="date"></div>
+          <div><label for="sportName">Art (z. B. Laufband)</label><input id="sportName" maxlength="40" placeholder="Training"></div>
+          <div><label for="sportMinutes">Zeit (Minuten)</label><input id="sportMinutes" type="text" inputmode="decimal" placeholder="z. B. 45"></div>
+          <div><label for="sportHr">Herzfrequenz Ø (Schläge pro Minute)</label><input id="sportHr" type="number" min="0" max="250"></div>
+          <div><label for="sportKm">Strecke (km)</label><input id="sportKm" type="text" inputmode="decimal" placeholder="z. B. 6,35"></div>
+          <div><label for="sportKcal">Kalorien (kcal)</label><input id="sportKcal" type="number" min="0" max="20000"></div>
+        </div>
+        <div class="row" style="margin-top:14px"><button id="sportAdd">Eintragen</button></div>
+      </section>
+      <section class="card">
+        <h2>Verlauf</h2>
+        <p class="muted" id="sportTotals">Noch keine Einheiten eingetragen.</p>
+        <div id="sportLog"></div>
+      </section>
     </div>
 
     <!-- Soundboard -->

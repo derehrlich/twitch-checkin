@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Sport</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Sport-Scoreboard als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Zeigt die im Admin (Reiter „Sport“) eingetragenen Einheiten. Ein- und Ausblenden steuerst du dort.   ?demo  Beispielzahlen, immer sichtbar   ?pos=top  Anzeige oben statt unten */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #board { position: fixed; left: 50%; bottom: 40px; transform: translate(-50%, 160%); opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; padding: 20px 28px 24px; box-sizing: border-box; }
+  body.top #board { bottom: auto; top: 40px; transform: translate(-50%, -160%); }
+  #board.on { transform: translate(-50%, 0); opacity: 1; }
+  .title { text-align: center; margin: 0 0 14px; font: 700 30px/1 var(--wordmark); letter-spacing: 3px; text-transform: uppercase; color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .75); }
+  .period { margin: -8px 0 14px; text-align: center; font-size: 18px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #e9d3ae; }
+  .recent { margin-top: 14px; display: grid; gap: 6px; }
+  .recent div { display: flex; justify-content: space-between; gap: 24px; padding: 6px 14px; border-radius: 8px; background: rgba(20, 10, 4, .4); font-size: 21px; font-weight: 500; color: #ecd9b6; }
+  .recent b { color: #fff3da; font-weight: 600; }
+  .tiles { display: flex; gap: 18px; }
+  .tile { min-width: 190px; padding: 12px 18px 14px; text-align: center; border-radius: 12px; background: rgba(20, 10, 4, .55); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 1px 0 rgba(255, 214, 160, .18); }
+  .tile small { display: block; font-size: 15px; font-weight: 600; letter-spacing: 2.4px; text-transform: uppercase; color: #e9d3ae; }
+  .tile b { display: block; margin-top: 4px; font-size: 56px; line-height: 1.05; font-weight: 700; color: #fff3da; text-shadow: 0 3px 0 rgba(43, 24, 12, .75), 0 6px 10px rgba(0, 0, 0, .35); font-variant-numeric: tabular-nums; }
+  .tile em { font-style: normal; font-size: 22px; font-weight: 600; color: #ecd9b6; margin-left: 4px; }
+  .heart b { color: #ff8a7a; }
+  .beat { display: inline-block; color: #ff8a7a; animation: beat 1s ease-in-out infinite; }
+  @keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } }
+</style>
+</head>
+<body>
+<div id="board" class="panel" aria-live="polite">
+  <div class="title" id="title">Sport-Scoreboard</div>
+  <div class="period" id="period"></div>
+  <div class="tiles">
+    <div class="tile"><small>Zeit</small><b><span id="time">0</span><em id="timeUnit">Min</em></b></div>
+    <div class="tile"><small><span class="beat">♥</span> Ø Puls</small><b><span id="hr">–</span><em>bpm</em></b></div>
+    <div class="tile"><small>Strecke</small><b><span id="km">0,00</span><em>km</em></b></div>
+    <div class="tile"><small>Kalorien</small><b><span id="kcal">0</span><em>kcal</em></b></div>
+  </div>
+  <div class="recent" id="recent"></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+if (params.get('pos') === 'top') document.body.classList.add('top');
+const $ = (id) => document.getElementById(id);
+const DEMO = { show: true, title: 'Sport-Scoreboard', periodLabel: 'Dieser Monat',
+  totals: { count: 12, seconds: 31_800, heartRate: 142, distanceKm: 78.4, calories: 5120 },
+  recent: [{ day: '2026-11-02', title: 'Laufband', seconds: 2700, distanceKm: 6.35, calories: 412 }, { day: '2026-10-30', title: 'Rad', seconds: 3600, distanceKm: 21.1, calories: 540 }, { day: '2026-10-28', title: 'Laufband', seconds: 1800, distanceKm: 4.2, calories: 290 }] };
+
+const fmtTime = (s) => { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} Std ${String(m).padStart(2, '0')} Min` : `${m} Min`; };
+const num = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function render(d) {
+  $('title').textContent = d.title;
+  $('period').textContent = `${d.periodLabel} · ${d.totals.count} ${d.totals.count === 1 ? 'Einheit' : 'Einheiten'}`;
+  const mins = Math.round(d.totals.seconds / 60);
+  $('time').textContent = mins >= 60 ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}` : mins;
+  $('timeUnit').textContent = mins >= 60 ? 'Std' : 'Min';
+  $('hr').textContent = d.totals.heartRate || '–';
+  $('km').textContent = num(d.totals.distanceKm, 2);
+  $('kcal').textContent = num(d.totals.calories);
+  $('recent').replaceChildren(...d.recent.map((r) => {
+    const row = document.createElement('div');
+    const left = document.createElement('span'); left.textContent = `${new Date(r.day + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })} · ${r.title}`;
+    const right = document.createElement('b'); right.textContent = `${fmtTime(r.seconds)} · ${num(r.distanceKm, 2)} km · ${num(r.calories)} kcal`;
+    row.append(left, right); return row;
+  }));
+  $('board').classList.toggle('on', Boolean(d.show));
+}
+
+async function poll() {
+  try {
+    if (params.has('demo')) return render(DEMO);
+    const res = await fetch('/api/sport', { cache: 'no-store' });
+    if (res.ok) render(await res.json());
+  } catch { /* beim nächsten Mal wieder */ }
+}
+poll();
+setInterval(poll, 5000);
+</script>
+</body>
+</html>

@@ -1827,5 +1827,46 @@ await test('Commands: Timer läuft nur bei Chat-Aktivität, nie doppelt ohne neu
   await db.delete('config/commands'); await db.delete('state/chatpulse');
 });
 
+// ---- Sport-Scoreboard
+const sportPub = (await import('../netlify/functions/sport.mjs')).default;
+await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten', async () => {
+  const sp = async (method, p, body) => { const r = await admin(adminReq(method, 'sport' + p, body, cookie)); return { status: r.status, ...(await r.json()) }; };
+  const pub = async () => (await sportPub(new Request(BASE + '/api/sport'))).json();
+  assert.equal((await admin(adminReq('GET', 'sport'))).status, 401, 'ohne Login gesperrt');
+  assert.equal((await pub()).show, false, 'standardmäßig unsichtbar');
+  assert.deepEqual((await pub()).totals, { count: 0, seconds: 0, distanceKm: 0, calories: 0, heartRate: 0 });
+  assert.equal((await sp('POST', '/log', { heartRate: 120 })).status, 400, 'ohne Zeit nicht möglich');
+
+  const today = streamDay(await getSettings());
+  await sp('POST', '/log', { day: today, title: 'Laufband', minutes: '30', heartRate: '142', distanceKm: '6,35', calories: 412.4 });
+  await sp('POST', '/log', { day: '2020-01-01', minutes: 30, heartRate: 100, distanceKm: 10, calories: 200 });
+  const bad = await sp('POST', '/log', { day: 'kaputt', minutes: 5, heartRate: 999, distanceKm: -5 });
+  assert.equal(bad.status, 200);
+  assert.equal(bad.log.find((e) => e.seconds === 300).day, today, 'ungültiges Datum wird durch heute ersetzt');
+  assert.equal(bad.log.find((e) => e.seconds === 300).heartRate, 250, 'Puls wird begrenzt');
+
+  let st = await sp('GET', '');
+  assert.equal(st.log.length, 3);
+  assert.equal(st.log[2].day, '2020-01-01', 'neueste zuerst');
+  assert.equal(st.totals.count, 3);
+  assert.equal(st.totals.calories, 612);
+  assert.equal(st.totals.distanceKm, 16.35);
+
+  await sp('PUT', '/config', { show: true, title: 'Laufband-Wochen', period: 'month' });
+  let v = await pub();
+  assert.deepEqual([v.show, v.title, v.periodLabel, v.totals.count], [true, 'Laufband-Wochen', 'Dieser Monat', 2], 'nur Einheiten dieses Monats');
+  assert.equal(v.totals.heartRate, Math.round((142 * 1800 + 250 * 300) / 2100), 'Puls ist nach Dauer gewichtet');
+  await sp('PUT', '/config', { period: 'all' });
+  v = await pub();
+  assert.equal(v.totals.count, 3);
+  assert.equal(v.recent.length, 3);
+  assert.equal((await sp('PUT', '/config', { period: 'quatsch' })).config.period, 'all', 'ungültiger Zeitraum wird ignoriert');
+
+  assert.equal((await sp('DELETE', '/log/zzzz')).status, 404);
+  for (const e of st.log) st = await sp('DELETE', `/log/${e.id}`);
+  assert.equal(st.log.length, 0);
+  await db.delete('sport/config');
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

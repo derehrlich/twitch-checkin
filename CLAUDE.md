@@ -23,14 +23,14 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 netlify/functions/   die HTTP-Endpunkte (admin, auth, community, einlaufsound, overlay, twitch-webhook …)
 netlify/lib/         Logik: checkin, streak, award (Top des Monats), entrysound, community, settings, twitch, store …
 netlify/lib/admin/   Admin-Routen je Reiter
-public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite
+public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html)
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
 - Einstellungen: `netlify/lib/settings.mjs` (Standardwerte und Prüfung), Admin-Formulare in `public/admin/js/schema.js`.
-- Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`).
+- Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 103 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 104 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
