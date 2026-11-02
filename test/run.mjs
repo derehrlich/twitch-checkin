@@ -1675,6 +1675,18 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     a.deadline = keep; await db.set(key, a);
   });
 
+  await test('Admin: Ankündigung erneut in den Chat nur mit laufender Frist', async () => {
+    await api('PUT', 'settings', { awardEnabled: true, chatEnabled: true });
+    const key = (await db.list('award/')).slice(-1)[0]; const a = await db.get(key); const keep = JSON.stringify(a);
+    a.deadline = new Date(Date.now() + 3 * 86_400_000).toISOString(); a.winners.forEach((w) => delete w.deadline); await db.set(key, a);
+    const before = chats().length;
+    const ok = await (await api('POST', 'catalog/announce', {})).json();
+    assert.equal(ok.ok, true); assert.equal(chats().length, before + 1); assert.match(chats().at(-1), /1\. @\w+/);
+    a.deadline = new Date(Date.now() - 86_400_000).toISOString(); await db.set(key, a);
+    assert.equal((await api('POST', 'catalog/announce', {})).status, 409, 'Frist vorbei');
+    await db.set(key, JSON.parse(keep));
+  });
+
   await test('Admin: Gewinner mit Wahl in der Übersicht, Vormonat ist schon abgeschlossen, Backup enthält Katalog und Gewinner', async () => {
     const list = await (await api('GET', 'catalog')).json();
     const may = list.awards.find((x) => x.month === '2030-05');
