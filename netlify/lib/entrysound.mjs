@@ -44,7 +44,8 @@ export function addMonths(date, months) {
   return d;
 }
 
-export const fmtDate = (date, settings) => new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: settings.timezone }).format(new Date(date));
+export const FOREVER = '2999-12-31T00:00:00.000Z'; // „ewig“: manuell vergebene Sounds ohne Ablauf
+export const fmtDate = (date, settings) => Date.parse(date) >= Date.parse('2900-01-01') ? 'unbegrenzt' : new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: settings.timezone }).format(new Date(date));
 
 /** Reward-Titel mit der genauen Monatszahl; Twitch erlaubt höchstens 45 Zeichen. */
 export function rewardTitles(s) {
@@ -134,6 +135,7 @@ export async function handleEntryExtend(redemption, settings, now = new Date()) 
     const start = Math.max(now.getTime(), Date.parse(rec.validUntil));
     const end = addMonths(new Date(start), months);
     const cap = addMonths(now, settings.entrySoundMaxMonths);
+    if (rec.permanent) return refuse(redemption, settings, settings.entrySoundTooMuchTemplate, { ...vars, rest: 'unbegrenzt' });
     if (end - cap > DAY) { // einen Tag Spielraum für Rundungen
       const rest = Math.max(0, (Date.parse(rec.validUntil) - now) / DAY / MONTH_DAYS);
       return refuse(redemption, settings, settings.entrySoundTooMuchTemplate, { ...vars, rest: fmtMonths(rest) });
@@ -196,6 +198,23 @@ export async function reject(userId, settings, { reason = '', refund = false } =
   return { ok: true, refunded: false };
 }
 
+/** Vergibt einen Einlaufsound von Hand (Familie, OGs …): ohne Kauf und ohne Freigabe.
+ *  permanent: gilt ewig, sonst `months` ab jetzt (bei laufendem Sound ab dessen Ende). Ohne Datei bleibt der bisherige Sound, nur die Laufzeit ändert sich. */
+export async function grant(userId, userName, { file = null, soundName = 'Sound', months = 0, permanent = false } = {}, now = new Date()) {
+  const rec = await getEntry(userId);
+  if (rec?.purchase) return { error: 'Es läuft noch ein Kauf dieser Person. Bitte zuerst freigeben oder ablehnen.', status: 409 };
+  if (!file && !rec?.soundVersion) return { error: 'Bitte eine Sound-Datei auswählen', status: 400 };
+  if (!permanent && !(months > 0)) return { error: 'Bitte eine Laufzeit in Monaten angeben oder „ewig“ wählen', status: 400 };
+  if (file) await db.set(fileKey(userId), { type: file.type, data: file.buf.toString('base64') });
+  const start = rec && isActive(rec, now) && !rec.permanent ? new Date(rec.validUntil) : now;
+  const validUntil = permanent ? FOREVER : addMonths(start, months).toISOString();
+  await db.set(entryKey(userId), {
+    ...(rec ?? {}), id: userId, name: userName, validUntil, permanent, uploadsLeft: rec?.uploadsLeft ?? 0, pending: rec?.pending ?? null, rejected: null, purchase: null,
+    soundName: file ? soundName : rec.soundName, soundVersion: file ? now.getTime() : rec.soundVersion,
+  });
+  return { ok: true, validUntil, permanent };
+}
+
 /** Entfernt Sound und Eintrag. Ein offener Kauf wird erstattet. */
 export async function remove(userId) {
   const rec = await getEntry(userId);
@@ -241,7 +260,7 @@ export async function listEntries(settings, now = new Date()) {
     const rec = await db.get(key);
     if (!rec) continue;
     const status = rec.pending ? 'pending' : rec.purchase ? 'awaiting' : isActive(rec, now) ? 'active' : 'expired';
-    rows.push({ id: rec.id, name: rec.name, status, soundName: rec.soundName ?? null, soundVersion: rec.soundVersion ?? null, validUntil: rec.validUntil ?? null, pending: rec.pending ?? null, purchaseAt: rec.purchase?.at ?? null, rejected: rec.rejected ?? null, uploadsLeft: rec.uploadsLeft ?? 0 });
+    rows.push({ id: rec.id, name: rec.name, status, soundName: rec.soundName ?? null, soundVersion: rec.soundVersion ?? null, validUntil: rec.validUntil ?? null, permanent: Boolean(rec.permanent), pending: rec.pending ?? null, purchaseAt: rec.purchase?.at ?? null, rejected: rec.rejected ?? null, uploadsLeft: rec.uploadsLeft ?? 0 });
   }
   const order = { pending: 0, awaiting: 1, active: 2, expired: 3 };
   return rows.sort((a, b) => order[a.status] - order[b.status] || String(a.name).localeCompare(String(b.name)));

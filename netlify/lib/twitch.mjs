@@ -228,6 +228,12 @@ export async function subscribe(webhookUrl, rewardIds, { raids = false, alerts =
 // ---- Raid-Helfer (öffentliche Daten, brauchen nur den App-Token)
 
 // Anzeigename, Profilbild und zuletzt gespieltes Spiel eines Kanals
+/** Twitch-Konto zu einem Login-Namen: { id, name } oder null. */
+export async function lookupUser(login) {
+  const { data } = await helix('GET', 'users', { as: 'app', query: { login } });
+  return data?.[0] ? { id: data[0].id, name: data[0].display_name } : null;
+}
+
 export async function channelInfo(broadcasterId) {
   const [ch, us] = await Promise.all([
     helix('GET', 'channels', { as: 'app', query: { broadcaster_id: broadcasterId } }),

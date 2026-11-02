@@ -45,6 +45,9 @@ export function winnersOf(rows, n) {
   return out;
 }
 
+/** Der Broadcaster selbst gewinnt nicht: Twitch-ID des verbundenen Kontos oder null. */
+const broadcasterId = async () => (await db.get('config/tokens'))?.user_id ?? null;
+
 const closed = new Set(); // Monate, die in dieser Function-Instanz schon als abgeschlossen bekannt sind (spart Lesezugriffe)
 const say = async (settings, template, vars) => {
   if (settings.chatEnabled) await sendChat(fill(template, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
@@ -59,7 +62,8 @@ export async function ensureAward(settings, now = new Date(), { force = false } 
   }
   if (await db.get(`award/${month}`)) { closed.add(month); return null; }
   const board = await monthBoard(settings, month);
-  const winners = winnersOf(board.rows, settings.awardSize);
+  const self = await broadcasterId();
+  const winners = winnersOf(board.rows.filter((r) => r.twitchId !== self), settings.awardSize);
   const record = { month, label: board.label, closedAt: now.toISOString(), deadline: new Date(now.getTime() + settings.awardDays * DAY).toISOString(), winners };
   if (!(await db.setIfNew(`award/${month}`, record))) { closed.add(month); return null; } // ein anderer Aufruf war schneller
   closed.add(month);
@@ -77,7 +81,8 @@ export async function openAwardFor(twitchId, now = new Date()) {
   for (const key of (await db.list('award/')).slice(-2).reverse()) {
     const award = await db.get(key);
     const winner = award?.winners.find((w) => w.twitchId === twitchId);
-    if (winner && Date.parse(award.deadline) > now) return { award, winner };
+    const deadline = winner?.deadline ?? award?.deadline; // neu Gezogene bekommen eine eigene Frist
+    if (winner && Date.parse(deadline) > now) return { award, winner, deadline };
   }
   return null;
 }
@@ -101,12 +106,35 @@ export async function choose(twitchId, twitchName, catalogId, settings, now = ne
   return { ok: true, validUntil, sound: cat.name };
 }
 
+export const REROLL_POOL = 5; // so viele der nächstbesten kommen beim Neuziehen in den Lostopf
+
+/** Zieht für einen Gewinner (z. B. weil der Broadcaster getroffen wurde oder jemand nicht will) zufällig Ersatz aus den nächstbesten.
+ *  Ausgeschlossen sind der Broadcaster, alle aktuellen und frühere Ersatz-Gewinner dieses Monats. Der Ersatz übernimmt den Platz und bekommt eine frische Frist. */
+export async function reroll(month, twitchId, settings, now = new Date()) {
+  const award = await db.get(`award/${month}`);
+  const out = award?.winners.find((w) => w.twitchId === twitchId);
+  if (!out) return { error: 'Diesen Gewinner gibt es nicht', status: 404 };
+  const self = await broadcasterId();
+  const taken = new Set([self, ...award.winners.map((w) => w.twitchId), ...(award.replaced ?? [])]);
+  const pool = (await monthBoard(settings, month)).rows.filter((r) => !taken.has(r.twitchId)).slice(0, REROLL_POOL);
+  if (!pool.length) return { error: 'Es ist niemand mehr da, der nachrücken kann', status: 409 };
+  const pick = pool[crypto.randomInt(pool.length)];
+  const deadline = new Date(now.getTime() + settings.awardDays * DAY).toISOString();
+  award.winners = award.winners.map((w) => (w === out ? { twitchId: pick.twitchId, name: pick.name, place: out.place, points: pick.points, choice: null, chosenAt: null, deadline, rerolled: true } : w));
+  award.replaced = [...(award.replaced ?? []), out.twitchId];
+  await db.set(`award/${month}`, award);
+  const won = await db.get(`awardsound/${out.twitchId}`);
+  if (won?.month === month) await db.delete(`awardsound/${out.twitchId}`); // der gewählte Sound des Vorgängers verfällt
+  await say(settings, settings.awardRerollTemplate, { user: pick.name, n: award.winners.length, month: award.label, url: awardUrl(), until: fmtDate(deadline, settings), old: out.name });
+  return { ok: true, winner: { name: pick.name, points: pick.points, place: out.place } };
+}
+
 /** Hinweis beim Check-in für Gewinner, die noch nicht gewählt haben. Sonst null. */
 export async function awardTip(twitchId, twitchName, settings, now = new Date()) {
   if (!settings.awardEnabled) return null;
   const open = await openAwardFor(twitchId, now);
   if (!open || open.winner.choice) return null;
-  return fill(settings.awardTipTemplate, { user: twitchName, n: open.award.winners.length, month: open.award.label, url: awardUrl(), until: fmtDate(open.award.deadline, settings) });
+  return fill(settings.awardTipTemplate, { user: twitchName, n: open.award.winners.length, month: open.award.label, url: awardUrl(), until: fmtDate(open.deadline, settings) });
 }
 
 /** Was die Person auf der Auswahl-Seite sieht: laufende Auswahl samt Katalog und der aktuell gültige Katalog-Sound. */
@@ -116,7 +144,7 @@ export async function awardView(twitchId, settings, now = new Date()) {
   const won = await db.get(`awardsound/${twitchId}`);
   const current = won && Date.parse(won.validUntil) > now ? catalog.find((c) => c.id === won.catalogId) : null;
   return {
-    open: open ? { label: open.award.label, place: open.winner.place, deadline: open.award.deadline, choice: open.winner.choice } : null,
+    open: open ? { label: open.award.label, place: open.winner.place, deadline: open.deadline, choice: open.winner.choice } : null,
     catalog: open ? catalog.map((c) => ({ id: c.id, name: c.name, url: `/api/einlaufsound/catalog-audio?id=${c.id}&v=${c.soundVersion}` })) : [],
     current: current ? { name: current.name, validUntil: won.validUntil } : null,
   };
@@ -129,8 +157,8 @@ export async function recentAwards(settings) {
   for (const key of (await db.list('award/')).slice(-3).reverse()) {
     const a = await db.get(key);
     if (!a) continue;
-    out.push({ month: a.month, label: a.label, closedAt: a.closedAt, deadline: a.deadline, open: Date.parse(a.deadline) > Date.now(),
-      winners: a.winners.map((w) => ({ name: w.name, place: w.place, points: w.points, choice: catalog.find((c) => c.id === w.choice)?.name ?? null })) });
+    out.push({ month: a.month, label: a.label, closedAt: a.closedAt, deadline: a.deadline, open: a.winners.some((w) => Date.parse(w.deadline ?? a.deadline) > Date.now()),
+      winners: a.winners.map((w) => ({ twitchId: w.twitchId, name: w.name, place: w.place, points: w.points, choice: catalog.find((c) => c.id === w.choice)?.name ?? null })) });
   }
   return out;
 }
@@ -148,5 +176,5 @@ export async function awardForBot(settings, now = new Date()) {
     discordId: (await linkByTwitch(w.twitchId))?.discordId ?? null, name: w.name, place: w.place, points: w.points,
     chosen: Boolean(w.choice), sound: catalog.find((c) => c.id === w.choice)?.name ?? null,
   })));
-  return { enabled: true, award: { month: award.month, label: award.label, closedAt: award.closedAt, deadline: award.deadline, open: Date.parse(award.deadline) > now, url: awardUrl(), winners } };
+  return { enabled: true, award: { month: award.month, label: award.label, closedAt: award.closedAt, deadline: award.deadline, open: award.winners.some((w) => Date.parse(w.deadline ?? award.deadline) > now), url: awardUrl(), winners } };
 }

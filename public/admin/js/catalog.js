@@ -23,7 +23,7 @@ export async function loadCatalog() {
     </div>`).join('') : '<p class="muted">Noch kein Sound im Katalog.</p>';
   $('awardRows').innerHTML = d.awards.length ? d.awards.map((a) => `
     <p style="margin:10px 0 2px"><b>${esc(a.label)}</b> <span class="muted">· ${a.open ? `Auswahl läuft bis ${fmtDate(a.deadline)}` : 'Auswahl beendet'}</span></p>
-    ${a.winners.length ? `<ol style="margin:0">${a.winners.map((w) => `<li>${esc(w.name)} (${w.points} Punkte) – ${w.choice ? `gewählt: <b>${esc(w.choice)}</b>` : 'noch nicht gewählt'}</li>`).join('')}</ol>` : '<p class="muted" style="margin:0">Niemand hatte Punkte.</p>'}`).join('') : '<p class="muted">Noch kein Monat abgeschlossen.</p>';
+    ${a.winners.length ? `<ol style="margin:0">${a.winners.map((w) => `<li data-month="${esc(a.month)}" data-tid="${esc(w.twitchId)}">${esc(w.name)} (${w.points} Punkte) – ${w.choice ? `gewählt: <b>${esc(w.choice)}</b>` : 'noch nicht gewählt'} <button data-act="reroll" class="ghost">Neu ziehen</button></li>`).join('')}</ol>` : '<p class="muted" style="margin:0">Niemand hatte Punkte.</p>'}`).join('') : '<p class="muted">Noch kein Monat abgeschlossen.</p>';
 }
 
 let preview = null;
@@ -36,6 +36,13 @@ export function initCatalog() {
     const r = await api('POST', 'catalog/close', {});
     await loadCatalog(); toast(r.created ? `Vormonat abgeschlossen (${r.winners} Gewinner) ✓` : 'Der Vormonat war schon abgeschlossen');
   }));
+  onAct($('awardRows'), '[data-tid]', async (act, row) => {
+    if (act !== 'reroll') return;
+    const name = row.firstChild.textContent.split(' (')[0];
+    if (!confirm(`Für ${name} neu ziehen? Es wird zufällig aus den nächstbesten Plätzen gezogen, ein bereits gewählter Sound von ${name} verfällt.`)) return;
+    const r = await api('POST', `catalog/award/${row.dataset.month}/${row.dataset.tid}/reroll`, {});
+    await loadCatalog(); toast(`Neu gezogen: ${r.winner.name} (${r.winner.points} Punkte) ✓`);
+  });
   onAct($('catRows'), '[data-id]', async (act, row, btn) => {
     const id = row.dataset.id, entry = entries.find((x) => x.id === id);
     if (act === 'save') { await api('PUT', `catalog/${id}`, { name: row.querySelector('[data-f=name]').value }); await loadCatalog(); toast('Gespeichert ✓'); }

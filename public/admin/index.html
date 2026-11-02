@@ -197,6 +197,17 @@
         <p class="muted">Zuschauer melden sich auf <code id="entryUrl"></code> mit Twitch an und laden dort ihre Datei hoch. Bei einem Kauf bleibt die Einlösung bis zu deiner Freigabe offen. „Ablehnen und erstatten“ gibt die Punkte zurück, „Ablehnen“ lässt die Person eine andere Datei hochladen. Die Länge prüfst du beim Anhören, das Overlay schneidet zu lange Sounds ohnehin ab.</p>
       </section>
       <section class="card">
+        <h2>Einlaufsound von Hand vergeben</h2>
+        <p class="muted">Für Familie, OGs und alle, die keinen Reward einlösen sollen: ohne Kauf, ohne Freigabe, sofort gültig. Bei jemandem mit laufendem Sound kannst du auch nur die Laufzeit ändern (Datei weglassen).</p>
+        <div class="row">
+          <div><label for="grantUser">Twitch-Name</label><input id="grantUser" maxlength="40" placeholder="z. B. meinefrau"></div>
+          <div><label for="grantFile">Sound-Datei</label><input id="grantFile" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
+          <div><label for="grantMonths">Monate</label><input id="grantMonths" type="number" min="1" max="120" value="12" style="width:90px"></div>
+          <div><label><input id="grantForever" type="checkbox"> ewig</label></div>
+          <button id="grantBtn">Vergeben</button>
+        </div>
+      </section>
+      <section class="card">
         <h2>Katalog für die Top des Monats</h2>
         <p class="muted">Aus diesen Sounds suchen sich die Besten des Vormonats einen aus. Höchstens <span id="catMax">15</span> Plätze, je Sound eine Datei (MP3, WAV oder OGG, bis 1,5 MB, kurz halten).</p>
         <div id="catRows"></div>
@@ -207,7 +218,7 @@
         <h3>Gewinner der letzten Monate</h3>
         <div id="awardRows"></div>
         <div class="row" style="margin-top:12px"><button id="closeAward" class="ghost">Vormonat jetzt abschließen</button></div>
-        <p class="muted">Der Abschluss passiert ab dem 2. des Monats von selbst, sobald im Chat etwas los ist oder jemand die Seite öffnet. Der Knopf macht es sofort, falls der Vormonat noch nicht abgeschlossen ist.</p>
+        <p class="muted">Der Abschluss passiert ab dem 2. des Monats von selbst, sobald im Chat etwas los ist oder jemand die Seite öffnet. Der Knopf macht es sofort, falls der Vormonat noch nicht abgeschlossen ist. Du selbst gewinnst nie. „Neu ziehen“ ersetzt einen Gewinner durch jemanden zufällig aus den nächstbesten und schreibt es in den Chat.</p>
       </section>
       <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
     </div>
