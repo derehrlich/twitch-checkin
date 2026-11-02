@@ -1827,5 +1827,46 @@ await test('Commands: Timer läuft nur bei Chat-Aktivität, nie doppelt ohne neu
   await db.delete('config/commands'); await db.delete('state/chatpulse');
 });
 
+// ---- Sport-Scoreboard
+const sportPub = (await import('../netlify/functions/sport.mjs')).default;
+await test('Sport: Werte, Stoppuhr, Verlauf und Summen', async () => {
+  const sp = async (method, p, body) => { const r = await admin(adminReq(method, 'sport' + p, body, cookie)); return { status: r.status, ...(await r.json()) }; };
+  assert.equal((await admin(adminReq('GET', 'sport'))).status, 401, 'ohne Login gesperrt');
+  let st = await sp('GET', '');
+  assert.equal(st.live.show, false, 'standardmäßig unsichtbar');
+  assert.equal((await sp('POST', '/save', {})).status, 400, 'leere Einheit wird nicht gespeichert');
+  assert.equal((await sp('POST', '/timer', { action: 'quatsch' })).status, 400);
+
+  await sp('PUT', '/live', { title: 'Laufband', heartRate: '142', distanceKm: '6,35', calories: 412.4, show: true, minutes: 30 });
+  st = await sp('POST', '/timer', { action: 'start' });
+  const pub = await (await sportPub(new Request(BASE + '/api/sport'))).json();
+  assert.deepEqual([pub.show, pub.title, pub.heartRate, pub.distanceKm, pub.calories, pub.running], [true, 'Laufband', 142, 6.35, 412, true]);
+  assert.ok(pub.seconds >= 1800 && pub.seconds < 1810, 'Stoppuhr startet bei den gesetzten 30 Minuten');
+  await sp('PUT', '/live', { heartRate: 999, distanceKm: -5 });
+  assert.equal((await (await sportPub(new Request(BASE + '/api/sport'))).json()).heartRate, 250, 'Puls wird begrenzt');
+  await sp('PUT', '/live', { heartRate: 142, distanceKm: 6.35 });
+  await sp('POST', '/timer', { action: 'pause' });
+
+  st = await sp('POST', '/save', {});
+  assert.equal(st.log.length, 1);
+  assert.deepEqual([st.log[0].title, st.log[0].heartRate, st.log[0].distanceKm, st.log[0].calories], ['Laufband', 142, 6.35, 412]);
+  assert.ok(st.log[0].seconds >= 1800 && st.log[0].seconds < 1810);
+  assert.deepEqual([st.live.seconds, st.live.heartRate, st.live.show, st.live.title], [0, 0, true, 'Laufband'], 'Anzeige startet bei 0, bleibt sichtbar');
+
+  await db.set('sport/log/aaaaaaaa', { id: 'aaaaaaaa', savedAt: 1, day: '2026-01-01', title: 'Rad', seconds: 1800, heartRate: 100, distanceKm: 10, calories: 200 });
+  st = await sp('GET', '');
+  assert.equal(st.log.length, 2);
+  assert.equal(st.totals.count, 2);
+  assert.equal(st.totals.distanceKm, 16.35);
+  assert.equal(st.totals.calories, 612);
+  assert.equal(st.totals.heartRate, 121, 'Puls ist nach Dauer gewichtet');
+
+  assert.equal((await sp('DELETE', '/log/zzzz')).status, 404);
+  st = await sp('DELETE', '/log/aaaaaaaa');
+  assert.equal(st.log.length, 1);
+  st = await sp('POST', '/timer', { action: 'reset' });
+  await db.delete('sport/live'); await db.delete(`sport/log/${st.log[0].id}`);
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

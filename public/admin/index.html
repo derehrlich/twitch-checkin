@@ -38,6 +38,7 @@
       <button data-tab="alerts" role="tab">Alerts</button>
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
+      <button data-tab="sport" role="tab">Sport</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="commands" role="tab">Commands</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
@@ -148,6 +149,41 @@
         </div>
       </section>
       <div data-schema="abspann" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Sport -->
+    <div class="tab-panel hidden" data-panel="sport">
+      <section class="card">
+        <h2>Sport-Scoreboard</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="sportUrl"></code> anlegen. Das Scoreboard bleibt unsichtbar, bis du hier auf „Einblenden“ klickst. Zahlen trägst du von Hand ein (z. B. von der Uhr oder dem Laufband) und klickst „Übernehmen“, das Overlay zeigt sie nach ca. 3 Sekunden. Mit <code>?pos=top</code> hinter der Adresse steht es oben statt unten.</p>
+        <div class="row">
+          <button id="sportShow">Einblenden</button>
+          <a class="btn ghost" href="/sport?demo" target="_blank" rel="noopener">Vorschau mit Beispielzahlen</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Aktuelle Einheit</h2>
+        <div class="row" style="align-items:flex-end">
+          <div><label>Stoppuhr</label><b id="sportClock" style="font-size:1.6rem">0:00</b> <span class="muted" id="sportState"></span></div>
+          <button id="sportStart">Start</button><button id="sportPause" class="ghost">Pause</button><button id="sportReset" class="danger">Zurücksetzen</button>
+        </div>
+        <div class="grid2" style="margin-top:14px">
+          <div><label for="sportTitle">Überschrift</label><input id="sportTitle" maxlength="40" placeholder="Training"></div>
+          <div><label for="sportMinutes">Zeit von Hand setzen (Minuten)</label><input id="sportMinutes" type="number" min="0" max="1440" step="0.5" placeholder="leer lassen = Stoppuhr"></div>
+          <div><label for="sportHr">Herzfrequenz Ø (Schläge pro Minute)</label><input id="sportHr" type="number" min="0" max="250"></div>
+          <div><label for="sportKm">Strecke (km)</label><input id="sportKm" type="text" inputmode="decimal" placeholder="z. B. 6,35"></div>
+          <div><label for="sportKcal">Kalorien (kcal)</label><input id="sportKcal" type="number" min="0" max="20000"></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button id="sportApply">Übernehmen</button>
+          <button id="sportSave" class="ghost">Einheit speichern &amp; Anzeige auf 0</button>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Verlauf</h2>
+        <p class="muted" id="sportTotals">Noch keine gespeicherten Einheiten.</p>
+        <div id="sportLog"></div>
+      </section>
     </div>
 
     <!-- Soundboard -->

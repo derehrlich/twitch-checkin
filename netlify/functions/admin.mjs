@@ -13,6 +13,7 @@ import { commands } from '../lib/admin/commands.mjs';
 import { catalog } from '../lib/admin/catalog.mjs';
 import { users, exportCsv } from '../lib/admin/users.mjs';
 import { backup } from '../lib/admin/backup.mjs';
+import { sport } from '../lib/admin/sport.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -33,6 +34,7 @@ const ROUTES = {
   users,
   'export.csv': exportCsv,
   backup,
+  sport,
 };
 
 export default async (req) => {

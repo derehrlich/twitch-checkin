@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Sport</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Sport-Scoreboard als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Ein- und Ausblenden steuerst du im Admin (Reiter „Sport“).   ?demo  Beispielzahlen, immer sichtbar   ?pos=top  Anzeige oben statt unten */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #board { position: fixed; left: 50%; bottom: 40px; transform: translate(-50%, 160%); opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; padding: 20px 28px 24px; box-sizing: border-box; }
+  body.top #board { bottom: auto; top: 40px; transform: translate(-50%, -160%); }
+  #board.on { transform: translate(-50%, 0); opacity: 1; }
+  .title { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 14px; font: 700 30px/1 var(--wordmark); letter-spacing: 3px; text-transform: uppercase; color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .75); }
+  .live { width: 12px; height: 12px; border-radius: 50%; background: #62c254; box-shadow: 0 0 8px 2px rgba(98, 194, 84, .8); }
+  .paused .live { background: #f0a83a; box-shadow: 0 0 8px 2px rgba(240, 168, 58, .8); }
+  .tiles { display: flex; gap: 18px; }
+  .tile { min-width: 190px; padding: 12px 18px 14px; text-align: center; border-radius: 12px; background: rgba(20, 10, 4, .55); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 1px 0 rgba(255, 214, 160, .18); }
+  .tile small { display: block; font-size: 15px; font-weight: 600; letter-spacing: 2.4px; text-transform: uppercase; color: #e9d3ae; }
+  .tile b { display: block; margin-top: 4px; font-size: 56px; line-height: 1.05; font-weight: 700; color: #fff3da; text-shadow: 0 3px 0 rgba(43, 24, 12, .75), 0 6px 10px rgba(0, 0, 0, .35); font-variant-numeric: tabular-nums; }
+  .tile em { font-style: normal; font-size: 22px; font-weight: 600; color: #ecd9b6; margin-left: 4px; }
+  .heart b { color: #ff8a7a; }
+  .beat { display: inline-block; color: #ff8a7a; animation: beat 1s ease-in-out infinite; }
+  @keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } }
+</style>
+</head>
+<body>
+<div id="board" class="panel" aria-live="polite">
+  <div class="title"><i class="live"></i><span id="title">Training</span></div>
+  <div class="tiles">
+    <div class="tile"><small>Zeit</small><b id="time">0:00</b></div>
+    <div class="tile heart"><small><span class="beat">♥</span> Ø Puls</small><b><span id="hr">–</span><em>bpm</em></b></div>
+    <div class="tile"><small>Strecke</small><b><span id="km">0,00</span><em>km</em></b></div>
+    <div class="tile"><small>Kalorien</small><b><span id="kcal">0</span><em>kcal</em></b></div>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+if (params.get('pos') === 'top') document.body.classList.add('top');
+const $ = (id) => document.getElementById(id);
+const DEMO = { show: true, title: 'Training', running: true, seconds: 2535, heartRate: 142, distanceKm: 6.35, calories: 412 };
+
+let data = null, fetchedAt = 0; // fetchedAt: wann die Zahlen geholt wurden, die Zeit läuft von da an lokal weiter
+const pad = (n) => String(n).padStart(2, '0');
+const fmtTime = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`; };
+
+function render() {
+  if (!data) return;
+  const seconds = data.running ? data.seconds + Math.floor((Date.now() - fetchedAt) / 1000) : data.seconds;
+  $('time').textContent = fmtTime(seconds);
+  $('title').textContent = data.title;
+  $('hr').textContent = data.heartRate || '–';
+  $('km').textContent = data.distanceKm.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('kcal').textContent = Math.round(data.calories).toLocaleString('de-DE');
+  $('board').classList.toggle('paused', !data.running);
+  $('board').classList.toggle('on', Boolean(data.show));
+}
+
+async function poll() {
+  try {
+    if (params.has('demo')) data = DEMO;
+    else {
+      const res = await fetch('/api/sport', { cache: 'no-store' });
+      if (res.ok) data = await res.json();
+    }
+    fetchedAt = Date.now();
+    render();
+  } catch { /* beim nächsten Mal wieder */ }
+}
+poll();
+setInterval(poll, 3000);
+setInterval(render, 500);
+</script>
+</body>
+</html>
