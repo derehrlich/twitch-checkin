@@ -32,6 +32,10 @@ export function initCatalog() {
     await api('POST', 'catalog', { name: $('newCatName').value });
     $('newCatName').value = ''; await loadCatalog(); toast('Angelegt ✓ – jetzt eine Datei hochladen');
   }));
+  $('announceAward').addEventListener('click', run(async () => {
+    const r = await api('POST', 'catalog/announce', {});
+    toast(`Im Chat angekündigt (${r.winners} Gewinner) ✓`);
+  }));
   $('closeAward').addEventListener('click', run(async () => {
     const r = await api('POST', 'catalog/close', {});
     await loadCatalog(); toast(r.created ? `Vormonat abgeschlossen (${r.winners} Gewinner) ✓` : 'Der Vormonat war schon abgeschlossen');
