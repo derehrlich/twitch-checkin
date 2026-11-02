@@ -1,6 +1,7 @@
 // Schnittstelle für den VerwirrBot (Anmeldung mit dem gemeinsamen Geheimwort LINK_SECRET als Bearer-Token):
 //   GET  /api/community/board    Rangliste des Monats (verknüpfte Konten), Liste der verknüpften Discord-IDs und Regeln, damit der Bot dieselben Gewichte nutzt
 //   GET  /api/community/award    Top des Monats (Hall of Fame): jüngste Auswahl mit Gewinnern { discordId, name, place, chosen, sound }, Frist und Link
+//   POST /api/community/award/announce   Ankündigung der Top des Monats noch einmal in den Twitch-Chat (Gewinner mit @)
 //   GET  /api/community/link?discordId=...   ist dieses Discord-Konto verknüpft? { linked, twitchName }
 //   GET  /api/community/link?twitch=name     zu einem Twitch-Namen das Discord-Konto: { linked, discordId, twitchName }
 //   POST /api/community/bonus    Bonuspunkte für den Monat { key, points, reason, discordId | twitch }, jeder key zählt nur einmal
@@ -8,7 +9,7 @@
 //   POST /api/community/unlink   Verknüpfung löschen { discordId }
 // Öffentlich zugänglich ist nur die Rangliste in /api/leaderboard.
 import { getSettings } from '../lib/settings.mjs';
-import { awardForBot } from '../lib/award.mjs';
+import { announceAgain, awardForBot } from '../lib/award.mjs';
 import { json } from '../lib/http.mjs';
 import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/community.mjs';
 
@@ -27,6 +28,10 @@ export default async (req) => {
     // linked: alle verknüpften Discord-IDs, damit der Bot nur für sie Zahlen meldet
     return json({ enabled: settings.communityEnabled, month: board.month, linked: (await allLinks()).map((l) => l.discordId), label: board.label, rules: { weights: weights(settings), msgCap: settings.communityMsgCap, msgGap: settings.communityMsgGap },
       rows: board.rows.slice(0, 200).map((r) => ({ discordId: r.discordId, name: r.name, points: r.points })) });
+  }
+  if (route[0] === 'award' && route[1] === 'announce' && writes) {
+    const res = await announceAgain(settings).catch((e) => ({ error: `Chat fehlgeschlagen: ${e.message}`, status: 502 }));
+    return res.error ? json({ error: res.error }, res.status) : json(res);
   }
   if (route[0] === 'award' && req.method === 'GET') return json(await awardForBot(settings));
   if (route[0] === 'link' && req.method === 'GET') {
