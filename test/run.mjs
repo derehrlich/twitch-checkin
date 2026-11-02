@@ -1599,6 +1599,61 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     await api('PUT', 'settings', { awardEnabled: true });
   });
 
+  await test('Broadcaster gewinnt nie; Neu ziehen: zufällig aus den nächstbesten, ohne Broadcaster und ohne bisherige Gewinner', async () => {
+    const s = await getSettings();
+    // April 2030: der Broadcaster (999) hat die meisten Punkte, danach Ada, Bo, Cy, Di, Ed, Flo, Gus, Hal
+    const apr = [['999', 'Streamerin', 500], ['6101', 'Ada', 90], ['6102', 'Bo', 80], ['6103', 'Cy', 70], ['6104', 'Di', 60], ['6105', 'Ed', 50], ['6106', 'Flo', 40], ['6107', 'Gus', 30], ['6108', 'Hal', 20]];
+    for (const [id, name, pts] of apr) {
+      await com.saveLink({ discordId: `70000000${id}`, discordName: name + 'DC', twitchId: id, twitchName: name });
+      await db.set(`cmonth/2030-04/${id}`, { name, msgs: pts, days: 0, lastDay: null, dayMsgs: 0, lastAt: 0 });
+    }
+    const rec = await aw.ensureAward(s, new Date(Date.UTC(2030, 4, 5, 12)));
+    assert.equal(rec.month, '2030-04');
+    assert.deepEqual(rec.winners.map((w) => w.name), ['Ada', 'Bo', 'Cy'], 'der Broadcaster ist ausgeschlossen, die Nächsten rücken auf');
+    assert.equal((await api('POST', 'catalog/award/2030-04/9999/reroll', {})).status, 404, 'kein Gewinner');
+    assert.equal((await api('POST', 'catalog/award/kaputt/6101/reroll', {})).status, 400);
+    const before = chats().length;
+    const r = await (await api('POST', 'catalog/award/2030-04/6102/reroll', {})).json();
+    assert.equal(r.ok, true);
+    assert.ok(['Di', 'Ed', 'Flo', 'Gus', 'Hal'].includes(r.winner.name), 'aus den nächsten fünf');
+    assert.notEqual(r.winner.name, 'Streamerin');
+    const after = await db.get('award/2030-04');
+    assert.deepEqual(after.winners.map((w) => w.place), [1, 2, 3], 'Platz bleibt');
+    assert.equal(after.winners[1].name, r.winner.name); assert.deepEqual(after.replaced, ['6102']);
+    assert.match(chats().at(-1), new RegExp(`Neu gezogen: ${r.winner.name} rückt für Bo`)); assert.equal(chats().length, before + 1);
+    assert.ok((await aw.openAwardFor(after.winners[1].twitchId))?.winner.rerolled, 'Ersatz kann wählen (eigene Frist ab jetzt)');
+    assert.equal(await aw.openAwardFor('6102'), null, 'der Ersetzte nicht mehr');
+    // der Pool ist endlich: nach genug Ziehungen ist niemand mehr übrig, ersetzte Personen kommen nicht zurück
+    let last;
+    for (let i = 0; i < 8; i++) last = await api('POST', `catalog/award/2030-04/${(await db.get('award/2030-04')).winners[1].twitchId}/reroll`, {});
+    assert.equal(last.status, 409, 'niemand mehr da');
+  });
+
+  await test('Einlaufsound von Hand vergeben: ewig, mit Laufzeit, nur Laufzeit ändern, Kauf-Verlängerung bei ewig abgelehnt', async () => {
+    await api('PUT', 'settings', { entrySoundEnabled: true });
+    const s = await getSettings();
+    assert.equal((await api('POST', 'entrysound/grant', { login: '7001', permanent: true })).status, 400, 'ohne Datei und ohne bisherigen Sound');
+    assert.equal((await api('POST', 'entrysound/grant', { login: '7001', data: wav, months: 0 })).status, 400, 'ohne Laufzeit');
+    assert.equal((await api('POST', 'entrysound/grant', { login: '7001', data: Buffer.from('kein Ton').toString('base64'), permanent: true })).status, 400, 'nur Audio');
+    const ok = await (await api('POST', 'entrysound/grant', { login: '7001', name: 'Frau', data: wav, fileName: 'frau.wav', permanent: true })).json();
+    assert.equal(ok.ok, true); assert.equal(ok.permanent, true);
+    const a = await es.activeSoundFor('7001', s, new Date(Date.UTC(2090, 0, 1)));
+    assert.match(a.url, /^\/api\/einlaufsound\/audio\?id=7001/, 'gilt noch in 60 Jahren');
+    const row = (await (await api('GET', 'entrysound')).json()).entries.find((e) => e.id === '7001');
+    assert.equal(row.status, 'active'); assert.equal(row.permanent, true);
+    assert.equal(es.fmtDate(ok.validUntil, s), 'unbegrenzt');
+    // nur die Laufzeit ändern, Datei bleibt
+    const v = (await db.get('entrysound/7001')).soundVersion;
+    const t = await (await api('POST', 'entrysound/grant', { login: '7001', months: 3 })).json();
+    assert.equal(t.permanent, false); assert.equal((await db.get('entrysound/7001')).soundVersion, v, 'Datei unverändert');
+    assert.ok(Math.abs((Date.parse(t.validUntil) - Date.now()) / (30.4375 * 86_400_000) - 3) < 0.1);
+    // offener Kauf blockiert die manuelle Vergabe
+    await db.set('entrysound/7002', { id: '7002', name: 'Kauf', uploadsLeft: 1, purchase: { redemptionId: 'r', rewardId: 'w', at: new Date().toISOString() } });
+    assert.equal((await api('POST', 'entrysound/grant', { login: '7002', data: wav, permanent: true })).status, 409);
+    await api('DELETE', 'entrysound/7001'); await db.delete('entrysound/7002');
+    await api('PUT', 'settings', { entrySoundEnabled: false });
+  });
+
   await test('Admin: Gewinner mit Wahl in der Übersicht, Vormonat ist schon abgeschlossen, Backup enthält Katalog und Gewinner', async () => {
     const list = await (await api('GET', 'catalog')).json();
     const may = list.awards.find((x) => x.month === '2030-05');

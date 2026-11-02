@@ -91,6 +91,7 @@ export const SCHEMA = {
       n('awardMonths', 'Der Sound gilt so viele Monate ab der ersten Auswahl', { min: 1, max: 12 }),
       a('awardAnnounceTemplate', 'Chat-Nachricht beim Monatsabschluss', { n: 3, month: 'Oktober 2026', list: '1. Anna · 2. Ben · 3. Cleo', url: 'https://…/einlaufsound', until: '07.11.2026' }),
       a('awardTipTemplate', 'Erinnerung beim Check-in, solange nicht gewählt', { user: 'Max', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardRerollTemplate', 'Nachricht, wenn für einen Gewinner neu gezogen wurde', { user: 'Max', old: 'Moritz', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
       a('awardChosenTemplate', 'Nachricht, wenn gewählt wurde', { user: 'Max', sound: 'Fanfare', until: '07.12.2026' }),
     ] },
     { title: 'Einlaufsound: Chat-Texte', hint: `Platzhalter: ${code('user')} Name, ${code('months')} Monate, ${code('until')} gültig bis, ${code('url')} Upload-Seite, ${code('days')} Frist, ${code('rest')} Restlaufzeit, ${code('max')} Obergrenze, ${code('reason')} Ablehnungsgrund. Nachrichten mit „Punkte zurück“ erstatten die Einlösung.`, items: [

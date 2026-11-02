@@ -1,9 +1,9 @@
 // Einlaufsound-Reiter: eingereichte Sounds anhören, freigeben, ablehnen (mit oder ohne Erstattung), Sounds entfernen.
-import { $, api, esc, onAct, previewVolume, toast } from './core.js';
+import { $, api, esc, onAct, previewVolume, readUpload, run, toast } from './core.js';
 
 let entries = [];
 const STATUS = { pending: 'Wartet auf Freigabe', awaiting: 'Kauf offen, Upload fehlt', active: 'Aktiv', expired: 'Abgelaufen (noch gespeichert)' };
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('de-DE') : '–');
+const fmtDate = (iso) => (!iso ? '–' : Date.parse(iso) >= Date.parse('2900-01-01') ? 'ewig' : new Date(iso).toLocaleDateString('de-DE'));
 
 export async function loadEntrySounds() {
   const data = await api('GET', 'entrysound');
@@ -13,7 +13,7 @@ export async function loadEntrySounds() {
   $('entryUrl').textContent = `${location.origin}/einlaufsound`;
   $('entryRows').innerHTML = entries.length ? entries.map((e) => `
     <div class="entry" data-id="${esc(e.id)}">
-      <p style="margin:0"><b>${esc(e.name)}</b> · ${STATUS[e.status]}${e.validUntil ? ` · gültig bis ${fmtDate(e.validUntil)}` : ''}${e.soundName ? ` · ${esc(e.soundName)}` : ''}</p>
+      <p style="margin:0"><b>${esc(e.name)}</b> · ${STATUS[e.status]}${e.validUntil ? (e.permanent ? ' · gilt ewig' : ` · gültig bis ${fmtDate(e.validUntil)}`) : ''}${e.soundName ? ` · ${esc(e.soundName)}` : ''}</p>
       ${e.pending ? `<p class="muted" style="margin:4px 0">Neu eingereicht: <b>${esc(e.pending.name)}</b> (${new Date(e.pending.at).toLocaleString('de-DE')})${e.status === 'pending' && e.purchaseAt ? ' · Kauf, Punkte reserviert' : ''}</p>` : ''}
       ${e.rejected ? `<p class="muted" style="margin:4px 0">Zuletzt abgelehnt: ${esc(e.rejected.reason)}</p>` : ''}
       <div class="row" style="margin-top:6px">
@@ -30,6 +30,14 @@ let preview = null;
 const play = (src, volume) => { preview?.pause(); preview = new Audio(src); preview.volume = volume; return preview.play(); };
 
 export function initEntrySound() {
+  $('grantBtn').addEventListener('click', run(async () => {
+    const file = $('grantFile').files[0];
+    const body = { login: $('grantUser').value, months: Number($('grantMonths').value), permanent: $('grantForever').checked };
+    if (file) { body.data = await readUpload(file, 1_500_000); body.fileName = file.name; }
+    const r = await api('POST', 'entrysound/grant', body);
+    $('grantFile').value = ''; await loadEntrySounds();
+    toast(`Vergeben an ${r.name} ✓ (${r.permanent ? 'ewig' : 'bis ' + fmtDate(r.validUntil)})`);
+  }));
   document.addEventListener('admin:synced', () => loadEntrySounds().catch(() => {}));
   onAct($('entryRows'), '[data-id]', async (act, row) => {
     const id = row.dataset.id, entry = entries.find((x) => x.id === id);

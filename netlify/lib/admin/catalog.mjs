@@ -1,7 +1,8 @@
 // /api/admin/catalog: Katalog für die Top des Monats (höchstens 15 Sounds) und Übersicht der Monatsgewinner.
 import { db } from '../store.mjs';
 import { getSettings } from '../settings.mjs';
-import { CATALOG_ID, CATALOG_MAX, catalogKey, ensureAward, getCatalog, newCatalogId, recentAwards, saveCatalog } from '../award.mjs';
+import { CATALOG_ID, CATALOG_MAX, catalogKey, ensureAward, getCatalog, newCatalogId, recentAwards, reroll, saveCatalog } from '../award.mjs';
+import { MONTH } from '../community.mjs';
 import { json } from '../http.mjs';
 import { audioUpload, cleanName, storeFile } from './common.mjs';
 
@@ -24,6 +25,11 @@ export async function catalog({ route, method, body }) {
     if (!settings.awardEnabled) return json({ error: 'Die Auswahl der Top des Monats ist ausgeschaltet' }, 400);
     const res = await ensureAward(settings, new Date(), { force: true });
     return json({ ok: true, created: Boolean(res), winners: res?.winners.length ?? 0 });
+  }
+  if (route[1] === 'award' && route[4] === 'reroll' && method === 'POST') { // Gewinner neu ziehen: /award/<Monat>/<twitchId>/reroll
+    if (!MONTH.test(route[2] ?? '') || !/^\d{1,20}$/.test(route[3] ?? '')) return json({ error: 'Ungültige Angabe' }, 400);
+    const res = await reroll(route[2], route[3], settings);
+    return res.error ? json({ error: res.error }, res.status ?? 400) : json(res);
   }
   const entry = list.find((e) => e.id === route[1]);
   if (!CATALOG_ID.test(route[1] ?? '') || !entry) return json({ error: 'Sound nicht gefunden' }, 404);

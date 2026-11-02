@@ -155,6 +155,7 @@ export const DEFAULTS = {
   // Platzhalter: {user} {n} {month} {list} {url} {until} {sound}
   awardAnnounceTemplate: '🏆 Die Top {n} im {month}: {list}! Ihr dürft euch einen Einlaufsound aussuchen: {url} (bis {until})',
   awardTipTemplate: '🏆 {user}, du warst im {month} unter den Top {n}! Such dir deinen Einlaufsound aus: {url} (noch bis {until})',
+  awardRerollTemplate: '🎲 Neu gezogen: {user} rückt für {old} in die Top {n} im {month} nach! Such dir deinen Einlaufsound aus: {url} (bis {until})',
   awardChosenTemplate: '🔊 {user} hat sich den Einlaufsound „{sound}“ ausgesucht, gültig bis {until}!',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
@@ -203,7 +204,7 @@ function sanitize(input) {
   str('discordInvite', 200);
   num('communityRankSize', 1, 10);
   if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
-  for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate']) str(k, 400);
+  for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate', 'awardRerollTemplate']) str(k, 400);
   num('awardSize', 1, 10); num('awardDays', 1, 30); num('awardMonths', 1, 12);
   num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
   num('communityMsgCap', 1, 500); num('communityMsgGap', 0, 3600);
