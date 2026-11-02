@@ -1829,43 +1829,43 @@ await test('Commands: Timer läuft nur bei Chat-Aktivität, nie doppelt ohne neu
 
 // ---- Sport-Scoreboard
 const sportPub = (await import('../netlify/functions/sport.mjs')).default;
-await test('Sport: Werte, Stoppuhr, Verlauf und Summen', async () => {
+await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten', async () => {
   const sp = async (method, p, body) => { const r = await admin(adminReq(method, 'sport' + p, body, cookie)); return { status: r.status, ...(await r.json()) }; };
+  const pub = async () => (await sportPub(new Request(BASE + '/api/sport'))).json();
   assert.equal((await admin(adminReq('GET', 'sport'))).status, 401, 'ohne Login gesperrt');
+  assert.equal((await pub()).show, false, 'standardmäßig unsichtbar');
+  assert.deepEqual((await pub()).totals, { count: 0, seconds: 0, distanceKm: 0, calories: 0, heartRate: 0 });
+  assert.equal((await sp('POST', '/log', { heartRate: 120 })).status, 400, 'ohne Zeit nicht möglich');
+
+  const today = streamDay(await getSettings());
+  await sp('POST', '/log', { day: today, title: 'Laufband', minutes: '30', heartRate: '142', distanceKm: '6,35', calories: 412.4 });
+  await sp('POST', '/log', { day: '2020-01-01', minutes: 30, heartRate: 100, distanceKm: 10, calories: 200 });
+  const bad = await sp('POST', '/log', { day: 'kaputt', minutes: 5, heartRate: 999, distanceKm: -5 });
+  assert.equal(bad.status, 200);
+  assert.equal(bad.log.find((e) => e.seconds === 300).day, today, 'ungültiges Datum wird durch heute ersetzt');
+  assert.equal(bad.log.find((e) => e.seconds === 300).heartRate, 250, 'Puls wird begrenzt');
+
   let st = await sp('GET', '');
-  assert.equal(st.live.show, false, 'standardmäßig unsichtbar');
-  assert.equal((await sp('POST', '/save', {})).status, 400, 'leere Einheit wird nicht gespeichert');
-  assert.equal((await sp('POST', '/timer', { action: 'quatsch' })).status, 400);
-
-  await sp('PUT', '/live', { title: 'Laufband', heartRate: '142', distanceKm: '6,35', calories: 412.4, show: true, minutes: 30 });
-  st = await sp('POST', '/timer', { action: 'start' });
-  const pub = await (await sportPub(new Request(BASE + '/api/sport'))).json();
-  assert.deepEqual([pub.show, pub.title, pub.heartRate, pub.distanceKm, pub.calories, pub.running], [true, 'Laufband', 142, 6.35, 412, true]);
-  assert.ok(pub.seconds >= 1800 && pub.seconds < 1810, 'Stoppuhr startet bei den gesetzten 30 Minuten');
-  await sp('PUT', '/live', { heartRate: 999, distanceKm: -5 });
-  assert.equal((await (await sportPub(new Request(BASE + '/api/sport'))).json()).heartRate, 250, 'Puls wird begrenzt');
-  await sp('PUT', '/live', { heartRate: 142, distanceKm: 6.35 });
-  await sp('POST', '/timer', { action: 'pause' });
-
-  st = await sp('POST', '/save', {});
-  assert.equal(st.log.length, 1);
-  assert.deepEqual([st.log[0].title, st.log[0].heartRate, st.log[0].distanceKm, st.log[0].calories], ['Laufband', 142, 6.35, 412]);
-  assert.ok(st.log[0].seconds >= 1800 && st.log[0].seconds < 1810);
-  assert.deepEqual([st.live.seconds, st.live.heartRate, st.live.show, st.live.title], [0, 0, true, 'Laufband'], 'Anzeige startet bei 0, bleibt sichtbar');
-
-  await db.set('sport/log/aaaaaaaa', { id: 'aaaaaaaa', savedAt: 1, day: '2026-01-01', title: 'Rad', seconds: 1800, heartRate: 100, distanceKm: 10, calories: 200 });
-  st = await sp('GET', '');
-  assert.equal(st.log.length, 2);
-  assert.equal(st.totals.count, 2);
-  assert.equal(st.totals.distanceKm, 16.35);
+  assert.equal(st.log.length, 3);
+  assert.equal(st.log[2].day, '2020-01-01', 'neueste zuerst');
+  assert.equal(st.totals.count, 3);
   assert.equal(st.totals.calories, 612);
-  assert.equal(st.totals.heartRate, 121, 'Puls ist nach Dauer gewichtet');
+  assert.equal(st.totals.distanceKm, 16.35);
+
+  await sp('PUT', '/config', { show: true, title: 'Laufband-Wochen', period: 'month' });
+  let v = await pub();
+  assert.deepEqual([v.show, v.title, v.periodLabel, v.totals.count], [true, 'Laufband-Wochen', 'Dieser Monat', 2], 'nur Einheiten dieses Monats');
+  assert.equal(v.totals.heartRate, Math.round((142 * 1800 + 250 * 300) / 2100), 'Puls ist nach Dauer gewichtet');
+  await sp('PUT', '/config', { period: 'all' });
+  v = await pub();
+  assert.equal(v.totals.count, 3);
+  assert.equal(v.recent.length, 3);
+  assert.equal((await sp('PUT', '/config', { period: 'quatsch' })).config.period, 'all', 'ungültiger Zeitraum wird ignoriert');
 
   assert.equal((await sp('DELETE', '/log/zzzz')).status, 404);
-  st = await sp('DELETE', '/log/aaaaaaaa');
-  assert.equal(st.log.length, 1);
-  st = await sp('POST', '/timer', { action: 'reset' });
-  await db.delete('sport/live'); await db.delete(`sport/log/${st.log[0].id}`);
+  for (const e of st.log) st = await sp('DELETE', `/log/${e.id}`);
+  assert.equal(st.log.length, 0);
+  await db.delete('sport/config');
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
