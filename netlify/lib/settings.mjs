@@ -155,7 +155,7 @@ export const DEFAULTS = {
   // Platzhalter: {user} {n} {month} {list} {url} {until} {sound}
   awardAnnounceTemplate: '🏆 Die Top {n} im {month}: {list}! Ihr dürft euch einen Einlaufsound aussuchen: {url} (bis {until})',
   awardTipTemplate: '🏆 {user}, du warst im {month} unter den Top {n}! Such dir deinen Einlaufsound aus: {url} (noch bis {until})',
-  awardRerollTemplate: '🎲 Neu gezogen: {user} rückt für {old} in die Top {n} im {month} nach! Such dir deinen Einlaufsound aus: {url} (bis {until})',
+  awardRerollTemplate: '🎲 Neu gezogen: @{user} rückt für {old} in die Top {n} im {month} nach! Such dir deinen Einlaufsound aus: {url} (bis {until})',
   awardChosenTemplate: '🔊 {user} hat sich den Einlaufsound „{sound}“ ausgesucht, gültig bis {until}!',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,

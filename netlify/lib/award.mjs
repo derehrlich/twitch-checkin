@@ -76,6 +76,23 @@ export async function ensureAward(settings, now = new Date(), { force = false } 
   return record;
 }
 
+/** Kündigt die Top des Monats (neueste Auswahl) noch einmal im Twitch-Chat an. Die Gewinner werden mit @ erwähnt, damit Twitch sie benachrichtigt.
+ *  Gilt nur, solange für mindestens einen Gewinner die Frist läuft. */
+export async function announceAgain(settings, now = new Date()) {
+  if (!settings.awardEnabled) return { error: 'Die Auswahl der Top des Monats ist ausgeschaltet', status: 400 };
+  if (!settings.chatEnabled) return { error: 'Der Chat ist ausgeschaltet', status: 400 };
+  const key = (await db.list('award/')).slice(-1)[0];
+  const award = key ? await db.get(key) : null;
+  const open = award?.winners.filter((w) => Date.parse(w.deadline ?? award.deadline) > now) ?? [];
+  if (!open.length) return { error: 'Es läuft keine Auswahl (Frist vorbei oder noch kein Monat abgeschlossen)', status: 409 };
+  const until = new Date(Math.max(...open.map((w) => Date.parse(w.deadline ?? award.deadline)))).toISOString();
+  await sendChat(fill(settings.awardAnnounceTemplate, {
+    n: award.winners.length, month: award.label, url: awardUrl(), until: fmtDate(until, settings),
+    list: award.winners.map((w) => `${w.place}. @${w.name}`).join(' · '),
+  }));
+  return { ok: true, winners: award.winners.length };
+}
+
 /** Laufende Auswahl dieser Person (jüngster Monat, in dem sie Gewinner ist und die Frist läuft) oder null. */
 export async function openAwardFor(twitchId, now = new Date()) {
   for (const key of (await db.list('award/')).slice(-2).reverse()) {

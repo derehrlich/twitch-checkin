@@ -1620,7 +1620,7 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     const after = await db.get('award/2030-04');
     assert.deepEqual(after.winners.map((w) => w.place), [1, 2, 3], 'Platz bleibt');
     assert.equal(after.winners[1].name, r.winner.name); assert.deepEqual(after.replaced, ['6102']);
-    assert.match(chats().at(-1), new RegExp(`Neu gezogen: ${r.winner.name} rückt für Bo`)); assert.equal(chats().length, before + 1);
+    assert.match(chats().at(-1), new RegExp(`Neu gezogen: @${r.winner.name} rückt für Bo`)); assert.equal(chats().length, before + 1);
     assert.ok((await aw.openAwardFor(after.winners[1].twitchId))?.winner.rerolled, 'Ersatz kann wählen (eigene Frist ab jetzt)');
     assert.equal(await aw.openAwardFor('6102'), null, 'der Ersetzte nicht mehr');
     // der Pool ist endlich: nach genug Ziehungen ist niemand mehr übrig, ersetzte Personen kommen nicht zurück
@@ -1652,6 +1652,27 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
     assert.equal((await api('POST', 'entrysound/grant', { login: '7002', data: wav, permanent: true })).status, 409);
     await api('DELETE', 'entrysound/7001'); await db.delete('entrysound/7002');
     await api('PUT', 'settings', { entrySoundEnabled: false });
+  });
+
+  await test('Bot: Ankündigung der Top des Monats noch einmal in den Chat, Gewinner mit @, nur solange eine Frist läuft', async () => {
+    const community = (await import('../netlify/functions/community.mjs')).default;
+    const post = (secret) => community(new Request(BASE + '/api/community/award/announce', { method: 'POST', headers: secret ? { authorization: `Bearer ${secret}`, 'content-type': 'application/json' } : {}, body: '{}' }));
+    assert.equal((await post()).status, 401);
+    await api('PUT', 'settings', { awardEnabled: true, chatEnabled: true });
+    const before = chats().length;
+    const res = await post('geheimwort-12345');
+    if (res.status === 200) { // eine Auswahl läuft (frisch gezogener Ersatz)
+      assert.equal(chats().length, before + 1); assert.match(chats().at(-1), /@\w+/);
+    } else assert.equal(res.status, 409, 'ohne laufende Frist keine Ankündigung');
+    // mit laufender Frist
+    const key = (await db.list('award/')).slice(-1)[0];
+    const a = await db.get(key); const keep = a.deadline;
+    a.deadline = new Date(Date.now() + 3 * 86_400_000).toISOString(); a.winners.forEach((w) => delete w.deadline); await db.set(key, a);
+    const ok = await (await post('geheimwort-12345')).json();
+    assert.equal(ok.ok, true); assert.match(chats().at(-1), /1\. @\w+/, 'Gewinner mit @');
+    a.deadline = new Date(Date.now() - 86_400_000).toISOString(); await db.set(key, a);
+    assert.equal((await post('geheimwort-12345')).status, 409, 'Frist vorbei');
+    a.deadline = keep; await db.set(key, a);
   });
 
   await test('Admin: Gewinner mit Wahl in der Übersicht, Vormonat ist schon abgeschlossen, Backup enthält Katalog und Gewinner', async () => {
