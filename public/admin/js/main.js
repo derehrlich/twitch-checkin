@@ -14,7 +14,7 @@ import { initRaids, loadRaids } from './raids.js';
 import { initBackup } from './backup.js';
 import { initSport, loadSport } from './sport.js';
 
-const TABS = ['start', 'checkin', 'alerts', 'raids', 'abspann', 'sport', 'soundboard', 'commands', 'einlaufsound', 'community', 'medien', 'besucher', 'tests', 'allgemein'];
+const TABS = ['start', 'checkin', 'alerts', 'raids', 'abspann', 'sport', 'alpakas', 'soundboard', 'commands', 'einlaufsound', 'community', 'medien', 'besucher', 'tests', 'allgemein'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'start';
@@ -39,6 +39,7 @@ async function init() {
 }
 
 renderForms();
+$('alpacaUrl').textContent = location.origin + '/alpakas';
 initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));

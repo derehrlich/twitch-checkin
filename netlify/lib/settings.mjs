@@ -157,6 +157,16 @@ export const DEFAULTS = {
   awardTipTemplate: '🏆 {user}, du warst im {month} unter den Top {n}! Such dir deinen Einlaufsound aus: {url} (noch bis {until})',
   awardRerollTemplate: '🎲 Neu gezogen: @{user} rückt für {old} in die Top {n} im {month} nach! Such dir deinen Einlaufsound aus: {url} (bis {until})',
   awardChosenTemplate: '🔊 {user} hat sich den Einlaufsound „{sound}“ ausgesucht, gültig bis {until}!',
+  // Alpakas im Overlay (/alpakas): jede Person, die im Chat schreibt, läuft als Pixel-Alpaka durchs Bild.
+  // Der Reward färbt das eigene Alpaka (Farbname oder Hex-Code beim Einlösen dazuschreiben).
+  alpacaEnabled: false,
+  alpacaRewardTitle: 'Alpaka färben',
+  alpacaRewardCost: 500,
+  alpacaMax: 30, // so viele Alpakas gleichzeitig (die zuletzt aktiven)
+  alpacaMinutes: 90, // so lange nach der letzten Nachricht läuft das Alpaka weiter
+  // Platzhalter: {user} {color}
+  alpacaTemplate: '🦙 {user} färbt sein Alpaka: {color}!',
+  alpacaBadTemplate: '{user}, diese Farbe kenne ich nicht 🦙 Schreib beim Einlösen zum Beispiel „rot“, „türkis“, „rosa“, einen Hex-Code wie #ff8800 oder „zufall“. Deine Punkte bekommst du zurück.',
   // Eigener Ton (wird über /api/admin/sound gesetzt, nicht über die Einstellungen)
   soundName: null,
   soundVersion: null,
@@ -164,7 +174,7 @@ export const DEFAULTS = {
 };
 
 // Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
-export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled);
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.alpacaEnabled);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -204,6 +214,8 @@ function sanitize(input) {
   str('discordInvite', 200);
   num('communityRankSize', 1, 10);
   if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
+  str('alpacaRewardTitle', 45); str('alpacaTemplate', 400); str('alpacaBadTemplate', 400);
+  num('alpacaRewardCost', 1, 1_000_000); num('alpacaMax', 1, 60); num('alpacaMinutes', 5, 720);
   for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate', 'awardRerollTemplate']) str(k, 400);
   num('awardSize', 1, 10); num('awardDays', 1, 30); num('awardMonths', 1, 12);
   num('communityWeightMsg', 0, 1000); num('communityWeightDay', 0, 1000); num('communityWeightCheckin', 0, 1000);
@@ -231,7 +243,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['alpacaEnabled', 'awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }

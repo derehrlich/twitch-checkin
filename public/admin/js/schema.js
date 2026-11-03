@@ -133,6 +133,17 @@ export const SCHEMA = {
     ] },
   ],
 
+  alpakas: [
+    { title: 'Alpakas im Overlay', hint: `Jede Person, die im Chat schreibt, läuft als Pixel-Alpaka durchs Bild, bis sie länger nichts mehr geschrieben hat. Ohne Reward haben alle einen natürlichen Fellton (weiß, beige, braun, grau). Mit dem Reward „Alpaka färben“ schreibt man die Farbe beim Einlösen dazu: einen Namen wie rot, türkis oder rosa, einen Hex-Code wie #ff8800 oder „zufall“. Die Farbe bleibt dauerhaft. Nach dem Ein- oder Ausschalten und nach Änderungen an Name oder Preis die Rewards abgleichen. Platzhalter der Texte: ${code('user')} ${code('color')}.`, items: [
+      c('alpacaEnabled', 'Alpakas aktivieren (braucht den Chat-Webhook und legt den Reward „Alpaka färben“ an)'),
+      n('alpacaMax', 'Höchstens so viele Alpakas gleichzeitig (die zuletzt aktiven)', { min: 1, max: 60 }),
+      n('alpacaMinutes', 'Alpaka läuft so viele Minuten nach der letzten Nachricht weiter', { min: 5, max: 720 }),
+      t('alpacaRewardTitle', 'Reward-Name', { maxlength: 45 }), n('alpacaRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
+      a('alpacaTemplate', 'Chatnachricht nach dem Färben', { user: 'Max', color: 'türkis' }),
+      a('alpacaBadTemplate', 'Nachricht, wenn die Farbe unbekannt ist (Punkte werden erstattet)', { user: 'Max' }),
+    ] },
+  ],
+
   abspann: [
     { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
       c('chatCommands', 'Chat-Befehle aktivieren'),
@@ -170,4 +181,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];

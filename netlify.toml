@@ -54,3 +54,8 @@
   from = "/verknuepfen"
   to = "/verknuepfen.html"
   status = 200
+
+[[redirects]]
+  from = "/alpakas"
+  to = "/alpakas.html"
+  status = 200

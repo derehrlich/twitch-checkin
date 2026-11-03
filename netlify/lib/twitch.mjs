@@ -82,11 +82,11 @@ export async function ensureRewards(settings, entry = null) {
   const state = (await db.get('config/state')) ?? {};
   const { data: list } = await helix('GET', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, only_manageable_rewards: 'true' } });
 
-  const make = async ({ stateKey, title, cost, prompt, color, syncPrompt = false }) => {
+  const make = async ({ stateKey, title, cost, prompt, color, syncPrompt = false, extra = {} }) => {
     let reward = list.find((r) => r.id === state[stateKey]) ?? list.find((r) => r.title === title);
     if (!reward) {
       try {
-        reward = (await helix('POST', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id }, body: { title, cost, prompt, background_color: color } })).data[0];
+        reward = (await helix('POST', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id }, body: { title, cost, prompt, background_color: color, ...extra } })).data[0];
       } catch (e) {
         if (e.message.includes('DUPLICATE_REWARD')) {
           throw new Error(`Auf deinem Kanal gibt es schon einen Reward „${title}“, der nicht von dieser App stammt. Benenne oder lösche ihn in Twitch, oder wähle in den Einstellungen einen anderen Reward-Namen (und speichere).`);
@@ -127,8 +127,16 @@ export async function ensureRewards(settings, entry = null) {
       delete state[k];
     }
   }
+  // Alpaka färben: der Zuschauer schreibt die Farbe beim Einlösen dazu
+  let alpaca = null;
+  if (settings.alpacaEnabled) {
+    alpaca = await make({ stateKey: 'alpacaRewardId', title: settings.alpacaRewardTitle, cost: settings.alpacaRewardCost, prompt: 'Färbe dein Alpaka im Stream! Schreib die Farbe dazu: z. B. rot, türkis, rosa, einen Hex-Code wie #ff8800 oder zufall. Bei unbekannter Farbe gibt es die Punkte zurück.', color: '#FF8FC0', syncPrompt: true, extra: { is_user_input_required: true } });
+  } else if (state.alpacaRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.alpacaRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.alpacaRewardId;
+  }
   await db.set('config/state', state);
-  return { checkin, checkout, streak, entryBuy, entryExtend };
+  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge

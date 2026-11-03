@@ -1868,5 +1868,90 @@ await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten'
   await db.delete('sport/config');
 });
 
+// ---- Alpakas im Overlay
+const alpakasPub = (await import('../netlify/functions/alpakas.mjs')).default;
+await test('Alpakas: Farben erkennen, Chatter laufen mit, Reward färbt, unbekannte Farbe gibt Punkte zurück', async () => {
+  const al = await import('../netlify/lib/alpaca.mjs');
+  assert.equal(al.parseColor('Rot'), '#e03a3a');
+  assert.equal(al.parseColor('mach es bitte TÜRKIS'), '#27c9c0', 'Umlaute und Satz');
+  assert.equal(al.parseColor('grün'), '#3fbf5f');
+  assert.equal(al.parseColor('#FF8800'), '#ff8800');
+  assert.equal(al.parseColor('#f80'), '#ff8800', 'Kurzform mit #');
+  assert.equal(al.parseColor('00ff7f'), '#00ff7f', 'sechs Zeichen auch ohne #');
+  assert.equal(al.parseColor('add'), null, 'drei Zeichen ohne # sind kein Hex-Code');
+  assert.equal(al.parseColor('blabla'), null);
+  assert.equal(al.parseColor(''), null);
+  assert.match(al.parseColor('zufall'), /^#[0-9a-f]{6}$/);
+  assert.ok(al.NATURAL.includes(al.colorFor('12345', null)), 'ohne Kauf ein natürlicher Ton');
+  assert.equal(al.colorFor('12345', '#ff0000'), '#ff0000');
+
+  const pub = async () => (await alpakasPub(new Request(BASE + '/api/alpakas'))).json();
+  assert.deepEqual(await pub(), { enabled: false, alpacas: [] }, 'standardmäßig aus');
+  await chatMsg('hallo', 'a1', 'Alpha');
+  assert.deepEqual((await pub()).alpacas, [], 'ausgeschaltet merkt sich niemand etwas');
+
+  assert.equal((await admin(adminReq('PUT', 'settings', { alpacaEnabled: true, alpacaMax: 2 }, cookie))).status, 200);
+  const setupRes = await admin(adminReq('POST', 'setup', {}, cookie));
+  const setup = await setupRes.json();
+  assert.equal(setupRes.status, 200, JSON.stringify(setup));
+  assert.equal(setup.alpaca, 'Alpaka färben');
+  const state = await db.get('config/state');
+  const reward = rewards.find((r) => r.id === state.alpacaRewardId);
+  assert.equal(reward.cost, 500);
+  const created = calls.filter((c) => c.path.endsWith('/custom_rewards') && c.method === 'POST').find((c) => c.body.title === 'Alpaka färben');
+  assert.equal(created.body.is_user_input_required, true, 'Zuschauer schreibt die Farbe dazu');
+  assert.ok(subs.some((x) => x.condition.reward_id === state.alpacaRewardId), 'Webhook für den Reward');
+  assert.ok(subs.some((x) => x.transport && x.condition.user_id === '999'), 'Chat-Webhook für die Chatter');
+
+  await chatMsg('hallo', 'a1', 'Alpha');
+  let v = await pub();
+  assert.equal(v.enabled, true);
+  assert.deepEqual(v.alpacas.map((a) => a.name), ['Alpha']);
+  assert.ok(al.NATURAL.includes(v.alpacas[0].color));
+  await chatMsg('hi', 'a2', 'Beta');
+  await chatMsg('ho', 'a3', 'Gamma');
+  assert.equal((await pub()).alpacas.length, 2, 'höchstens alpacaMax Alpakas, die zuletzt aktiven');
+  await chatMsg('bot', 'b1', 'Nightbot');
+  assert.ok(!(await pub()).alpacas.some((a) => a.name === 'Nightbot'), 'Bots bekommen kein Alpaka');
+
+  const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+  const redeem = async (id, userId, name, input) => {
+    const ev = redemption(id, userId, name, state.alpacaRewardId);
+    ev.event.user_input = input;
+    const before = chats().length;
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...ev }));
+    return chats().slice(before);
+  };
+  const say = await redeem('alp-1', 'a1', 'Alpha', 'Türkis');
+  assert.equal(statusOf('alp-1'), 'FULFILLED');
+  assert.match(say[0], /Alpha färbt sein Alpaka: Türkis/);
+  v = await pub();
+  assert.equal(v.alpacas.find((a) => a.name === 'Alpha').color, '#27c9c0', 'sofort sichtbar');
+  assert.equal((await db.get('alpaca-color/a1')).color, '#27c9c0', 'dauerhaft gespeichert');
+
+  const bad = await redeem('alp-2', 'a2', 'Beta', 'durchsichtig');
+  assert.equal(statusOf('alp-2'), 'CANCELED', 'Punkte zurück');
+  assert.match(bad[0], /Beta, diese Farbe kenne ich nicht/);
+  assert.equal((await db.get('alpaca-color/a2')), null);
+  assert.equal((await redeem('alp-3', 'a2', 'Beta', '')).length, 1, 'leere Eingabe: auch Hinweis');
+  assert.equal(statusOf('alp-3'), 'CANCELED');
+
+  // wer wiederkommt, behält die gekaufte Farbe
+  await db.delete('alpaca-active'); // Liste weg, die gekaufte Farbe bleibt gespeichert
+  await al.touchAlpaca('a1', 'Alpha', await getSettings(), Date.now() + 120_000);
+  assert.equal((await pub()).alpacas.find((a) => a.name === 'Alpha').color, '#27c9c0');
+
+  // nach dem Zeitfenster verschwindet das Alpaka wieder
+  const cfg = await getSettings();
+  const later = Date.now() + 120_000 + (cfg.alpacaMinutes + 1) * 60_000; // die letzte Nachricht war +2 Minuten
+  assert.deepEqual((await al.publicView(cfg, later)).alpacas, []);
+
+  await admin(adminReq('PUT', 'settings', { alpacaEnabled: false }, cookie));
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.equal((await db.get('config/state')).alpacaRewardId, undefined, 'Reward wird beim Ausschalten abgeschaltet');
+  assert.equal(rewards.find((r) => r.id === state.alpacaRewardId).is_enabled, false);
+  await db.delete('alpaca-active');
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

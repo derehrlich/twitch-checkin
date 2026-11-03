@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Alpakas</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Alpaka-Leiste als OBS-Browserquelle (z. B. 1920×160, Hintergrund bleibt durchsichtig).
+     Jede Person, die im Chat schreibt, läuft als Pixel-Alpaka am unteren Rand. Gesteuert wird im Admin (Reiter „Alpakas“).
+     ?demo  Beispiel-Alpakas   ?scale=4  Größe (1 bis 10)   ?names=0  ohne Namen */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+  #field { position: fixed; inset: 0; }
+  .alp { position: absolute; bottom: 0; will-change: transform; transition: opacity .6s; }
+  .alp.gone { opacity: 0; }
+  .alp .sprite { display: block; image-rendering: pixelated; transform-origin: 50% 100%; }
+  .alp.left .sprite { transform: scaleX(-1); }
+  .alp.pop .sprite { animation: pop .7s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+  .alp.left.pop .sprite { animation-name: popl; }
+  @keyframes popl { 0% { transform: scaleX(-1) scale(0); } 100% { transform: scaleX(-1) scale(1); } }
+  .alp .name { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 700 15px/1 var(--wordmark); color: #fff3da; text-shadow: 1px 1px 0 #2b180c, -1px 1px 0 #2b180c, 1px -1px 0 #2b180c, -1px -1px 0 #2b180c; }
+  .spark { position: absolute; width: 6px; height: 6px; background: #ffe98a; pointer-events: none; animation: spark 1s ease-out forwards; }
+  @keyframes spark { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="field"></div>
+<script>
+const params = new URLSearchParams(location.search);
+const SCALE = Math.min(10, Math.max(1, Number(params.get('scale')) || 4));
+const NAMES = params.get('names') !== '0';
+const field = document.getElementById('field');
+
+// ---- Pixel-Alpaka. Blick nach rechts. b Fell, l helles Fell, d Schatten, e Auge, n Schnauze. Der dunkle Umriss entsteht beim Zeichnen von selbst.
+// Die Beine kommen je Bild extra dazu (siehe FRAMES), dadurch läuft es.
+const SPRITE = [
+  '.................b...b.',
+  '.................b...b.',
+  '................bbblbbb',
+  '................bbebbbn',
+  '................bbbbbnn',
+  '................bbbbbbb',
+  '.................bbbbb.',
+  '.................bbblb.',
+  '.................bbbbb.',
+  '..bb.bbbbbbbbbbbbbbbb..',
+  '.bbbbbbblbbbbbbbbbbbb..',
+  '..bbbbbbbbbblbbbbbbb...',
+  '..bbblbbbbbbbbbbblbb...',
+  '..bbbbbbbbblbbbbbbbb...',
+  '...bbbbbbbbbbbbbbbbb...',
+  '....bbbbbbbbbbbbbbb....',
+  '.....dddddddddddddd....',
+];
+const SW = 23, SH = 20, PAD = 1; // Fläche des Alpakas und Rand für den Umriss
+const W = SW + 2 * PAD, H = SH + 2 * PAD;
+const LEG_X = [5, 7, 14, 16]; // hinten links, hinten rechts, vorn links, vorn rechts (je 2 Pixel breit)
+const LEG_Y = 17;
+// je Bild die Höhe jedes Beins (3 = ganz unten, 2 = angehoben); die Diagonale bewegt sich gemeinsam
+const FRAMES = [[3, 2, 2, 3], [3, 3, 3, 3], [2, 3, 3, 2], [3, 3, 3, 3]];
+const BOB = [0, 1, 0, 1]; // Körper senkt sich zwischen den Schritten
+
+// ---- Farben
+const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+const parse = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const mix = (rgb, to, t) => rgb.map((v, i) => clamp(v + (to[i] - v) * t));
+const css = (rgb) => `rgb(${rgb.join(',')})`;
+function palette(hex) {
+  const base = parse(/^#[0-9a-f]{6}$/i.test(hex) ? hex : '#d9c3a0');
+  const lum = (0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]) / 255;
+  return {
+    b: css(base),
+    l: css(mix(base, [255, 255, 255], 0.35)),
+    d: css(mix(base, [0, 0, 0], 0.22)),
+    o: css(lum < 0.2 ? mix(base, [255, 255, 255], 0.28) : mix(base, [20, 10, 5], 0.62)), // sehr dunkle Alpakas bekommen einen hellen Rand
+    e: '#1b1210',
+    n: css(mix(base, [255, 200, 190], 0.55)),
+  };
+}
+
+function draw(ctx, pal, frame) {
+  const grid = Array.from({ length: SH }, () => Array(SW).fill('.'));
+  const bob = BOB[frame];
+  SPRITE.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.' && y + bob < SH) grid[y + bob][x] = row[x]; });
+  FRAMES[frame].forEach((h, i) => {
+    for (let k = 0; k < h; k++) for (const x of [LEG_X[i], LEG_X[i] + 1]) grid[LEG_Y + k - (3 - h)][x] = 'd';
+  });
+  ctx.clearRect(0, 0, W, H);
+  const at = (x, y) => (grid[y]?.[x] ?? '.');
+  for (let y = -1; y <= SH; y++) for (let x = -1; x <= SW; x++) {
+    let c = at(x, y);
+    if (c === '.') {
+      if (at(x - 1, y) === '.' && at(x + 1, y) === '.' && at(x, y - 1) === '.' && at(x, y + 1) === '.') continue;
+      c = 'o'; // Umriss um alles, was Fell ist
+    }
+    ctx.fillStyle = pal[c]; ctx.fillRect(x + PAD, y + PAD, 1, 1);
+  }
+}
+
+// ---- Verhalten: jedes Alpaka schlendert, bleibt ab und zu stehen und dreht um
+const alpacas = new Map(); // id -> { el, ctx, pal, x, dir, speed, pause, frame, color, name }
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pw = () => W * SCALE;
+
+function spawn(a) {
+  const el = document.createElement('div');
+  el.className = 'alp pop';
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H; canvas.className = 'sprite';
+  canvas.style.width = `${W * SCALE}px`; canvas.style.height = `${H * SCALE}px`;
+  el.append(canvas);
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  nameEl.style.bottom = `${H * SCALE + 4}px`;
+  if (!NAMES) nameEl.style.display = 'none';
+  el.append(nameEl);
+  field.append(el);
+  const o = { el, ctx: canvas.getContext('2d'), nameEl, x: rnd(0, Math.max(1, innerWidth - pw())), dir: Math.random() < .5 ? -1 : 1, speed: rnd(14, 34), pause: rnd(0, 3), frame: 0, t: 0, color: null, name: '' };
+  alpacas.set(a.id, o);
+  setTimeout(() => el.classList.remove('pop'), 800);
+  return o;
+}
+
+function sparkle(o) {
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.style.left = `${o.x + pw() / 2}px`; s.style.bottom = `${H * SCALE / 2}px`;
+    const ang = (i / 10) * Math.PI * 2, d = rnd(30, 70);
+    s.style.setProperty('--dx', `${Math.cos(ang) * d}px`); s.style.setProperty('--dy', `${Math.sin(ang) * d}px`);
+    field.append(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+}
+
+function sync(list) {
+  const ids = new Set(list.map((a) => a.id));
+  for (const a of list) {
+    const o = alpacas.get(a.id) ?? spawn(a);
+    if (o.name !== a.name) { o.name = a.name; o.nameEl.textContent = a.name; }
+    if (o.color !== a.color) {
+      const first = o.color === null;
+      o.color = a.color; o.pal = palette(a.color);
+      if (!first) sparkle(o); // Farbe wurde gerade gewechselt
+      draw(o.ctx, o.pal, o.frame);
+    }
+  }
+  for (const [id, o] of alpacas) if (!ids.has(id)) {
+    alpacas.delete(id);
+    o.el.classList.add('gone');
+    setTimeout(() => o.el.remove(), 700);
+  }
+}
+
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const maxX = Math.max(0, innerWidth - pw());
+  for (const o of alpacas.values()) {
+    if (o.pause > 0) { o.pause -= dt; if (o.frame % 2) { o.frame = 1; o.t = 0; } }
+    else {
+      o.x += o.dir * o.speed * dt;
+      if (o.x <= 0) { o.x = 0; o.dir = 1; } else if (o.x >= maxX) { o.x = maxX; o.dir = -1; }
+      if (Math.random() < dt * 0.15) o.pause = rnd(1.5, 5); // bleibt kurz stehen
+      else if (Math.random() < dt * 0.08) o.dir *= -1; // dreht um
+      o.t += dt;
+      const f = Math.floor(o.t / 0.16) % 4;
+      if (f !== o.frame) { o.frame = f; if (o.pal) draw(o.ctx, o.pal, f); }
+    }
+    if (o.pause > 0 && o.frame !== 1 && o.pal) { o.frame = 1; draw(o.ctx, o.pal, 1); }
+    o.el.style.transform = `translateX(${o.x}px)`;
+    o.el.classList.toggle('left', o.dir < 0);
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// ---- Daten
+const DEMO = [
+  ['Anna', '#ff8fc0'], ['Ben', '#27c9c0'], ['Cleo', '#f1e6d0'], ['Dennis', '#a14ee8'], ['EhrlichVerwirrt', '#d9c3a0'],
+  ['Fiona', '#e03a3a'], ['Gero', '#3b3430'], ['Hanna', '#ffd93d'], ['Ivo', '#3a7bff'], ['Jule', '#3fbf5f'],
+].map(([name, color], i) => ({ id: 'd' + i, name, color }));
+
+async function poll() {
+  try {
+    if (params.has('demo')) return sync(DEMO);
+    const res = await fetch('/api/alpakas', { cache: 'no-store' });
+    if (res.ok) sync((await res.json()).alpacas ?? []);
+  } catch { /* beim nächsten Mal wieder */ }
+}
+poll();
+setInterval(poll, 5000);
+</script>
+</body>
+</html>
