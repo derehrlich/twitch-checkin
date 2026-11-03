@@ -39,6 +39,7 @@
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="sport" role="tab">Sport</button>
+      <button data-tab="alpakas" role="tab">Alpakas</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="commands" role="tab">Commands</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
@@ -149,6 +150,18 @@
         </div>
       </section>
       <div data-schema="abspann" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <!-- Alpakas -->
+    <div class="tab-panel hidden" data-panel="alpakas">
+      <section class="card">
+        <h2>Alpaka-Leiste</h2>
+        <p class="muted">In OBS (oder Meld) eine Browserquelle auf <code id="alpacaUrl"></code> anlegen, Breite wie dein Overlay (z. B. 1920), Höhe etwa 120. Der Hintergrund ist durchsichtig, die Alpakas laufen am unteren Rand. Mit <code>?scale=2</code> hinter der Adresse werden sie größer, mit <code>?scale=1</code> kleiner (Standard 1,5, ein Alpaka ist dann etwa 95 Pixel hoch).</p>
+        <div class="row">
+          <a class="btn" href="/alpakas?demo" target="_blank" rel="noopener">Vorschau mit Beispiel-Alpakas</a>
+        </div>
+      </section>
+      <div data-schema="alpakas" style="display:grid; gap:22px;"></div>
     </div>
 
     <!-- Sport -->

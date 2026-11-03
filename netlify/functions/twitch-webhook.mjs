@@ -7,6 +7,7 @@ import { handleRaid } from '../lib/raid.mjs';
 import { handleAlert } from '../lib/alerts.mjs';
 import { getBoard, handleSoundboard } from '../lib/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/entrysound.mjs';
+import { handleAlpaca } from '../lib/alpaca.mjs';
 import { handleChat } from '../lib/chat.mjs';
 import { logEvent } from '../lib/credits.mjs';
 import { ALERT_TYPES, CHAT_TYPE } from '../lib/twitch.mjs';
@@ -68,15 +69,17 @@ export default async (req) => {
     const isRescue = Boolean(state.streakRewardId) && e.reward.id === state.streakRewardId;
     const isEntryBuy = Boolean(state.entryBuyRewardId) && e.reward.id === state.entryBuyRewardId;
     const isEntryExtend = Boolean(state.entryExtendRewardId) && e.reward.id === state.entryExtendRewardId;
-    const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
-    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !board) return new Response(null, { status: 204 });
+    const isAlpaca = Boolean(state.alpacaRewardId) && e.reward.id === state.alpacaRewardId;
+    const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
+    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !board) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
     try {
-      const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward };
+      const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, user_input: e.user_input, reward: e.reward };
       const settings = await getSettings();
       if (board) await handleSoundboard(redemption, board, settings);
+      else if (isAlpaca) await handleAlpaca(redemption, settings);
       else if (isEntryBuy) await handleEntryBuy(redemption, settings);
       else if (isEntryExtend) await handleEntryExtend(redemption, settings);
       else await (isRescue ? handleRescue : isCheckout ? handleCheckout : handleRedemption)(redemption, settings);

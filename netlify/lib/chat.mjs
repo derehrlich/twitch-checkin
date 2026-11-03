@@ -7,6 +7,7 @@ import { countChat, recordChatter } from './credits.mjs';
 import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from './community.mjs';
 import { ensureAward } from './award.mjs';
+import { touchAlpaca } from './alpaca.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -72,6 +73,7 @@ export async function handleChat(e, settings) {
     await recordChatter(day, id, name);
     if (settings.chatStats) await countChat(id, name, day);
   }
+  if (settings.alpacaEnabled && !ignore.includes(String(name).toLowerCase())) await touchAlpaca(id, name, settings).catch((err) => console.warn('Alpaka fehlgeschlagen:', err.message)); // auch der Kanalinhaber bekommt eins
   if (settings.awardEnabled) await ensureAward(settings).catch((err) => console.warn('Monatsabschluss fehlgeschlagen:', err.message)); // schließt den Vormonat einmalig ab
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
