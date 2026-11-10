@@ -17,7 +17,11 @@ Es wird nichts im Router freigegeben. Der Tunnel baut die Verbindung von innen n
 - Domain bei Cloudflare mit Status „Aktiv" (z. B. `ehrlichverwirrt.de`), darunter die Adresse `wache.ehrlichverwirrt.de`.
 - Cloudflare Tunnel (`cloudflared`) auf dem NAS.
 - Backup der Netlify-Version: Admin → *Allgemein → Backup & Wiederherstellen* → „Backup herunterladen" (am besten **mit Tönen & Bildern**). **Das zuerst machen, solange Netlify noch läuft.**
-- Deine Werte aus Netlify (Site configuration → Environment variables): `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `EVENTSUB_SECRET`, `ADMIN_PASSWORD`, `LINK_SECRET`. Mit demselben `EVENTSUB_SECRET` und `LINK_SECRET` musst du am VerwirrBot nichts ändern.
+- Deine Werte: `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `EVENTSUB_SECRET`, `ADMIN_PASSWORD`, `LINK_SECRET`. Netlify zeigt als „secret" gespeicherte Werte nicht mehr an, du holst sie so:
+  - `TWITCH_CLIENT_ID`: Twitch-Entwicklerkonsole (nicht geheim). `TWITCH_CLIENT_SECRET`: dort „Neues Geheimnis" erzeugen (das alte wird dann ungültig, also das neue auch in Netlify eintragen, solange Netlify noch läuft).
+  - `EVENTSUB_SECRET`: frei ausdenken (10 bis 100 Zeichen, nur Buchstaben und Zahlen). Er muss nicht gleich bleiben, denn die Webhooks werden für die neue Adresse ohnehin neu angelegt (Admin → *Rewards & Webhooks abgleichen*).
+  - `ADMIN_PASSWORD`: neues langes Passwort.
+  - `LINK_SECRET`: aus `data/verwirrbot.env` des VerwirrBot auf dem NAS übernehmen, dann ändert sich am VerwirrBot nichts.
 
 ## Schritt 1: Image bereitstellen (einmalig)
 
