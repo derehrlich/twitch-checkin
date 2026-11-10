@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.netlify
+data
+node_modules
+extension
+docs
+test
+scripts
+*.md
