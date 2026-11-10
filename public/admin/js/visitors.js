@@ -31,12 +31,32 @@ function renderDetail() {
   $('detail').classList.toggle('hidden', !u);
   if (!u) return;
   const d = durations(u);
-  $('dName').textContent = `${u.name} – ${u.count} Besuche, Streak ${u.streak ?? 0} (Rekord ${u.record ?? 0})` + (d.n ? `, ${fmtDuration(d.total)} gesamt (Ø ${fmtDuration(d.avg)})` : '');
+  $('dName').textContent = `${u.name} – ${u.count} Besuche, Streak ${u.streak ?? 0} (Rekord ${u.record ?? 0})` + (d.n ? `, ${fmtDuration(d.total)} gesamt (Ø ${fmtDuration(d.avg)})` : '') + (u.streakImport ? `, übernommene Streak ${u.streakImport.count} bis ${u.streakImport.asOf}` : '');
   const label = (day) => { const x = u.sessions?.[day]; return x ? (x.minutes != null ? ` · ${fmtDuration(x.minutes)}` : ' · ohne Check-out') : ''; };
   $('dDays').innerHTML = [...u.days].reverse().map((day) => `<span class="chip">${esc(day)}${label(day)}<button data-day="${esc(day)}" title="Besuch entfernen">×</button></span>`).join('');
 }
 
+// Zeilen wie "Name 12", "Name, 12" oder "@Name;12" einlesen
+function parseImport(text) {
+  const rows = [], bad = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim(); if (!line) continue;
+    const m = line.match(/^@?([A-Za-z0-9_]+)\s*[,;:=\t ]\s*(\d+)$/);
+    if (m) rows.push({ name: m[1], count: Number(m[2]) }); else bad.push(line);
+  }
+  return { rows, bad };
+}
+
 export function initVisitors() {
+  $('impBtn').addEventListener('click', run(async () => {
+    const { rows, bad } = parseImport($('impRows').value);
+    if (bad.length) return toast(`Zeile nicht lesbar: ${bad[0]}`, true);
+    if (!rows.length) return toast('Bitte mindestens eine Zeile eintragen', true);
+    const res = await api('POST', 'users/streaks', { rows, asOf: $('impAsOf').value || undefined });
+    $('impOut').innerHTML = res.results.map((r) => `${r.ok ? '✓' : '✗'} ${esc(r.name)}: ${esc(r.status)}${r.created ? ' (neu angelegt)' : ''}`).join('<br>');
+    await loadUsers(); await loadStatus();
+    toast(res.results.every((r) => r.ok) ? 'Streaks übernommen ✓' : 'Teilweise übernommen, siehe Liste', !res.results.some((r) => r.ok));
+  }));
   $('sort').addEventListener('change', renderUsers);
   $('search').addEventListener('input', renderUsers);
   $('users').addEventListener('click', (e) => { const tr = e.target.closest('tr.user'); if (tr) { selected = tr.dataset.id; renderDetail(); $('detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } });

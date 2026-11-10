@@ -17,19 +17,25 @@ export async function getStreamDays() {
 /**
  * Streak über alle Stream-Tage. Ein verpasster Stream wird bis zur Schonfrist (grace) verziehen, danach reißt die Streak.
  * Gerettete Tage (saved) überbrücken eine Lücke, zählen aber nicht mit. Der heutige Tag ist erst nach seinem Ende ein Fehltag.
+ * Eine von Hand übernommene Streak (streakImport = { count, asOf }, z. B. von Twitch) setzt die Zählung auf `count`, und zwar
+ * bis einschließlich dem Stream-Tag `asOf`. Danach läuft alles normal weiter: Besuche zählen dazu, Fehltage reißen sie.
  * Rückgabe: aktuelle Streak und persönlicher Rekord.
  */
-export function computeStreak({ days, saved = [] }, streamDays, today, grace) {
+export function computeStreak({ days, saved = [], streakImport = null }, streamDays, today, grace) {
   const attended = new Set(days);
   const bridged = new Set(saved);
   let current = 0, record = 0, misses = 0;
+  let imported = streakImport?.count > 0 && streakImport.asOf <= today ? streakImport : null;
+  const applyImport = () => { current = imported.count; record = Math.max(record, current); misses = 0; imported = null; };
   for (const d of streamDays) {
     if (d > today) break;
+    if (imported && d > imported.asOf) applyImport(); // der Stand liegt vor diesem Tag: ab hier zählt die übernommene Streak
     if (attended.has(d)) { current++; misses = 0; record = Math.max(record, current); }
     else if (bridged.has(d)) misses = 0;
     else if (d === today) continue;
     else if (++misses > grace) current = 0;
   }
+  if (imported) applyImport(); // der Stand liegt am letzten bekannten Stream-Tag oder danach
   return { current, record };
 }
 

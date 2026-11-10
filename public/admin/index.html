@@ -326,6 +326,17 @@
           </div>
         </div>
       </section>
+      <section class="card">
+        <h2>Streaks übernehmen</h2>
+        <p class="muted">Trägt bestehende Streaks von Hand ein, zum Beispiel aus Twitch. Pro Zeile ein Zuschauer: Twitch-Name, dann die Streak, etwa <code>Zuschauer1 12</code>. Die Zahl gilt bis einschließlich dem gewählten Stream-Tag (leer = heute). Danach läuft die Streak normal weiter: Jeder Check-in zählt eins dazu, verpasste Streams reißen sie wie gewohnt. Unbekannte Zuschauer werden angelegt (ohne Besuche), eine <code>0</code> nimmt die übernommene Streak wieder weg. Besuche und Monatspunkte ändern sich nicht.</p>
+        <label for="impRows">Zuschauer und Streak</label>
+        <textarea id="impRows" rows="6" placeholder="Zuschauer1 12&#10;Zuschauer2, 7"></textarea>
+        <div class="row">
+          <div style="flex:0 1 220px"><label for="impAsOf">Stand (Stream-Tag)</label><input id="impAsOf" type="date"></div>
+          <button id="impBtn">Übernehmen</button>
+        </div>
+        <div id="impOut" class="muted" style="margin-top:10px"></div>
+      </section>
     </div>
 
     <!-- Tests -->

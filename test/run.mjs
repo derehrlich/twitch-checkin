@@ -579,6 +579,16 @@ await test('Streak: Schonfrist verzeiht einen verpassten Stream, zwei reißen si
   assert.deepEqual(run([D(1), D(3)], [], D(3), 0), { current: 1, record: 1 }, 'ohne Schonfrist reißt jeder verpasste Stream');
 });
 
+await test('Streak übernehmen: gilt bis zum Stand, danach zählen Besuche weiter und Fehltage reißen sie', async () => {
+  const run = (days, streakImport, today, grace = 1) => computeStreak({ days, saved: [], streakImport }, allDays, today, grace);
+  assert.deepEqual(run([D(6), D(7)], { count: 10, asOf: D(5) }, D(7)), { current: 12, record: 12 }, 'Import bis D5, dann zwei Besuche');
+  assert.deepEqual(run([], { count: 10, asOf: D(7) }, D(7)), { current: 10, record: 10 }, 'Stand heute ohne weitere Besuche');
+  assert.deepEqual(run([D(6)], { count: 10, asOf: D(5) }, D(9)), { current: 0, record: 11 }, 'zwei Fehltage reißen sie, Rekord bleibt');
+  assert.deepEqual(run([D(1), D(2)], { count: 5, asOf: D(3) }, D(4)), { current: 5, record: 5 }, 'ersetzt die alte Zählung bis zum Stand');
+  assert.deepEqual(run([D(1), D(2)], { count: 5, asOf: D(8) }, D(7)), { current: 0, record: 2 }, 'Stand in der Zukunft wird ignoriert');
+  assert.deepEqual(run([D(6)], { count: 0, asOf: D(5) }, D(6)), { current: 1, record: 1 }, 'Streak 0 ändert nichts');
+});
+
 await test('Streak-Retter: findet nur die jüngste, rettbare Lücke', async () => {
   const f = (days, saved, today, max = 3) => findRescue({ days, saved }, allDays, today, 1, max);
   assert.deepEqual(f([D(1), D(2), D(3), D(6), D(7)], [], D(8)), { status: 'ok', days: [D(4), D(5)] });
@@ -646,6 +656,30 @@ await test('Streak-Retter über den Webhook: nutzt die Reward-ID aus dem Setup',
   assert.equal((await webhook(signed('notification', redemption('hook-s1', '51', 'Neuling', 'reward3')))).status, 204);
   assert.ok(calls.slice(before).some((c) => c.path.endsWith('/redemptions') && c.body.status === 'CANCELED'), 'nicht nötig: Punkte zurück');
   assert.equal(await db.get('seen/hook-s1') !== null, true);
+});
+
+await test('Admin: Streaks übernehmen für bekannte und neue Zuschauer, Prüfungen, wieder entfernen', async () => {
+  const before = await (await admin(adminReq('GET', 'users', null, cookie))).json();
+  const known = before[0];
+  const post = (body) => admin(adminReq('POST', 'users/streaks', body, cookie));
+  assert.equal((await post({ rows: [{ name: 'x', count: 1 }], asOf: '2999-01-01' })).status, 400, 'Stand in der Zukunft');
+  assert.equal((await post({ rows: [] })).status, 400);
+  const res = await (await post({ rows: [{ name: `@${known.name}`, count: 42 }, { name: 'neu_zuschauer', count: 7 }, { name: 'ungültig!', count: 3 }, { name: 'abc', count: -1 }, { name: 'abc', count: 1.5 }] })).json();
+  assert.deepEqual(res.results.map((r) => r.ok), [true, true, false, false, false]);
+  assert.equal(res.results[1].created, true, 'neuer Zuschauer wird angelegt');
+  const after = await (await admin(adminReq('GET', 'users', null, cookie))).json();
+  const a = after.find((u) => u.id === known.id);
+  assert.equal(a.streak, 42); assert.ok(a.record >= 42); assert.equal(a.count, known.count, 'Besuche bleiben');
+  assert.equal(after.find((u) => u.id === '777').streak, 7);
+  assert.equal(after.length, before.length + 1);
+  // wieder entfernen
+  const off = await (await post({ rows: [{ name: known.name, count: 0 }, { name: 'neu_zuschauer', count: 0 }] })).json();
+  assert.equal(off.results[0].ok, true);
+  assert.equal(off.results[1].ok, true, 'wird auch gefunden, wenn der gespeicherte Anzeigename vom getippten Namen abweicht (über die Twitch-ID)');
+  await db.delete('user/777');
+  const clean = await (await admin(adminReq('GET', 'users', null, cookie))).json();
+  assert.equal(clean.length, before.length);
+  assert.equal(clean.find((u) => u.id === known.id).streak, before[0].streak, 'Streak wie vorher');
 });
 
 await test('Admin: Nutzerliste zeigt Streak und Rekord, Einstellungen bereinigen Meilenstein-Stufen', async () => {
