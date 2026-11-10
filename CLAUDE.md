@@ -14,6 +14,12 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 - **Reihenfolge beim Ausliefern:** erst die Stadtwache (Merge in `main`, Netlify deployt automatisch), dann den VerwirrBot einspielen (ZIP im Dashboard unter System → Update einspielen). Die ZIP baut die GitHub Action im Bot-Repo bei jedem Stand von `main`.
 - **Was ich nicht von hier aus kann:** Den Bot auf dem NAS einspielen (macht Marcel im Dashboard) und die Live-Seiten per `curl` prüfen (Proxy blockt). Den Deploy der Stadtwache prüfe ich mit dem Netlify-Werkzeug (Projekt `stadtwache`, `get-project` → `currentDeploy`, `commit_ref` mit `main` vergleichen).
 
+## Betrieb zu Hause (CasaOS)
+- `server.mjs` + `Dockerfile` + `docker-compose.yml` lassen dieselben Functions auf Marcels NAS laufen (Dateispeicher in `/data`, Port 3000). Die Action `.github/workflows/docker-image.yml` baut bei jedem Stand von `main` das Image `ghcr.io/derehrlich/twitch-checkin`. Schritt-für-Schritt-Anleitung für Marcel: `docs/casaos.md`.
+- Geplante Adresse: `https://wache.ehrlichverwirrt.de` über einen Cloudflare Tunnel (Domain `ehrlichverwirrt.de`, DNS bei Cloudflare). Cloudflare Access nur vor `/admin` und `/api/admin`, **nie** vor Webhook, Auth, Overlay, Rangliste oder `/api/community/*`.
+- Neue Functions brauchen nichts am Server: `export const config = { path: ... }` genügt, `server.mjs` findet sie. Neue Weiterleitungen in `netlify.toml` werden ebenfalls übernommen (nur `from`/`to`/`status`).
+- Test: `npm test` führt auch `test/server.mjs` aus.
+
 ## Ausliefern
 - Branch → Pull Request → Merge in `main` → Netlify baut und deployt automatisch (Seite `stadtwache.netlify.app`, Netlify-Projekt `stadtwache`). Nie ohne Marcels Auftrag mergen.
 - Neue Funktionen sind standardmäßig **ausgeschaltet** und werden im Admin eingeschaltet.

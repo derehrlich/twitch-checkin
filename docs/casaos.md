@@ -1,61 +1,74 @@
-# Stadtwache auf dem eigenen CasaOS-Server (Vorbereitung)
+# Stadtwache auf dem eigenen CasaOS-Server
 
-Stand heute läuft die Stadtwache auf Netlify (Functions + Netlify Blobs). Dieses Dokument sammelt, was für den Betrieb auf einem CasaOS-Server zu klären ist und was du vorbereiten kannst. **Es ist noch kein fertiges CasaOS-Paket**, siehe „Offene Punkte“.
+Die Stadtwache läuft wahlweise auf Netlify **oder** zu Hause auf dem NAS. Der Code ist derselbe: `server.mjs` lädt die vorhandenen Functions, liefert `public/` aus und speichert die Daten in einem Ordner (`/data`). Gebaut wird ein Docker-Image (`Dockerfile`), das die GitHub Action `docker-image.yml` nach `ghcr.io/derehrlich/twitch-checkin` legt.
 
-## Was sich ändert, wenn der Bot bei dir zu Hause läuft
+Warum zu Hause: Das Overlay fragt alle 3 Sekunden nach. Auf Netlify zählt jede Abfrage gegen das Kontingent, zu Hause kostet sie nichts.
 
-| Thema | Netlify heute | CasaOS |
-|---|---|---|
-| Ausführung | Netlify Functions | eigener Node-Prozess im Docker-Container (noch zu bauen) |
-| Daten | Netlify Blobs | Dateien in einem Ordner (`LOCAL_STORE_DIR`, wird bereits von den Tests genutzt) |
-| Erreichbarkeit | automatisch öffentlich mit HTTPS | **musst du selbst öffentlich machen**, siehe unten |
-| Overlay-Abfragen alle 3 s | zählen gegen das Function-Kontingent | kostenlos |
-| Updates | automatisch bei jedem Push | Container neu bauen oder Image aktualisieren |
+## Wie alles zusammenhängt
 
-## Das Wichtigste: Twitch muss deinen Server erreichen
+```
+Twitch / OBS / Zuschauer ──https──> Cloudflare ──Tunnel──> cloudflared (NAS) ──> Stadtwache (Port 3000)
+```
 
-Twitch schickt Check-ins, Raids, Follows usw. als Webhook (EventSub) an deinen Bot. Dafür gilt:
+Es wird nichts im Router freigegeben. Der Tunnel baut die Verbindung von innen nach außen auf.
 
-- Die Adresse muss **öffentlich per HTTPS auf Port 443** erreichbar sein. Eine reine LAN-Adresse wie `http://192.168.x.x` reicht nicht.
-- Dieselbe öffentliche Adresse brauchst du als **OAuth Redirect URL** in der Twitch-App (`https://DEINE-ADRESSE/api/auth/callback`). Twitch erlaubt `http` nur für `localhost`.
-- Sie muss in der Umgebungsvariable `SITE_URL` stehen.
+## Was du vorher brauchst
 
-Drei übliche Wege:
+- Domain bei Cloudflare mit Status „Aktiv" (z. B. `ehrlichverwirrt.de`), darunter die Adresse `wache.ehrlichverwirrt.de`.
+- Cloudflare Tunnel (`cloudflared`) auf dem NAS.
+- Backup der Netlify-Version: Admin → *Allgemein → Backup & Wiederherstellen* → „Backup herunterladen" (am besten **mit Tönen & Bildern**). **Das zuerst machen, solange Netlify noch läuft.**
+- Deine Werte: `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `EVENTSUB_SECRET`, `ADMIN_PASSWORD`, `LINK_SECRET`. Netlify zeigt als „secret" gespeicherte Werte nicht mehr an, du holst sie so:
+  - `TWITCH_CLIENT_ID`: Twitch-Entwicklerkonsole (nicht geheim). `TWITCH_CLIENT_SECRET`: dort „Neues Geheimnis" erzeugen (das alte wird dann ungültig, also das neue auch in Netlify eintragen, solange Netlify noch läuft).
+  - `EVENTSUB_SECRET`: frei ausdenken (10 bis 100 Zeichen, nur Buchstaben und Zahlen). Er muss nicht gleich bleiben, denn die Webhooks werden für die neue Adresse ohnehin neu angelegt (Admin → *Rewards & Webhooks abgleichen*).
+  - `ADMIN_PASSWORD`: neues langes Passwort.
+  - `LINK_SECRET`: aus `data/verwirrbot.env` des VerwirrBot auf dem NAS übernehmen, dann ändert sich am VerwirrBot nichts.
 
-1. **Cloudflare Tunnel** (empfohlen): kostenlos, kein Portfreigabe, eigene Domain nötig. `cloudflared` gibt es als CasaOS-App oder als Container. Der Tunnel zeigt auf den Port des Bots.
-2. **Tailscale Funnel**: kostenlos, kein eigener Domainname nötig (`*.ts.net`), ebenfalls ohne Portfreigabe.
-3. **Reverse Proxy + DynDNS + Portfreigabe 443** (z. B. Nginx Proxy Manager, bei CasaOS als App verfügbar): volle Kontrolle, aber du musst Router, DynDNS und Zertifikat selbst pflegen.
+## Schritt 1: Image bereitstellen (einmalig)
 
-Das **OBS-Overlay** kann auch über die LAN-Adresse laufen (Browserquelle `http://CASAOS-IP:PORT/overlay`), die öffentliche Adresse ist aber die sichere Wahl, solange nicht getestet ist, ob der eingebettete Twitch-Clip-Player (Raid-Clips) mit einer reinen IP-Adresse funktioniert.
+1. Den Branch in `main` mergen (oder in GitHub unter *Actions → Docker-Image → Run workflow* den Branch von Hand bauen lassen).
+2. Nach dem ersten Lauf: GitHub → dein Profil → *Packages* → `twitch-checkin` → *Package settings* → **Change visibility → Public**. Sonst kann CasaOS das Image nicht laden.
 
-## Das kannst du schon jetzt vorbereiten
+## Schritt 2: In CasaOS installieren
 
-1. **Backup ziehen**: Admin → *Allgemein → Backup & Wiederherstellen* → „Backup herunterladen“ (bei Bedarf „mit Tönen & Bildern“). Das ist dein Umzugspaket: Besucher, Streaks, Einstellungen, Soundboard, Raid-Zähler.
-2. **Zugang klären**: Domain bzw. Tunnel-Adresse festlegen (siehe oben). Daran hängen `SITE_URL` und die Twitch-Redirect-URL.
-3. **Ordner auf dem Server anlegen**, z. B. `/DATA/AppData/stadtwache/data` für die Daten. Ihn solltest du in dein CasaOS-Backup aufnehmen.
-4. **Umgebungsvariablen notieren** (dieselben wie bei Netlify):
-   - `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`
-   - `EVENTSUB_SECRET` (10–100 Zeichen)
-   - `ADMIN_PASSWORD` (lang wählen)
-   - `SITE_URL` (die öffentliche Adresse, ohne Slash am Ende)
-   - `LOCAL_STORE_DIR` (Pfad im Container, z. B. `/data`)
-5. **Twitch-App ergänzen** (<https://dev.twitch.tv/console/apps>): die neue Redirect URL zusätzlich eintragen. Die alte von Netlify kann vorerst bleiben.
+1. CasaOS → App-Store → **Benutzerdefinierte App installieren** (oben rechts) → Compose-Datei einfügen (Inhalt von `docker-compose.yml`).
+2. Die Werte `HIER_…` ersetzen und `SITE_URL` auf deine Adresse stellen (mit `https://`, ohne Schrägstrich am Ende).
+3. Installieren. Die Daten liegen danach in `/DATA/AppData/stadtwache/data`. Diesen Ordner **nie überschreiben** und in dein NAS-Backup aufnehmen.
+4. Test im Heimnetz: `http://192.168.178.144:3000/admin/` öffnen und mit dem Admin-Passwort anmelden.
 
-## Umzug in der Praxis (wenn der Server steht)
+## Schritt 3: Daten übernehmen
 
-1. Auf dem Server starten, Admin öffnen, Backup einspielen (*Allgemein → Wiederherstellen*).
-2. **Mit Twitch verbinden** (Tokens werden aus Sicherheitsgründen nicht mitgesichert) und **Rewards & Webhooks abgleichen**. Der Status oben muss grün sein.
-3. OBS-Browserquelle auf die neue Overlay-Adresse umstellen.
-4. Erst danach die Netlify-Seite abschalten, damit Twitch-Ereignisse nicht an zwei Stellen landen und kein Check-in doppelt gezählt wird.
+1. Im neuen Admin: *Allgemein → Backup & Wiederherstellen → Wiederherstellen* (die Datei von Netlify).
+2. **Mit Twitch verbinden.** Tokens sind nie im Backup. Das geht erst, wenn die Redirect-URL aus Schritt 4 in der Twitch-App steht.
 
-## Offene Punkte
+## Schritt 4: Tunnel und Twitch
 
-Damit der Bot wirklich auf CasaOS läuft, fehlt noch:
+1. Cloudflare → Zero Trust → Netzwerke → Tunnels → dein Tunnel → *Public Hostname* hinzufügen:
+   - Subdomain `wache`, Domain `ehrlichverwirrt.de`
+   - Typ `HTTP`, URL `192.168.178.144:3000`
+2. Twitch-Entwicklerkonsole (<https://dev.twitch.tv/console/apps>) → deine App → **OAuth Redirect URL** ergänzen: `https://wache.ehrlichverwirrt.de/api/auth/callback`. Die alte Netlify-Adresse kann vorerst stehen bleiben.
+3. Admin (jetzt unter der neuen Adresse) → mit Twitch verbinden → **Rewards & Webhooks abgleichen**. Der Status oben muss grün sein.
+4. OBS: Browserquellen auf die neue Adresse umstellen (`https://wache.ehrlichverwirrt.de/overlay` usw.). Das Twitch-Panel (Erweiterung) ebenfalls, falls es die Adresse enthält.
+5. **VerwirrBot-Dashboard:** Die Adresse der Stadtwache auf die neue ändern.
 
-- **Ein kleiner Node-Server**, der die vorhandenen Functions (`netlify/functions/*.mjs`, alle im Format `Request → Response`) unter ihren Pfaden ausliefert und `public/` bereitstellt. Die Datenhaltung ist dank `LOCAL_STORE_DIR` schon vorbereitet.
-- **Dockerfile und CasaOS-Compose-Datei** (Port, Volume, Umgebungsvariablen).
-- Ein Test, dass Overlay (inkl. Clip-Player) und Webhooks über die gewählte Adresse laufen.
+## Schritt 5: Netlify abschalten
 
-Alternative ohne eigenen Server-Code: `npx netlify dev` in einem Container. Das ist aber ein Entwicklungswerkzeug und für den Dauerbetrieb nicht ideal.
+Erst wenn alles läuft und ein Test-Check-in angekommen ist: Netlify-Seite pausieren oder löschen. Läuft beides gleichzeitig, wird ein Ereignis an zwei Orte geliefert und ein Check-in könnte doppelt gezählt werden.
 
-Wenn du dich für einen Weg zur Erreichbarkeit entschieden hast (Cloudflare Tunnel, Tailscale oder Reverse Proxy), kann der Server-Teil gebaut werden.
+## Admin-Bereich zusätzlich schützen (Cloudflare Access)
+
+Cloudflare → Zero Trust → Access → Anwendungen → *Selbst gehostet*: Anwendung für `wache.ehrlichverwirrt.de` mit den Pfaden **`/admin`** und **`/api/admin`**, Regel „Erlauben, wenn E-Mail = deine Adresse". Alles andere **nicht** in die Regel aufnehmen, sonst brechen Twitch-Webhooks (`/api/twitch-webhook`), Anmeldung (`/api/auth/*`), Overlay, Rangliste und der VerwirrBot (`/api/community/*`).
+
+## Betrieb
+
+- **Update:** Nach jedem Merge in `main` baut GitHub ein neues Image. In CasaOS die App neu erstellen bzw. das Image neu laden (oder später Watchtower einsetzen). Die Daten bleiben, sie liegen im Ordner `data`.
+- **Server war aus:** Nach einem längeren Ausfall kann Twitch die Webhooks abgeschaltet haben. Admin → **Rewards & Webhooks abgleichen**.
+- **Gesundheit:** `/healthz` antwortet mit `ok`; Docker prüft das selbst.
+- **Sicherung:** Der Ordner `/DATA/AppData/stadtwache/data` enthält auch die Twitch-Tokens (Dateirechte nur für den Besitzer). Nicht öffentlich teilen. Das Admin-Backup enthält sie nicht.
+
+## Lokal ausprobieren (Entwickler)
+
+```
+npm ci
+ADMIN_PASSWORD=test SITE_URL=http://localhost:3000 npm start   # Daten in ./data
+npm test
+```

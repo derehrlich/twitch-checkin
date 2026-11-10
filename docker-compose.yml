@@ -1,0 +1,55 @@
+# Stadtwache auf CasaOS. In CasaOS: App-Store → „Benutzerdefinierte App installieren" → diese Datei einfügen.
+# Anleitung: docs/casaos.md. Die Werte mit „HIER_…" vorher durch deine eigenen ersetzen (oder danach in der App unter „Einstellungen").
+name: stadtwache
+services:
+  stadtwache:
+    image: ghcr.io/derehrlich/twitch-checkin:latest
+    container_name: stadtwache
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hier liegen alle Daten (Besucher, Einstellungen, Töne). Dieser Ordner kommt ins Backup und wird nie überschrieben.
+      - /DATA/AppData/stadtwache/data:/data
+    environment:
+      LOCAL_STORE_DIR: /data
+      TZ: Europe/Berlin
+      # Von https://dev.twitch.tv/console/apps
+      TWITCH_CLIENT_ID: HIER_CLIENT_ID
+      TWITCH_CLIENT_SECRET: HIER_CLIENT_SECRET
+      # 10 bis 100 Zeichen, frei gewählt (derselbe Wert wie bisher bei Netlify, sonst müssen die Webhooks neu angelegt werden)
+      EVENTSUB_SECRET: HIER_EVENTSUB_GEHEIMWORT
+      # Langes Passwort für den Admin-Bereich
+      ADMIN_PASSWORD: HIER_ADMIN_PASSWORT
+      # Öffentliche Adresse mit https, ohne Schrägstrich am Ende
+      SITE_URL: https://wache.ehrlichverwirrt.de
+      # Gemeinsames Geheimwort mit dem VerwirrBot (wie bisher in Netlify und in verwirrbot.env)
+      LINK_SECRET: HIER_LINK_SECRET
+    # Nur nötig, was die Stadtwache wirklich braucht
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+x-casaos:
+  architectures:
+    - amd64
+  main: stadtwache
+  author: Marcel Ehrlich
+  category: Twitch
+  description:
+    de_de: Stadtwache, der Twitch-Bot mit Check-in, Streak, Alerts, Soundboard und Community-Rangliste
+    en_us: Stadtwache, the Twitch bot with check-in, streak, alerts, soundboard and community leaderboard
+  title:
+    custom: Stadtwache
+  port_map: "3000"
+  index: /admin/

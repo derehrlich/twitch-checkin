@@ -181,7 +181,7 @@ Im Admin unter *Allgemein → Backup & Wiederherstellen* lädst du eine Sicherun
 
 ## Betrieb auf dem eigenen Server
 
-Vorbereitende Infos für CasaOS (Erreichbarkeit für Twitch, Umzug, offene Punkte) stehen in [`docs/casaos.md`](docs/casaos.md).
+Betrieb zu Hause auf CasaOS (Docker-Image, Tunnel, Umzug von Netlify) steht in [`docs/casaos.md`](docs/casaos.md).
 
 ## Chat-Befehle, Abspann und Rangliste
 
