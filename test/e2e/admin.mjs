@@ -152,6 +152,15 @@ await page.waitForSelector('#detail:visible'); assert.match(await page.locator('
 await page.fill('#addDay', '2030-01-05'); await page.click('#addDayBtn'); await page.waitForFunction(() => document.getElementById('dName').innerText.includes('3 Besuche'));
 await page.click('#dDays button[data-day="2030-01-05"]', { trial: true }).catch(() => {}); ok('Besucher: Besuch nachtragen');
 
+// Streaks übernehmen: Stammgast bekommt Streak 30, ein Tippfehler wird abgelehnt, 0 nimmt sie wieder weg
+await page.fill('#impRows', 'Stammgast 30'); await page.click('#impBtn');
+await page.waitForFunction(() => document.getElementById('impOut').innerText.includes('Streak 30 bis'));
+await page.waitForFunction(() => [...document.querySelectorAll('#users tr')].some((r) => r.innerText.includes('Stammgast') && r.innerText.includes('30 (30)')));
+await page.fill('#impRows', 'kaputt'); await page.click('#impBtn');
+await page.waitForFunction(() => document.querySelector('.toast, #toast')?.innerText.includes('nicht lesbar'));
+await page.fill('#impRows', 'Stammgast 0'); await page.click('#impBtn');
+await page.waitForFunction(() => document.getElementById('impOut').innerText.includes('entfernt')); ok('Besucher: Streaks übernehmen und wieder entfernen');
+
 // Raids: Übersicht und Mehrfach-Eintrag
 await page.click('.tabs button[data-tab="raids"]'); await page.waitForSelector('#raidList');
 await page.fill('#raidBulk', 'raiderin 4\nzweite 2'); await page.click('#raidBulkBtn');

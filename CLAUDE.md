@@ -36,7 +36,7 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 105 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 107 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
@@ -44,3 +44,4 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Chat-Nachrichten dürfen höchstens 500 Zeichen haben (wird gekürzt).
 - Ein ewiger Einlaufsound hat `validUntil` 2999-12-31 und `permanent: true`; `fmtDate` zeigt „unbegrenzt“.
 - Neu gezogene Gewinner haben eine eigene Frist (`winner.deadline`), die Auswahl-Frist gilt also je Gewinner.
+- Streaks werden nicht gespeichert, sondern in `computeStreak` (`netlify/lib/streak.mjs`) aus den Besuchstagen berechnet. Von Hand übernommene Streaks (Admin → Besucher → „Streaks übernehmen“, `POST /api/admin/users/streaks`) liegen als `user.streakImport = { count, asOf }` am Nutzer und werden dort mit eingerechnet, nicht in den Besuchen.
