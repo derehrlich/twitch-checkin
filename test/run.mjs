@@ -2173,5 +2173,30 @@ await test('Auto-Shoutout: nur Listen-Namen, einmal pro Stream-Tag', async () =>
   assert.equal(await autoShoutout(ev('Stammi'), await getSettings(), new Date(Date.now() + 86_400_000 * 2)), false, 'ausgeschaltet');
 });
 
+await test('Einstellungen: Schema ist die einzige Quelle (Standardwerte, Grenzen, Sonderregeln)', async () => {
+  const { sanitize, DEFAULTS } = await import('../netlify/lib/settings.mjs');
+  const { SCHEMA, SYNC_KEYS } = await import('../public/admin/js/schema.js');
+  const items = Object.values(SCHEMA).flat().flatMap((g) => g.items);
+  const ids = items.map((i) => i.id);
+  assert.equal(new Set(ids).size, ids.length, 'jede Einstellung nur einmal im Schema');
+  for (const i of items) {
+    assert.ok(i.def !== undefined, `${i.id}: Standardwert fehlt`);
+    assert.equal(DEFAULTS[i.id], i.def);
+    if (i.type === 'number') assert.ok(Number.isFinite(i.attrs.min) && Number.isFinite(i.attrs.max), `${i.id}: min und max fehlen`);
+    if (i.type === 'text' && !i.attrs.kind) assert.ok(i.attrs.maxlength, `${i.id}: maxlength fehlt`);
+    // der eigene Standardwert muss die Prüfung bestehen (Leerer Text nur, wo erlaubt)
+    const back = sanitize({ [i.id]: i.def });
+    if (i.def === '' && !i.attrs.empty) assert.deepEqual(back, {}); else assert.deepEqual(back, { [i.id]: i.def }, `${i.id}: Standardwert besteht die eigene Prüfung nicht`);
+  }
+  for (const k of SYNC_KEYS) assert.ok(ids.includes(k), `SYNC_KEYS: ${k} gibt es nicht`);
+  // Grenzen, Sonderregeln, Unbekanntes
+  assert.deepEqual(sanitize({ rewardCost: 99_999_999, dayRolloverHour: -4, volume: 0.35, duration: '7000' }), { rewardCost: 1_000_000, dayRolloverHour: 0, volume: 0.35, duration: 7000 });
+  assert.deepEqual(sanitize({ rewardCost: '', rewardTitle: '   ', chatEnabled: 'ja', unbekannt: 1 }), {});
+  assert.deepEqual(sanitize({ soCommand: ' !SO ', quoteCommand: 'ohne', timezone: 'Europe/Paris' }), { soCommand: '!so', timezone: 'Europe/Paris' });
+  assert.deepEqual(sanitize({ timezone: 'Mars/Olympus', milestoneLevels: '5, 10,x,20' }), { milestoneLevels: '5,10,20' });
+  assert.equal(sanitize({ followMessage: '' }).followMessage, '', 'Schild-Nachricht darf leer sein');
+  assert.equal(sanitize({ followTitle: 'x'.repeat(200) }).followTitle.length, 60);
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);
