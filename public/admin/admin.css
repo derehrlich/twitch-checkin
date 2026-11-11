@@ -73,3 +73,8 @@ details summary { cursor: pointer; }
   .brand img { display: none; }
   .brand h1 { font-size: 1.05rem; }
 }
+
+/* Überschriften innerhalb eines Reiters (z. B. Belohnungen) und kurzer Einleitungstext */
+.tab-panel h2.part { margin: 14px 0 -6px; font-size: 1.25rem; color: var(--gelb); border-bottom: 1px solid var(--rand); padding-bottom: 6px; }
+.tab-panel h2.part:first-of-type { margin-top: 0; }
+.tab-panel .intro { margin: 0; }

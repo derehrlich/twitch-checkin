@@ -1,4 +1,4 @@
-// Update-Knopf im Admin (Reiter „Allgemein“): zeigt die laufende Version und bittet Watchtower, nach einem neuen Image zu schauen.
+// Update-Knopf im Admin (Reiter „System“): zeigt die laufende Version und bittet Watchtower, nach einem neuen Image zu schauen.
 // Watchtower (eigene App in CasaOS, docker-compose.watchtower.yml) lädt es bei Bedarf und startet die Stadtwache neu.
 //   GET  /api/admin/update   { commit, builtAt, configured }
 //   POST /api/admin/update   stößt Watchtower an

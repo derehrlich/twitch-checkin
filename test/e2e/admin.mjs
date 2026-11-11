@@ -71,18 +71,18 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button').count(), 15);
+assert.equal(await page.locator('.tabs button').count(), 8);
 const visiblePanels = async () => page.locator('.tab-panel:visible').evaluateAll((els) => els.map((e) => e.dataset.panel));
 assert.deepEqual(await visiblePanels(), ['start']);
 await page.waitForFunction(() => document.querySelectorAll('#checks .check').length >= 5);
 const checks = await page.locator('#checks').innerText(); assert.match(checks, /Mit Twitch verbunden als streamerin/);
 assert.match(await page.inputValue('#overlayUrl'), /\/overlay$/); ok('Start: Status und OBS-Adresse');
-for (const tab of ['checkin', 'alerts', 'raids', 'soundboard', 'medien', 'besucher', 'tests', 'allgemein']) {
+for (const tab of ['zuschauer', 'ereignisse', 'chat', 'belohnungen', 'overlays', 'medien', 'system']) {
   await page.click(`.tabs button[data-tab="${tab}"]`); assert.deepEqual(await visiblePanels(), [tab]); assert.equal(await page.evaluate(() => location.hash), '#' + tab);
 }
-ok('alle 9 Reiter schalten um und setzen die Adresse (#reiter)');
+ok('alle 8 Reiter schalten um und setzen die Adresse (#reiter)');
 await page.goto('http://localhost:8092/admin/#alerts'); await page.waitForSelector('#app:visible');
-assert.deepEqual(await visiblePanels(), ['alerts']); ok('Direktlink #alerts öffnet den Reiter');
+assert.deepEqual(await visiblePanels(), ['ereignisse']); ok('Alter Direktlink #alerts öffnet den neuen Reiter Twitch-Ereignisse');
 
 // 3. Einstellungen: Formulare aus dem Schema, Änderung -> Speichern-Leiste, Reiter-Markierung, Speichern, Abgleich-Hinweis
 const ids = await page.evaluate(() => [...document.querySelectorAll('[data-setting]')].map((e) => e.id));
@@ -90,7 +90,7 @@ assert.ok(ids.length > 60, 'Felder: ' + ids.length); assert.equal(new Set(ids).s
 assert.equal(await page.locator('#savebar').isHidden(), true);
 await page.check('#alertsEnabled'); await page.fill('#followTitle', 'Willkommen!');
 assert.equal(await page.locator('#savebar').isVisible(), true);
-assert.equal(await page.locator('.tabs button[data-tab="alerts"]').evaluate((e) => e.classList.contains('dirty')), true); ok('Änderung zeigt die Speichern-Leiste und markiert den Reiter');
+assert.equal(await page.locator('.tabs button[data-tab="ereignisse"]').evaluate((e) => e.classList.contains('dirty')), true); ok('Änderung zeigt die Speichern-Leiste und markiert den Reiter');
 await page.click('#discard'); assert.equal(await page.isChecked('#alertsEnabled'), false); assert.equal(await page.inputValue('#followTitle'), 'Neuer Follower!');
 assert.equal(await page.locator('#savebar').isHidden(), true); ok('Verwerfen stellt den gespeicherten Stand wieder her');
 await page.check('#alertsEnabled'); await page.fill('#followTitle', 'Willkommen!'); await page.click('#save');
@@ -99,24 +99,24 @@ assert.equal(await page.locator('#syncHint').isVisible(), true); ok('Speichern k
 await page.reload(); await page.waitForSelector('#app:visible');
 assert.equal(await page.isChecked('#alertsEnabled'), true); assert.equal(await page.inputValue('#followTitle'), 'Willkommen!'); ok('Einstellungen sind nach dem Neuladen noch da');
 // Vorschau
-await page.click('.tabs button[data-tab="checkin"]'); await page.fill('#chatTemplate', 'Hi {user} #{count} 🔥{streak}');
+await page.click('.tabs button[data-tab="zuschauer"]'); await page.fill('#chatTemplate', 'Hi {user} #{count} 🔥{streak}');
 assert.match(await page.locator('[data-preview="chatTemplate"]').textContent(), /Hi Max #7 🔥5/); ok('Vorschau der Chatnachricht aktualisiert sich');
 await page.click('#discard');
 
 // 4. Abgleichen
-await page.click('.tabs button[data-tab="start"]'); await page.click('.js-sync >> nth=1');
+await page.click('.tabs button[data-tab="start"]'); await page.click('[data-panel=start] .js-sync');
 await page.waitForFunction(() => document.getElementById('syncHint').classList.contains('hidden'));
 assert.equal(rewards.length >= 3, true); assert.equal(subs.some((s) => s.condition.to_broadcaster_user_id === '999'), true); ok('Rewards und Webhooks werden bei Twitch abgeglichen');
 await page.waitForFunction(() => document.getElementById('checks').innerText.includes('Webhooks aktiv')); ok('Status zeigt: Webhooks aktiv');
 
 // 5. Soundboard
-await page.click('.tabs button[data-tab="soundboard"]');
+await page.click('.tabs button[data-tab="belohnungen"]');
 await page.fill('#newBoardTitle', 'Airhorn'); await page.fill('#newBoardCost', '300'); await page.click('#addBoard');
 await page.waitForSelector('#boardRows [data-id]'); assert.equal(await page.locator('#boardRows [data-id]').count(), 1);
 fs.writeFileSync(S + '/horn.wav', Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVE'), Buffer.alloc(60)]));
 await page.setInputFiles('#boardRows [data-f=file]', S + '/horn.wav'); await page.click('#boardRows [data-act=upload]');
 await page.waitForFunction(() => document.querySelector('#boardRows').innerText.includes('horn.wav')); ok('Soundboard: Eintrag anlegen und Ton hochladen');
-await page.click('.js-sync >> nth=3'); await page.waitForFunction(() => document.querySelector('#boardRows').innerText.includes('Reward: angelegt'));
+await page.click('[data-panel=belohnungen] .js-sync >> nth=0'); await page.waitForFunction(() => document.querySelector('#boardRows').innerText.includes('Reward: angelegt'));
 assert.equal(rewards.some((r) => r.title === 'Airhorn' && r.cost === 300 && r.is_enabled), true); ok('Soundboard: Reward in Twitch angelegt');
 await page.click('#boardRows [data-act=test]'); await page.waitForTimeout(400);
 let poll = await (await realFetch('http://localhost:8092/api/overlay')).json();
@@ -131,14 +131,14 @@ await page.setInputFiles('#imageRows [data-slot=follow] input[type=file]', S + '
 await page.waitForFunction(() => document.querySelector('#imageRows [data-slot=follow]').innerText.includes('bild.gif'));
 poll = await (await realFetch('http://localhost:8092/api/overlay')).json(); assert.ok(poll.sounds.follow && poll.images.follow); ok('Medien: Ton und GIF je Alert hochladen, Overlay kennt beides');
 // Upload darf ungespeicherte Formularwerte nicht überschreiben
-await page.click('.tabs button[data-tab="allgemein"]'); await page.fill('#timezone', 'Europe/Paris');
+await page.click('.tabs button[data-tab="system"]'); await page.fill('#timezone', 'Europe/Paris');
 await page.click('.tabs button[data-tab="medien"]'); await page.setInputFiles('#soundRows [data-slot=raid] input[type=file]', S + '/horn.wav'); await page.click('#soundRows [data-slot=raid] [data-act=up]');
 await page.waitForFunction(() => document.querySelector('#soundRows [data-slot=raid]').innerText.includes('horn.wav'));
 assert.equal(await page.inputValue('#timezone'), 'Europe/Paris'); ok('Upload lässt ungespeicherte Änderungen in den Formularen stehen');
 await page.click('#discard');
 
 // 7. Tests
-await page.click('.tabs button[data-tab="tests"]'); await page.fill('#testUser', 'Tester');
+await page.click('.tabs button[data-tab="system"]'); await page.fill('#testUser', 'Tester');
 await page.click('[data-test=alert-follow]'); await page.waitForFunction(() => document.getElementById('toast').classList.contains('show'));
 await page.click('[data-test=alert-cheer]'); await page.click('[data-test=milestone]'); await page.waitForTimeout(500);
 const events = (await (await realFetch('http://localhost:8092/api/overlay?since=' + encodeURIComponent(since))).json()).events;
@@ -146,7 +146,7 @@ const kinds = events.map((e) => e.type + (e.kind ? ':' + e.kind : '')); assert.o
 assert.equal(events.find((e) => e.kind === 'follow').title, 'Willkommen!'); ok('Tests: Follow, Bits und Meilenstein erreichen das Overlay (mit dem gespeicherten Titel)');
 
 // 8. Besucher
-await page.click('.tabs button[data-tab="besucher"]'); await page.waitForSelector('#users tr.user');
+await page.click('.tabs button[data-tab="zuschauer"]'); await page.waitForSelector('#users tr.user');
 assert.match(await page.locator('#users').innerText(), /Stammgast/); await page.click('#users tr.user');
 await page.waitForSelector('#detail:visible'); assert.match(await page.locator('#dName').innerText(), /Stammgast – 2 Besuche/); ok('Besucher: Liste und Detail');
 await page.fill('#addDay', '2030-01-05'); await page.click('#addDayBtn'); await page.waitForFunction(() => document.getElementById('dName').innerText.includes('3 Besuche'));
@@ -162,16 +162,20 @@ await page.fill('#impRows', 'Stammgast 0'); await page.click('#impBtn');
 await page.waitForFunction(() => document.getElementById('impOut').innerText.includes('entfernt')); ok('Besucher: Streaks übernehmen und wieder entfernen');
 
 // Raids: Übersicht und Mehrfach-Eintrag
-await page.click('.tabs button[data-tab="raids"]'); await page.waitForSelector('#raidList');
+await page.click('.tabs button[data-tab="ereignisse"]'); await page.waitForSelector('#raidList');
 await page.fill('#raidBulk', 'raiderin 4\nzweite 2'); await page.click('#raidBulkBtn');
 await page.waitForFunction(() => document.getElementById('raidList').innerText.includes('Nachgetragen'));
 assert.match(await page.locator('#raidList').innerText(), /4/); assert.match(await page.locator('#raidBulkInfo').innerText(), /eingetragen/);
 await page.click('#raidList tr[data-name]'); assert.notEqual(await page.inputValue('#raidSeedLogin'), ''); ok('Raids: Übersicht und mehrere Kanäle auf einmal eintragen');
 
-// Chat & Abspann: Einstellungen speichern, Seiten laden
-await page.click('.tabs button[data-tab="abspann"]'); await page.waitForSelector('#streakCommand:visible');
-assert.equal(await page.inputValue('#streakCommand'), '!streak'); assert.equal(await page.locator('#creditsEnabled').isChecked(), true);
-await page.fill('#topCommand', '!bestenliste'); await page.fill('#creditsTitle', 'Bis bald!'); await page.click('#save');
+// Chat und Overlays: Einstellungen speichern, Seiten laden
+await page.click('.tabs button[data-tab="chat"]'); await page.waitForSelector('#streakCommand:visible');
+assert.equal(await page.inputValue('#streakCommand'), '!streak');
+assert.equal(await page.locator('#soEnabled').isChecked(), false, 'Shoutout ist standardmäßig aus'); assert.equal(await page.locator('#quoteEnabled').isChecked(), false);
+await page.fill('#topCommand', '!bestenliste');
+await page.click('.tabs button[data-tab="overlays"]'); await page.waitForSelector('#creditsTitle:visible');
+assert.equal(await page.locator('#creditsEnabled').isChecked(), true);
+await page.fill('#creditsTitle', 'Bis bald!'); await page.click('#save');
 await page.waitForFunction(() => document.getElementById('toast').innerText.includes('Gespeichert'));
 assert.match(await page.locator('#boardUrl').innerText(), /\/rangliste$/);
 const abs = await b.newPage({ viewport: { width: 1280, height: 900 } }); const absErrs = []; abs.on('pageerror', (e) => absErrs.push(e.message));
@@ -181,7 +185,7 @@ await abs.goto('http://localhost:8092/abspann'); await abs.waitForSelector('#rol
 assert.equal(await abs.locator('#roll h1').innerText(), 'Bis bald!', 'Überschrift kommt aus den Einstellungen');
 await abs.goto('http://localhost:8092/rangliste'); await abs.waitForSelector('#grid section');
 assert.equal(await abs.locator('#grid section').count(), 5); assert.deepEqual(absErrs, []);
-await abs.close(); ok('Chat & Abspann: Einstellungen, Abspann und Rangliste laden');
+await abs.close(); ok('Chat und Overlays: Einstellungen, Abspann und Rangliste laden');
 
 // 9. Abmelden
 await page.click('#logout'); await page.waitForSelector('#login:visible'); ok('Abmelden zeigt wieder die Anmeldung');

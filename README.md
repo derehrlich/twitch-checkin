@@ -164,20 +164,20 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 
 | Reiter | Inhalt |
 |---|---|
-| **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adresse |
-| **Check-in & Streak** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter mit Namen, Preisen und Chattexten |
-| **Alerts** | Follow, Sub, Gift-Subs, Bits: Schalter, Chat-Dank, Schilder (Titel, Nachricht, Dauer) |
-| **Raids** | Raid-Reaktion, Shoutout, Clip, Chattext, Schild, Übersicht erfasster Raids, früher erhaltene Raids nachtragen (auch mehrere auf einmal) |
-| **Chat & Abspann** | Chat-Befehle `!streak` und `!top`, Abspann-Einstellungen, Rangliste, Links zu Abspann und Rangliste |
-| **Soundboard** | Einträge mit Reward, Abklingzeit, Lautstärke und Ton; Chat-Nachricht |
+| **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adressen |
+| **Zuschauer** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter; Besucher mit Suche, Besuchstagen und Dauer, Besuche nachtragen oder entfernen, Streaks übernehmen, CSV-Export |
+| **Twitch-Ereignisse** | Follow, Sub, Gift-Subs, Bits (Schalter, Chat-Dank, Schilder); Raid-Reaktion mit Shoutout, Clip, Chattext und Schild; Übersicht erfasster Raids, frühere Raids nachtragen |
+| **Chat** | Eigene Commands und Regeln, Chat-Befehle `!streak` und `!top`, Shoutout (`!so`, Auto-Shoutout), Zitate, Chat-Leiste fürs Overlay |
+| **Belohnungen** | Soundboard, Einlaufsound mit Prüfung, Katalog und Top des Monats, Alpakas, Community-Rangliste und verknüpfte Konten |
+| **Overlays** | Abspann, Rangliste und Twitch-Panel, Sport-Scoreboard |
 | **Medien** | Töne und Bilder/GIFs je Alert |
-| **Besucher** | Suche, Sortierung, Besuchstage mit Dauer, Besuche nachtragen oder entfernen, Nutzer löschen, CSV-Export |
-| **Tests** | Beispiel-Ereignisse ans Overlay oder in den Chat, ohne Zähler zu verändern |
-| **Allgemein** | Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, Backup & Wiederherstellen |
+| **System** | Updates, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, automatische Sicherung, Backup & Wiederherstellen, Tests |
+
+Alte Adressen wie `/admin/#abspann` oder `#besucher` führen automatisch zum neuen Reiter.
 
 ## Backup & Wiederherstellen
 
-Im Admin unter *Allgemein → Backup & Wiederherstellen* lädst du eine Sicherung als JSON herunter und spielst sie bei Bedarf wieder ein. Sie enthält Besucher (mit Streaks und Dauer), Einstellungen, Soundboard, Raid-Zähler und Reward-IDs. Töne und Bilder sind nur mit „Backup mit Tönen & Bildern“ dabei (bei Netlify begrenzt auf ca. 6 MB je Anfrage). **Die Twitch-Verbindung ist nicht enthalten:** Nach dem Wiederherstellen einmal *Mit Twitch verbinden* und *Rewards & Webhooks abgleichen* klicken. Beim Einspielen wird der aktuelle Stand ersetzt.
+Im Admin unter *System → Backup & Wiederherstellen* lädst du eine Sicherung als JSON herunter und spielst sie bei Bedarf wieder ein. Sie enthält Besucher (mit Streaks und Dauer), Einstellungen, Soundboard, Raid-Zähler und Reward-IDs. Töne und Bilder sind nur mit „Backup mit Tönen & Bildern“ dabei (bei Netlify begrenzt auf ca. 6 MB je Anfrage). **Die Twitch-Verbindung ist nicht enthalten:** Nach dem Wiederherstellen einmal *Mit Twitch verbinden* und *Rewards & Webhooks abgleichen* klicken. Beim Einspielen wird der aktuelle Stand ersetzt.
 
 ## Betrieb auf dem eigenen Server
 

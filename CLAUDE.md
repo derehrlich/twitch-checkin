@@ -34,6 +34,7 @@ public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einl
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
 - Einstellungen: `netlify/lib/settings.mjs` (Standardwerte und Prüfung), Admin-Formulare in `public/admin/js/schema.js`.
+- Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
 - Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests

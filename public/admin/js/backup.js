@@ -1,4 +1,4 @@
-// Backup & Wiederherstellen (Reiter „Allgemein“): Der Download ist ein normaler Link, das Einspielen läuft über die API.
+// Backup & Wiederherstellen (Reiter „System“): Der Download ist ein normaler Link, das Einspielen läuft über die API.
 import { $, api, esc, run, toast } from './core.js';
 import { loadSettings } from './settings.js';
 import { loadStatus } from './status.js';

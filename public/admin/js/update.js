@@ -1,4 +1,4 @@
-// Updates (Reiter „Allgemein“): zeigt die laufende Version und stößt über Watchtower ein Update an.
+// Updates (Reiter „System“): zeigt die laufende Version und stößt über Watchtower ein Update an.
 import { $, api, run, toast } from './core.js';
 
 const short = (v) => (v?.commit ? `${v.commit.slice(0, 7)}${v.builtAt ? `, gebaut am ${new Date(v.builtAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}` : 'unbekannt');
