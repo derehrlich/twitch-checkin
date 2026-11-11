@@ -4,8 +4,8 @@
 // Speicher:
 //   alpaca-color/<twitchId>   { color: '#rrggbb', name }   gekaufte Farbe, bleibt für immer
 //   alpaca-active             { <twitchId>: { n: Name, c: Farbe|null, t: letzte Nachricht } }   wer gerade im Overlay läuft
-import { db } from './store.mjs';
-import { sendChat, setRedemptionStatus } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
 
 export const ACTIVE_KEY = 'alpaca-active';
 export const colorKey = (id) => `alpaca-color/${id}`;

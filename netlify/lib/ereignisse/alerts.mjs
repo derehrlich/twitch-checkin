@@ -1,5 +1,5 @@
-import { fill, pushOverlay, signText } from './checkin.mjs';
-import { sendChat } from './twitch.mjs';
+import { fill, pushOverlay, signText } from '../zuschauer/checkin.mjs';
+import { sendChat } from '../kern/twitch.mjs';
 
 const TIERS = { 1000: 'Stufe 1', 2000: 'Stufe 2', 3000: 'Stufe 3' };
 export const tierName = (t) => TIERS[t] ?? 'Stufe 1'; // Prime meldet Twitch als Stufe 1

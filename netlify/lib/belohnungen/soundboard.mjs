@@ -1,9 +1,9 @@
 // Kanalpunkte-Soundboard: jeder Eintrag ist ein eigener Reward (Name, Preis, Abklingzeit) mit einer Sounddatei.
 // Eintrag: { id, title, cost, cooldown, volume, enabled, soundName, soundVersion, rewardId }
 import crypto from 'node:crypto';
-import { db } from './store.mjs';
-import { fill, pushOverlay } from './checkin.mjs';
-import { sendChat, setRedemptionStatus } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { fill, pushOverlay } from '../zuschauer/checkin.mjs';
+import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
 
 export const MAX_ENTRIES = 20; // Twitch erlaubt höchstens 50 eigene Rewards pro Kanal, die anderen brauchen auch Platz
 export const ID = /^[a-f0-9]{8}$/;

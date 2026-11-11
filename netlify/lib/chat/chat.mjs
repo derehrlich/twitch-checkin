@@ -1,13 +1,13 @@
 // Chat-Webhook (channel.chat.message): merkt sich Chatter für den Abspann und beantwortet !streak und !top.
-import { db } from './store.mjs';
-import { fill, fmtDuration, streamDay } from './checkin.mjs';
-import { computeStreak, getStreamDays } from './streak.mjs';
-import { clipById, sendChat } from './twitch.mjs';
-import { countChat, recordChatter } from './credits.mjs';
-import { allUsers } from './admin/common.mjs';
-import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from './community.mjs';
-import { ensureAward } from './award.mjs';
-import { touchAlpaca } from './alpaca.mjs';
+import { db } from '../kern/store.mjs';
+import { fill, fmtDuration, streamDay } from '../zuschauer/checkin.mjs';
+import { computeStreak, getStreamDays } from '../zuschauer/streak.mjs';
+import { clipById, sendChat } from '../kern/twitch.mjs';
+import { countChat, recordChatter } from '../overlays/credits.mjs';
+import { allUsers } from '../admin/common.mjs';
+import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from '../belohnungen/community.mjs';
+import { ensureAward } from '../belohnungen/award.mjs';
+import { touchAlpaca } from '../belohnungen/alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
 import { autoShoutout, handleExtras } from './extras.mjs';

@@ -1,8 +1,8 @@
 // Abspann: sammelt pro Stream-Tag, wer geschrieben, gefollowt, abonniert, Bits geschickt oder geraidet hat.
 //   chatter/<tag>/<twitchId>   Anzeigename (einmal pro Person und Tag)
 //   log/<tag>/<nachrichtenId>  { t, type, user, ... } je Follow, Sub, Resub, Gift, Cheer und Raid
-import { db } from './store.mjs';
-import { streamDay } from './checkin.mjs';
+import { db } from '../kern/store.mjs';
+import { streamDay } from '../zuschauer/checkin.mjs';
 
 const seenChatters = new Set(); // spart Schreibzugriffe, solange die Function-Instanz läuft
 

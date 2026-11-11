@@ -1,9 +1,9 @@
 // /api/admin/catalog: Katalog für die Top des Monats (höchstens 15 Sounds) und Übersicht der Monatsgewinner.
-import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
-import { CATALOG_ID, CATALOG_MAX, announceAgain, catalogKey, ensureAward, getCatalog, newCatalogId, recentAwards, reroll, saveCatalog } from '../award.mjs';
-import { MONTH } from '../community.mjs';
-import { json } from '../http.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { CATALOG_ID, CATALOG_MAX, announceAgain, catalogKey, ensureAward, getCatalog, newCatalogId, recentAwards, reroll, saveCatalog } from '../belohnungen/award.mjs';
+import { MONTH } from '../belohnungen/community.mjs';
+import { json } from '../kern/http.mjs';
 import { audioUpload, cleanName, storeFile } from './common.mjs';
 
 const cleanTitle = (v) => String(v ?? '').trim().slice(0, 40);

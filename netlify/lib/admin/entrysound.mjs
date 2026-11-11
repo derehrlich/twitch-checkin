@@ -1,9 +1,9 @@
 // /api/admin/entrysound: Einlaufsounds prüfen und freigeben, ablehnen (mit oder ohne Erstattung) oder entfernen.
-import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
-import { USER_ID, approve, cleanup, extendMonths, fmtMonths, grant, listEntries, pendingKey, reject, remove, rewardTitles } from '../entrysound.mjs';
-import { json } from '../http.mjs';
-import { lookupUser } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { USER_ID, approve, cleanup, extendMonths, fmtMonths, grant, listEntries, pendingKey, reject, remove, rewardTitles } from '../belohnungen/entrysound.mjs';
+import { json } from '../kern/http.mjs';
+import { lookupUser } from '../kern/twitch.mjs';
 import { allUsers, audioUpload, cleanName } from './common.mjs';
 
 /** Person aus Twitch-ID oder -Namen: erst bei den Besuchern suchen, sonst bei Twitch fragen. */

@@ -1,7 +1,7 @@
 // /api/admin/community: Verknüpfungen Discord <-> Twitch ansehen und löschen, Stand der Einrichtung.
-import { getSettings } from '../settings.mjs';
-import { allLinks, monthBoard, monthLabel, monthOf, removeLink, secretSet } from '../community.mjs';
-import { json } from '../http.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { allLinks, monthBoard, monthLabel, monthOf, removeLink, secretSet } from '../belohnungen/community.mjs';
+import { json } from '../kern/http.mjs';
 
 export async function community({ route, method }) {
   const settings = await getSettings();

@@ -6,10 +6,10 @@
 // Platzhalter in Texten: {user} (wer ausgelöst hat), {args} (Rest der Nachricht nach dem Befehl), {channel},
 //   {game} {title} {uptime} {viewers} (live von Twitch), {random} (Zahl 1-100), {count} (zählt bei jedem Auslösen hoch, z. B. für !tod)
 import crypto from 'node:crypto';
-import { db } from './store.mjs';
-import { fill, fmtDuration, pushOverlay } from './checkin.mjs';
-import { sendChat, streamInfo, userToken } from './twitch.mjs';
-import { getBoard, isActive } from './soundboard.mjs';
+import { db } from '../kern/store.mjs';
+import { fill, fmtDuration, pushOverlay } from '../zuschauer/checkin.mjs';
+import { sendChat, streamInfo, userToken } from '../kern/twitch.mjs';
+import { getBoard, isActive } from '../belohnungen/soundboard.mjs';
 
 export const MAX_COMMANDS = 40;
 export const MAX_ACTIONS = 6;

@@ -1,9 +1,9 @@
 // /api/admin/commands: eigene Commands anlegen, ändern, testen, löschen.
-import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
-import { getBoard, isActive } from '../soundboard.mjs';
-import { ID, MAX_COMMANDS, getCommands, newId, runActions, sanitize, saveCommands } from '../commands.mjs';
-import { json } from '../http.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { getBoard, isActive } from '../belohnungen/soundboard.mjs';
+import { ID, MAX_COMMANDS, getCommands, newId, runActions, sanitize, saveCommands } from '../chat/commands.mjs';
+import { json } from '../kern/http.mjs';
 
 export async function commands({ route, method, body }) {
   const list = await getCommands();

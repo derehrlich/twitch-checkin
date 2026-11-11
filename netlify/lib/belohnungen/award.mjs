@@ -11,10 +11,10 @@
 //   award/<YYYY-MM>           { month, label, closedAt, deadline, winners: [{ twitchId, name, place, points, choice, chosenAt }] }
 //   awardsound/<twitchId>     gültiger Katalog-Sound { catalogId, validUntil, month }
 import crypto from 'node:crypto';
-import { db } from './store.mjs';
+import { db } from '../kern/store.mjs';
 import { dayOf, linkByTwitch, monthBoard, monthOf, secretSet } from './community.mjs';
 import { addMonths, fmtDate } from './entrysound.mjs';
-import { sendChat, siteUrl } from './twitch.mjs';
+import { sendChat, siteUrl } from '../kern/twitch.mjs';
 
 export const CATALOG_MAX = 15;
 export const CATALOG_ID = /^[a-f0-9]{8}$/;

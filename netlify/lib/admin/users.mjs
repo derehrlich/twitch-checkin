@@ -1,10 +1,10 @@
 // /api/admin/users (Besucher, Besuche nachtragen und entfernen) und der CSV-Export.
-import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
-import { streamDay } from '../checkin.mjs';
-import { computeStreak, getStreamDays } from '../streak.mjs';
-import { json, text } from '../http.mjs';
-import { lookupUser } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { streamDay } from '../zuschauer/checkin.mjs';
+import { computeStreak, getStreamDays } from '../zuschauer/streak.mjs';
+import { json, text } from '../kern/http.mjs';
+import { lookupUser } from '../kern/twitch.mjs';
 import { allUsers } from './common.mjs';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;

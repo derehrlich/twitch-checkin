@@ -191,7 +191,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const server = await createApp();
   server.listen(port, () => console.log(`Stadtwache läuft auf Port ${port}, Daten in ${process.env.LOCAL_STORE_DIR}`));
   // Nächtliche Sicherung: alle 10 Minuten nachsehen, ob heute schon gesichert wurde
-  const { backupTick } = await import('./netlify/lib/autobackup.mjs');
+  const { backupTick } = await import('./netlify/lib/system/autobackup.mjs');
   const tick = () => backupTick().then((r) => { if (r) console.log(r.ok ? `Sicherung angelegt: ${r.name}` : r.error); }).catch((e) => console.error('Sicherung:', e.message));
   setTimeout(tick, 60_000).unref();
   setInterval(tick, 10 * 60_000).unref();

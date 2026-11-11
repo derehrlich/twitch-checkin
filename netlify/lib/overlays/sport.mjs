@@ -2,9 +2,9 @@
 //   sport/config      { show, title, period }   period: 'all' | 'month' | 'week'
 //   sport/log/<id>    { id, savedAt, day, title, seconds, heartRate, distanceKm, calories }
 import crypto from 'node:crypto';
-import { db } from './store.mjs';
-import { getSettings } from './settings.mjs';
-import { streamDay } from './checkin.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { streamDay } from '../zuschauer/checkin.mjs';
 
 export const CONFIG_KEY = 'sport/config';
 export const LOG_PREFIX = 'sport/log/';

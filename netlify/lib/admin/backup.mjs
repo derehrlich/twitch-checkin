@@ -2,9 +2,9 @@
 // Enthalten: Besucher, Einstellungen, Soundboard, Raid-Zähler, Stream-Tage, Reward-IDs, Einlaufsound-Einträge, Verknüpfungen und Monatszahlen.
 // Nie enthalten: Twitch-Tokens (nach einem Restore neu verbinden) und kurzlebige Daten (event/, seen/).
 // Töne und Bilder (auch die des Soundboards) sind groß und deshalb nur mit ?media=1 dabei (ein Download über den Browser wird sonst sehr groß).
-import { db } from '../store.mjs';
-import { json } from '../http.mjs';
-import { backupStatus, runBackupNow } from '../autobackup.mjs';
+import { db } from '../kern/store.mjs';
+import { json } from '../kern/http.mjs';
+import { backupStatus, runBackupNow } from '../system/autobackup.mjs';
 
 const FORMAT = 'stadtwache-backup';
 const DATA_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/', 'entrysound/', 'link/', 'cmonth/', 'dmonth/', 'award/', 'awardsound/', 'sport/', 'alpaca-color/'];

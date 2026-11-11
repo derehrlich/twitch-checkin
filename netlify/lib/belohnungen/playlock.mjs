@@ -2,7 +2,7 @@
 // Jede OBS-Quelle ist eine eigene Seite und weiß nichts von den anderen. Bevor sie etwas mit Ton abspielt, fragt sie hier
 // "darf ich?". Es spielt immer nur eine Quelle, die übrigen warten in der Reihenfolge, in der sie sich gemeldet haben.
 // Gespeichert wird nur ein Eintrag: wer gerade spielt und bis wann, plus die Wartenden.
-import { db } from './store.mjs';
+import { db } from '../kern/store.mjs';
 
 const KEY = 'config/playlock';
 const WAITER_TTL = 8_000;   // ein Wartender, der sich so lange nicht meldet, ist weg (Seite neu geladen)

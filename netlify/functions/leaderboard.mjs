@@ -1,11 +1,11 @@
 // Öffentliche Ranglisten für /rangliste (Link im Twitch-Panel oder Browserquelle in OBS). Nur Namen und Zahlen.
-import { getSettings } from '../lib/settings.mjs';
-import { streamDay } from '../lib/checkin.mjs';
-import { computeStreak, getStreamDays } from '../lib/streak.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { streamDay } from '../lib/zuschauer/checkin.mjs';
+import { computeStreak, getStreamDays } from '../lib/zuschauer/streak.mjs';
 import { allUsers } from '../lib/admin/common.mjs';
-import { db } from '../lib/store.mjs';
-import { json } from '../lib/http.mjs';
-import { monthBoard, secretSet, weights } from '../lib/community.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { json } from '../lib/kern/http.mjs';
+import { monthBoard, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
 export const config = { path: '/api/leaderboard' };
 

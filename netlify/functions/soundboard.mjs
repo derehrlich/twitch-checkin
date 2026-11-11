@@ -1,8 +1,8 @@
 // Liefert Soundboard-Töne aus (?id=<id>&v=<Version>, dauerhaft zwischenspeicherbar). Ohne id: Liste { id: Adresse }
 // der aktiven Töne, damit das Overlay sie schon vor der ersten Einlösung laden kann.
-import { db } from '../lib/store.mjs';
-import { getBoard, ID, isActive, soundKey } from '../lib/soundboard.mjs';
-import { json } from '../lib/http.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { getBoard, ID, isActive, soundKey } from '../lib/belohnungen/soundboard.mjs';
+import { json } from '../lib/kern/http.mjs';
 
 export const config = { path: '/api/soundboard' };
 

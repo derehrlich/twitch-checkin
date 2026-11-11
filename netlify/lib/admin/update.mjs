@@ -3,7 +3,7 @@
 //   GET  /api/admin/update   { commit, builtAt, configured }
 //   POST /api/admin/update   stößt Watchtower an
 // Umgebung: WATCHTOWER_URL (z. B. http://192.168.178.144:8081) und WATCHTOWER_TOKEN (derselbe Schlüssel wie bei Watchtower)
-import { json } from '../http.mjs';
+import { json } from '../kern/http.mjs';
 
 export async function update({ route, method }) {
   if (route[0] !== 'update') return;

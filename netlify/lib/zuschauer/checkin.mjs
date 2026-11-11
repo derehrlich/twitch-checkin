@@ -1,8 +1,8 @@
-import { db } from './store.mjs';
-import { sendChat, setRedemptionStatus } from './twitch.mjs';
-import { activeSoundFor } from './entrysound.mjs';
-import { linkTip } from './community.mjs';
-import { awardTip } from './award.mjs';
+import { db } from '../kern/store.mjs';
+import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
+import { activeSoundFor } from '../belohnungen/entrysound.mjs';
+import { linkTip } from '../belohnungen/community.mjs';
+import { awardTip } from '../belohnungen/award.mjs';
 import { findRescue, getStreamDays, parseLevels, streakFor } from './streak.mjs';
 
 const pad = (n) => String(n).padStart(15, '0');

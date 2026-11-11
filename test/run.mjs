@@ -74,7 +74,7 @@ globalThis.fetch = async (url, init = {}) => {
   return ok({}, 404);
 };
 
-const { db } = await import('../netlify/lib/store.mjs');
+const { db } = await import('../netlify/lib/kern/store.mjs');
 const webhook = (await import('../netlify/functions/twitch-webhook.mjs')).default;
 const overlay = (await import('../netlify/functions/overlay.mjs')).default;
 const admin = (await import('../netlify/functions/admin.mjs')).default;
@@ -82,9 +82,9 @@ const auth = (await import('../netlify/functions/auth.mjs')).default;
 const sound = (await import('../netlify/functions/sound.mjs')).default;
 const image = (await import('../netlify/functions/image.mjs')).default;
 const board = (await import('../netlify/functions/soundboard.mjs')).default;
-const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/checkin.mjs');
-const { getSettings } = await import('../netlify/lib/settings.mjs');
-const { computeStreak, findRescue, parseLevels } = await import('../netlify/lib/streak.mjs');
+const { streamDay, handleCheckout, fmtDuration } = await import('../netlify/lib/zuschauer/checkin.mjs');
+const { getSettings } = await import('../netlify/lib/kern/settings.mjs');
+const { computeStreak, findRescue, parseLevels } = await import('../netlify/lib/zuschauer/streak.mjs');
 
 const BASE = 'https://beispiel.netlify.app';
 let n = 0;
@@ -522,7 +522,7 @@ await test('Raid: zählt, wie oft der Kanal schon geraidet hat, im Chat und im O
 });
 
 await test('Raid: Erster Raid heißt „zum ersten Mal“, Nachtragen im Admin und Test ändern keine Zähler', async () => {
-  const { visitText } = await import('../netlify/lib/raid.mjs');
+  const { visitText } = await import('../netlify/lib/ereignisse/raid.mjs');
   assert.equal(visitText(1), 'zum ersten Mal bei uns');
   assert.equal((await admin(adminReq('POST', 'raids', { login: 'RaiderIn', count: 10 }, cookie))).status, 200);
   assert.equal((await db.get('raid/777')).count, 10);
@@ -635,7 +635,7 @@ await test('Streak-Retter-Einlösung: rettet die Lücke einmalig, sonst Hinweis 
   await db.set('user/50', { name: 'Retter', count: 4, first: 'x', last: 'x', days: [sd(1), sd(2), sd(3), sd(8)] });
   const status = () => calls.filter((c) => c.path.endsWith('/redemptions')).at(-1).body.status;
   const day = (n) => new Date(`2031-03-0${n}T12:00:00+01:00`);
-  const { handleRescue } = await import('../netlify/lib/checkin.mjs');
+  const { handleRescue } = await import('../netlify/lib/zuschauer/checkin.mjs');
   const rd = (id) => ({ id, user_id: '50', user_name: 'Retter', reward: { id: 'reward3' } });
 
   let r = await handleRescue(rd('s1'), await getSettings(), day(9));
@@ -772,7 +772,7 @@ await test('Alerts: Chat-Dank nur wenn eingeschaltet; Admin-Test erzeugt Karten'
 
 // ---- Blobs-Token
 await test('Speicher: Blobs-Client entsteht bei jedem Zugriff neu, ein abgelaufenes Token einer alten Umgebung schadet nicht', async () => {
-  const { createBlobStore } = await import('../netlify/lib/store.mjs');
+  const { createBlobStore } = await import('../netlify/lib/kern/store.mjs');
   // Simuliert die Plattform: jeder neu angelegte Client bekommt das gerade gültige Token, ein früher angelegter läuft ab
   let currentToken = 'token-1'; let opened = 0; const data = new Map();
   const fakeOpen = () => {
@@ -1106,8 +1106,8 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
 // ---- Einlaufsound (Kauf, Upload, Freigabe, Verlängern, Ablauf)
 {
   const entryFn = (await import('../netlify/functions/einlaufsound.mjs')).default;
-  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
-  const es = await import('../netlify/lib/entrysound.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/kern/http.mjs');
+  const es = await import('../netlify/lib/belohnungen/entrysound.mjs');
   const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(200)]);
   const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
   const viewerReq = (method, p, body, ck) => new Request(BASE + '/api/einlaufsound/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -1295,8 +1295,8 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
   const verknuepfen = (await import('../netlify/functions/verknuepfen.mjs')).default;
   const community = (await import('../netlify/functions/community.mjs')).default;
   const leaderboard = (await import('../netlify/functions/leaderboard.mjs')).default;
-  const com = await import('../netlify/lib/community.mjs');
-  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/kern/http.mjs');
   const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
   const vReq = (method, p, body, ck) => new Request(BASE + '/api/verknuepfen/' + p, { method, headers: { 'content-type': 'application/json', ...(ck ? { cookie: ck } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const bot = (method, p, body, secret = 'geheimwort-12345') => community(new Request(BASE + '/api/community/' + p, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` }, body: body ? JSON.stringify(body) : undefined }));
@@ -1512,11 +1512,11 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
 
 // ---- Top des Monats: Katalog, Monatsabschluss, Auswahl
 {
-  const aw = await import('../netlify/lib/award.mjs');
-  const es = await import('../netlify/lib/entrysound.mjs');
-  const com = await import('../netlify/lib/community.mjs');
+  const aw = await import('../netlify/lib/belohnungen/award.mjs');
+  const es = await import('../netlify/lib/belohnungen/entrysound.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
   const entryFn = (await import('../netlify/functions/einlaufsound.mjs')).default;
-  const { makeViewerSession } = await import('../netlify/lib/http.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/kern/http.mjs');
   process.env.LINK_SECRET = 'geheimwort-12345';
   const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(200)]).toString('base64');
   const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
@@ -1746,7 +1746,7 @@ await test('Backup: Download ohne Tokens, Restore stellt Stand wieder her und le
 }
 
 await test('Abspiel-Reihenfolge: nacheinander in der Reihenfolge des Eintreffens, Freigabe, abgelaufene Wartende', async () => {
-  const { claim, release } = await import('../netlify/lib/playlock.mjs');
+  const { claim, release } = await import('../netlify/lib/belohnungen/playlock.mjs');
   await db.delete('config/playlock');
   const T = 1_000_000;
   assert.deepEqual(await claim({ id: 'alert', at: T, ms: 5000 }, T), { wait: 0 });
@@ -1836,7 +1836,7 @@ await test('Commands: anlegen, Befehl mit Rolle und Abklingzeit, Stichwort, mehr
 });
 
 await test('Commands: Timer läuft nur bei Chat-Aktivität, nie doppelt ohne neue Nachrichten, Sound-Aktion nur mit Ton', async () => {
-  const { tickTimers, recordPulse } = await import('../netlify/lib/commands.mjs');
+  const { tickTimers, recordPulse } = await import('../netlify/lib/chat/commands.mjs');
   await db.delete('config/commands'); await db.delete('state/chatpulse');
   const settings = await getSettings();
   const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
@@ -1912,7 +1912,7 @@ await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten'
 
 // ---- Automatische Sicherung
 await test('Auto-Sicherung: einmal pro Tag ab der Uhrzeit, alte werden gelöscht, Status und Knopf im Admin', async () => {
-  const ab = await import('../netlify/lib/autobackup.mjs');
+  const ab = await import('../netlify/lib/system/autobackup.mjs');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wache-backup-'));
   process.env.BACKUP_DIR = dir;
   await admin(adminReq('PUT', 'settings', { backupKeep: 2, backupHour: 3 }, cookie));
@@ -1975,7 +1975,7 @@ await test('Updates: Version anzeigen, ohne Einrichtung gesperrt, Watchtower ans
 // ---- Chat-Leiste (/chat)
 const chatlogPub = (await import('../netlify/functions/chatlog.mjs')).default;
 await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, versteckt Befehle und Bots, kürzt und läuft ab', async () => {
-  const cl = await import('../netlify/lib/chatlog.mjs');
+  const cl = await import('../netlify/lib/chat/chatlog.mjs');
   const pub = async () => (await chatlogPub(new Request(BASE + '/api/chatlog'))).json();
   const ev = (name, message, extra = {}) => ({ broadcaster_user_id: '999', chatter_user_id: 'u-' + name, chatter_user_name: name, message_id: crypto.randomUUID(), message, ...extra });
   const send = (e) => webhook(signed('notification', { subscription: { type: 'channel.chat.message' }, event: e }, { id: 'cl-' + e.message_id }));
@@ -2015,7 +2015,7 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
   assert.deepEqual((await pub()).messages.map((m) => m.n), ['Cleo', 'Dennis'], 'höchstens so viele wie eingestellt, die neuesten');
 
   assert.equal(cl.pieces({ text: 'x'.repeat(500) }).map((p) => p.x).join('').length, 200, 'lange Nachrichten werden gekürzt');
-  const settings = await (await import('../netlify/lib/settings.mjs')).getSettings();
+  const settings = await (await import('../netlify/lib/kern/settings.mjs')).getSettings();
   assert.deepEqual((await cl.publicView(settings, Date.now() + 61_000)).messages, [], 'nach Ablauf der Zeit weg');
   assert.equal((await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: false }, cookie))).status, 200);
   await db.delete('chatlog');
@@ -2025,7 +2025,7 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
 // ---- Alpakas im Overlay
 const alpakasPub = (await import('../netlify/functions/alpakas.mjs')).default;
 await test('Alpakas: Farben erkennen, Chatter laufen mit, Reward färbt, unbekannte Farbe gibt Punkte zurück', async () => {
-  const al = await import('../netlify/lib/alpaca.mjs');
+  const al = await import('../netlify/lib/belohnungen/alpaca.mjs');
   assert.equal(al.parseColor('Rot'), '#e03a3a');
   assert.equal(al.parseColor('mach es bitte TÜRKIS'), '#27c9c0', 'Umlaute und Satz');
   assert.equal(al.parseColor('grün'), '#3fbf5f');
@@ -2108,7 +2108,7 @@ await test('Alpakas: Farben erkennen, Chatter laufen mit, Reward färbt, unbekan
 });
 
 await test('Commands: Platzhalter {game} {title} {uptime} {viewers} {random} {count}', async () => {
-  const { runActions } = await import('../netlify/lib/commands.mjs');
+  const { runActions } = await import('../netlify/lib/chat/commands.mjs');
   const settings = await getSettings();
   const cmd = { id: 'cafe0001', name: 'info', actions: [{ type: 'chat', text: '{game}|{title}|{uptime}|{viewers}|{random}|#{count}' }] };
   await db.delete('counter/cafe0001');
@@ -2123,7 +2123,7 @@ await test('Commands: Platzhalter {game} {title} {uptime} {viewers} {random} {co
 });
 
 await test('Zitate: speichern und löschen nur Mods, anzeigen alle, !so nur Mods', async () => {
-  const { handleChat } = await import('../netlify/lib/chat.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, quoteEnabled: true, soEnabled: true, commandCooldown: 0 }, cookie));
   const s = await getSettings();
   const msg = (text, mod = false) => ({ broadcaster_user_id: '999', chatter_user_id: mod ? 'm1' : 'v1', chatter_user_name: mod ? 'Moddi' : 'Viewer', badges: mod ? [{ set_id: 'moderator' }] : [], message_id: crypto.randomUUID(), message: { text } });
@@ -2158,7 +2158,7 @@ await test('Zitate: speichern und löschen nur Mods, anzeigen alle, !so nur Mods
 });
 
 await test('Auto-Shoutout: nur Listen-Namen, einmal pro Stream-Tag', async () => {
-  const { autoShoutout } = await import('../netlify/lib/extras.mjs');
+  const { autoShoutout } = await import('../netlify/lib/chat/extras.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, autoShoutoutEnabled: true, autoShoutoutUsers: 'Stammi, @Anna' }, cookie));
   const s = await getSettings();
   const ev = (name) => ({ chatter_user_id: 'id-' + name, chatter_user_name: name, chatter_user_login: name.toLowerCase() });
@@ -2174,7 +2174,7 @@ await test('Auto-Shoutout: nur Listen-Namen, einmal pro Stream-Tag', async () =>
 });
 
 await test('Einstellungen: Schema ist die einzige Quelle (Standardwerte, Grenzen, Sonderregeln)', async () => {
-  const { sanitize, DEFAULTS } = await import('../netlify/lib/settings.mjs');
+  const { sanitize, DEFAULTS } = await import('../netlify/lib/kern/settings.mjs');
   const { SCHEMA, SYNC_KEYS } = await import('../public/admin/js/schema.js');
   const items = Object.values(SCHEMA).flat().flatMap((g) => g.items);
   const ids = items.map((i) => i.id);

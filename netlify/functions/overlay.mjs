@@ -1,11 +1,11 @@
 // Das OBS-Overlay fragt hier regelmäßig nach neuen Check-ins.
 // Erster Abruf (ohne ?since) liefert nur den aktuellen Stand, damit alte Ereignisse nicht erneut abgespielt werden.
-import { db } from '../lib/store.mjs';
-import { getSettings } from '../lib/settings.mjs';
-import { json } from '../lib/http.mjs';
-import { SLOTS } from '../lib/sounds.mjs';
-import { IMAGE_SLOTS } from '../lib/images.mjs';
-import { tickTimersThrottled } from '../lib/commands.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { json } from '../lib/kern/http.mjs';
+import { SLOTS } from '../lib/medien/sounds.mjs';
+import { IMAGE_SLOTS } from '../lib/medien/images.mjs';
+import { tickTimersThrottled } from '../lib/chat/commands.mjs';
 
 export const config = { path: '/api/overlay' };
 

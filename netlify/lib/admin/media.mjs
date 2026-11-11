@@ -1,9 +1,9 @@
 // Eigene Töne (je Platz: checkin, raid, follow, ...) und Bilder/GIFs für die Alert-Schilder.
-import { db } from '../store.mjs';
-import { setImage, setSound } from '../settings.mjs';
-import { SLOTS, slotKey } from '../sounds.mjs';
-import { IMAGE_SLOTS, imageKey } from '../images.mjs';
-import { json } from '../http.mjs';
+import { db } from '../kern/store.mjs';
+import { setImage, setSound } from '../kern/settings.mjs';
+import { SLOTS, slotKey } from '../medien/sounds.mjs';
+import { IMAGE_SLOTS, imageKey } from '../medien/images.mjs';
+import { json } from '../kern/http.mjs';
 import { audioUpload, cleanName, imageUpload, storeFile } from './common.mjs';
 
 /** POST lädt hoch, DELETE setzt zurück. Ohne Angabe eines Platzes gilt der Check-in-Ton (wie früher). */

@@ -1,17 +1,17 @@
 // Empfängt EventSub-Webhooks von Twitch (Kanalpunkte-Einlösungen).
 import crypto from 'node:crypto';
-import { db } from '../lib/store.mjs';
-import { getSettings } from '../lib/settings.mjs';
-import { handleCheckout, handleRedemption, handleRescue } from '../lib/checkin.mjs';
-import { handleRaid } from '../lib/raid.mjs';
-import { handleAlert } from '../lib/alerts.mjs';
-import { getBoard, handleSoundboard } from '../lib/soundboard.mjs';
-import { handleEntryBuy, handleEntryExtend } from '../lib/entrysound.mjs';
-import { handleAlpaca } from '../lib/alpaca.mjs';
-import { handleChat } from '../lib/chat.mjs';
-import { logEvent } from '../lib/credits.mjs';
-import { ALERT_TYPES, CHAT_TYPE } from '../lib/twitch.mjs';
-import { safeEqual, text } from '../lib/http.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { handleCheckout, handleRedemption, handleRescue } from '../lib/zuschauer/checkin.mjs';
+import { handleRaid } from '../lib/ereignisse/raid.mjs';
+import { handleAlert } from '../lib/ereignisse/alerts.mjs';
+import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
+import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
+import { handleAlpaca } from '../lib/belohnungen/alpaca.mjs';
+import { handleChat } from '../lib/chat/chat.mjs';
+import { logEvent } from '../lib/overlays/credits.mjs';
+import { ALERT_TYPES, CHAT_TYPE } from '../lib/kern/twitch.mjs';
+import { safeEqual, text } from '../lib/kern/http.mjs';
 
 export const config = { path: '/api/twitch-webhook' };
 

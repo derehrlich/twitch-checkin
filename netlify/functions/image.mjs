@@ -1,6 +1,6 @@
 // Liefert ein im Admin hochgeladenes Alert-Bild aus (?slot=follow). ?v=<Version> erlaubt dauerhaftes Zwischenspeichern.
-import { db } from '../lib/store.mjs';
-import { IMAGE_SLOTS, imageKey } from '../lib/images.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { IMAGE_SLOTS, imageKey } from '../lib/medien/images.mjs';
 
 export const config = { path: '/api/image' };
 

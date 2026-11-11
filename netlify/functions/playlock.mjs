@@ -1,6 +1,6 @@
 // Die Overlay-Quellen melden hier, wann sie etwas mit Ton abspielen wollen (siehe lib/playlock.mjs).
-import { json } from '../lib/http.mjs';
-import { claim, release } from '../lib/playlock.mjs';
+import { json } from '../lib/kern/http.mjs';
+import { claim, release } from '../lib/belohnungen/playlock.mjs';
 
 export const config = { path: '/api/playlock' };
 

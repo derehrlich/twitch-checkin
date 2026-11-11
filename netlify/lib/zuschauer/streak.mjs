@@ -1,4 +1,4 @@
-import { db } from './store.mjs';
+import { db } from '../kern/store.mjs';
 
 // Wie viele Stream-Tage zurück eine Lücke liegen darf, damit der Streak-Retter sie noch schließt
 export const RESCUE_WINDOW = 7;

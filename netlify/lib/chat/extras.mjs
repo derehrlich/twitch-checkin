@@ -2,9 +2,9 @@
 //   quote/<n>       { n, text, by, date }   (n zählt fortlaufend, gelöschte Nummern werden nicht neu vergeben)
 //   quote-counter   letzte vergebene Nummer
 //   shouted/<tag>/<id>  Sperre: Auto-Shoutout höchstens einmal pro Stream-Tag und Person
-import { db } from './store.mjs';
-import { fill, streamDay } from './checkin.mjs';
-import { channelInfo, sendChat, shoutout, userByLogin } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { fill, streamDay } from '../zuschauer/checkin.mjs';
+import { channelInfo, sendChat, shoutout, userByLogin } from '../kern/twitch.mjs';
 import { allowed } from './commands.mjs';
 
 const isMod = (e) => allowed({ role: 'mod' }, e);

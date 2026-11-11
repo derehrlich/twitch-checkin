@@ -1,8 +1,8 @@
 // Verbindet den Broadcaster-Account per OAuth (nur mit Admin-Login möglich).
 import crypto from 'node:crypto';
-import { db } from '../lib/store.mjs';
-import { cookie, hasSession, makeViewerSession, parseCookies, safeEqual, text } from '../lib/http.mjs';
-import { SCOPES, siteUrl, toStored, tokenRequest, userByLogin } from '../lib/twitch.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { cookie, hasSession, makeViewerSession, parseCookies, safeEqual, text } from '../lib/kern/http.mjs';
+import { SCOPES, siteUrl, toStored, tokenRequest, userByLogin } from '../lib/kern/twitch.mjs';
 
 const NEXT_PAGES = ['/einlaufsound', '/verknuepfen'];
 
