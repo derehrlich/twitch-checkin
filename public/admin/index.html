@@ -39,7 +39,7 @@
       <button data-tab="raids" role="tab">Raids</button>
       <button data-tab="abspann" role="tab">Chat &amp; Abspann</button>
       <button data-tab="sport" role="tab">Sport</button>
-      <button data-tab="alpakas" role="tab">Alpakas</button>
+      <button data-tab="alpakas" role="tab">Alpakas &amp; Chat-Leiste</button>
       <button data-tab="soundboard" role="tab">Soundboard</button>
       <button data-tab="commands" role="tab">Commands</button>
       <button data-tab="einlaufsound" role="tab">Einlaufsound</button>
@@ -154,6 +154,13 @@
 
     <!-- Alpakas -->
     <div class="tab-panel hidden" data-panel="alpakas">
+      <section class="card">
+        <h2>Chat-Leiste (waagerechter Chat)</h2>
+        <p class="muted">In OBS (oder Meld) eine Browserquelle auf <code id="chatUrl"></code> anlegen, Breite wie dein Overlay (z. B. 1920), Höhe etwa 90. Der Hintergrund ist durchsichtig. Neue Nachrichten kommen rechts herein und schieben die älteren nach links. Mit <code>?pos=top</code> sitzt die Leiste oben, mit <code>?scale=1.3</code> wird sie größer. Einschalten unten bei „Chat-Leiste“, danach die Webhooks abgleichen.</p>
+        <div class="row">
+          <a class="btn" href="/chat?demo" target="_blank" rel="noopener">Vorschau mit Beispiel-Nachrichten</a>
+        </div>
+      </section>
       <section class="card">
         <h2>Alpaka-Leiste</h2>
         <p class="muted">In OBS (oder Meld) eine Browserquelle auf <code id="alpacaUrl"></code> anlegen, Breite wie dein Overlay (z. B. 1920), Höhe etwa 120. Der Hintergrund ist durchsichtig, die Alpakas laufen am unteren Rand. Mit <code>?scale=2</code> hinter der Adresse werden sie größer, mit <code>?scale=1</code> kleiner (Standard 1,5, ein Alpaka ist dann etwa 95 Pixel hoch).</p>

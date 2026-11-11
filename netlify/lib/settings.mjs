@@ -163,6 +163,10 @@ export const DEFAULTS = {
   alpacaRewardTitle: 'Alpaka färben',
   alpacaRewardCost: 500,
   alpacaMax: 30, // so viele Alpakas gleichzeitig (die zuletzt aktiven)
+  chatOverlayEnabled: false, // waagerechtes Chat-Overlay (/chat)
+  chatOverlaySeconds: 60, // so lange bleibt eine Nachricht sichtbar
+  chatOverlayMax: 12, // höchstens so viele Nachrichten gleichzeitig
+  chatOverlayHideCommands: true, // Nachrichten mit ! am Anfang nicht zeigen
   alpacaMinutes: 90, // so lange nach der letzten Nachricht läuft das Alpaka weiter
   // Platzhalter: {user} {color}
   alpacaTemplate: '🦙 {user} färbt sein Alpaka: {color}!',
@@ -174,7 +178,7 @@ export const DEFAULTS = {
 };
 
 // Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
-export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.alpacaEnabled);
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.alpacaEnabled || s.chatOverlayEnabled);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -215,6 +219,7 @@ function sanitize(input) {
   num('communityRankSize', 1, 10);
   if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
   str('alpacaRewardTitle', 45); str('alpacaTemplate', 400); str('alpacaBadTemplate', 400);
+  num('chatOverlaySeconds', 5, 600); num('chatOverlayMax', 1, 30);
   num('alpacaRewardCost', 1, 1_000_000); num('alpacaMax', 1, 60); num('alpacaMinutes', 5, 720);
   for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate', 'awardRerollTemplate']) str(k, 400);
   num('awardSize', 1, 10); num('awardDays', 1, 30); num('awardMonths', 1, 12);
@@ -243,7 +248,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['alpacaEnabled', 'awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['chatOverlayEnabled', 'chatOverlayHideCommands', 'alpacaEnabled', 'awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }
