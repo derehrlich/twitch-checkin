@@ -160,6 +160,16 @@ export const SCHEMA = {
       a('streakCmdNone', 'Antwort, wenn noch kein Check-in vorhanden ist', { user: 'Max' }),
       a('topTemplate', 'Antwort auf !top', { n: 5, list: '1. Anna (42) · 2. Max (37) · 3. Kai (30)' }),
     ] },
+    { title: 'Shoutout und Zitate', hint: `Beides ist standardmäßig aus. <b>!so name</b> dürfen Mods und du nutzen, der Bot macht den offiziellen Twitch-Shoutout und schreibt eine Nachricht (Platzhalter ${code('name')} ${code('game')} ${code('url')}). Twitch erlaubt Shoutouts nur, solange du live bist, und höchstens einen alle 2 Minuten. Der <b>Auto-Shoutout</b> gilt für die Namen in der Liste, einmal pro Stream-Tag beim ersten Chat-Beitrag. <b>Zitate:</b> jeder kann <b>!quote</b> (oder <b>!quote 3</b>) nutzen, Mods speichern mit <b>!addquote Text</b> und löschen mit <b>!delquote 3</b>. Platzhalter ${code('n')} ${code('text')} ${code('by')} ${code('date')}.`, items: [
+      c('soEnabled', '!so (Shoutout per Befehl) aktivieren'), t('soCommand', 'Befehl für den Shoutout', { maxlength: 26, placeholder: '!so' }),
+      a('soTemplate', 'Nachricht beim Shoutout', { name: 'RaiderIn', game: 'Hades', url: 'twitch.tv/raiderin' }),
+      c('autoShoutoutEnabled', 'Auto-Shoutout für Stammgäste aktivieren'), t('autoShoutoutUsers', 'Namen für den Auto-Shoutout (mit Komma getrennt)', { maxlength: 400 }),
+      c('quoteEnabled', 'Zitate aktivieren'),
+      t('quoteCommand', 'Befehl zum Anzeigen', { maxlength: 26, placeholder: '!quote' }), t('quoteAddCommand', 'Befehl zum Speichern (Mods)', { maxlength: 26, placeholder: '!addquote' }), t('quoteDelCommand', 'Befehl zum Löschen (Mods)', { maxlength: 26, placeholder: '!delquote' }),
+      a('quoteTemplate', 'Anzeige eines Zitats', { n: 3, text: 'Das war Absicht!', by: 'Max', date: '11.11.2026' }),
+      a('quoteAddedTemplate', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
+      a('quoteNoneTemplate', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
+    ] },
     { title: 'Abspann', hint: 'Der Abspann sammelt pro Stream-Tag automatisch, wer geschrieben, gefolgt, abonniert, Bits geschickt oder geraidet hat – auch wenn die Alerts ausgeschaltet sind. Nach dem Einschalten die Webhooks abgleichen, sonst werden keine Ereignisse empfangen. Bots stehen nicht im Abspann.', items: [
       c('creditsEnabled', 'Abspann-Daten sammeln'),
       t('creditsTitle', 'Überschrift', { maxlength: 80 }), t('creditsOutro', 'Schlusszeile', { maxlength: 80 }),

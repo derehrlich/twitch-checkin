@@ -31,7 +31,7 @@ export async function commands({ route, method, body }) {
     return json(cmd);
   }
   if (route[2] === 'test' && method === 'POST') { // ignoriert Rolle, Abklingzeit und Aktivität, ändert nichts am Timer
-    await runActions(cmd, { user: String(body.user || 'TestUser').slice(0, 40), args: 'Beispiel', channel: 'Kanal' }, await getSettings());
+    await runActions(cmd, { user: String(body.user || 'TestUser').slice(0, 40), args: 'Beispiel', channel: 'Kanal', dry: true }, await getSettings());
     return json({ ok: true });
   }
   if (route.length === 2 && method === 'DELETE') {

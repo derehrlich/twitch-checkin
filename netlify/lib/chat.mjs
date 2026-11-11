@@ -10,6 +10,7 @@ import { ensureAward } from './award.mjs';
 import { touchAlpaca } from './alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
+import { autoShoutout, handleExtras } from './extras.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -85,9 +86,15 @@ export async function handleChat(e, settings) {
     if (counted) await recordPulse().catch(() => {});
     await handleCustom(e, text, settings, { ignored: ignore.includes(String(name).toLowerCase()) }).catch((err) => console.warn('Command fehlgeschlagen:', err.message));
   }
+  if (counted) await autoShoutout(e, settings).catch((err) => console.warn('Auto-Shoutout fehlgeschlagen:', err.message));
   if (counted) await clipHint(e, settings, text).catch((err) => console.warn('Clip-Hinweis fehlgeschlagen:', err.message));
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   const cmd = text.split(/\s+/)[0].toLowerCase();
+  if (settings.chatEnabled && [settings.soCommand, settings.quoteCommand, settings.quoteAddCommand, settings.quoteDelCommand].includes(cmd)) {
+    if (await cooling(cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
+    const reply = await handleExtras(e, text, cmd, settings).catch((err) => { console.warn('Befehl fehlgeschlagen:', err.message); return null; });
+    return { ok: true, reply };
+  }
   if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && (cmd === settings.communityCommand || cmd === settings.communityRankCommand))) return { ok: true };
   // Twitch kann Nachrichten doppelt zustellen
   if (e.message_id && !(await db.setIfNew(`seen/chat-${e.message_id}`, Date.now()))) return { ok: true };

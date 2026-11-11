@@ -3,11 +3,12 @@
 //   trigger: { type: 'command', word: '!ant' } | { type: 'keyword', word: 'hallo' } | { type: 'timer', minutes, minMessages }
 //   role:    all | sub | vip | mod | owner   (wer den Command nutzen darf, gilt für Befehl und Stichwort)
 //   actions: nacheinander, je { type: 'chat', text } | { type: 'alert', title, message } | { type: 'sound', soundId }
-// Platzhalter in Texten: {user} (wer ausgelöst hat), {args} (Rest der Nachricht nach dem Befehl), {channel}
+// Platzhalter in Texten: {user} (wer ausgelöst hat), {args} (Rest der Nachricht nach dem Befehl), {channel},
+//   {game} {title} {uptime} {viewers} (live von Twitch), {random} (Zahl 1-100), {count} (zählt bei jedem Auslösen hoch, z. B. für !tod)
 import crypto from 'node:crypto';
 import { db } from './store.mjs';
-import { fill, pushOverlay } from './checkin.mjs';
-import { sendChat } from './twitch.mjs';
+import { fill, fmtDuration, pushOverlay } from './checkin.mjs';
+import { sendChat, streamInfo, userToken } from './twitch.mjs';
 import { getBoard, isActive } from './soundboard.mjs';
 
 export const MAX_COMMANDS = 40;
@@ -85,9 +86,31 @@ async function cooling(key, seconds, now) {
   return false;
 }
 
+// Live-Werte für {game} {title} {uptime} {viewers}; fällt Twitch aus, stehen Platzhalter wie „?“ da statt der Klammern
+export async function liveVars() {
+  try {
+    const info = await streamInfo((await userToken()).user_id);
+    return {
+      game: info.game || 'unbekannt', title: info.title || 'unbekannt', viewers: String(info.viewers),
+      uptime: info.live && info.startedAt ? fmtDuration((Date.now() - Date.parse(info.startedAt)) / 60_000) : 'offline',
+    };
+  } catch (err) {
+    console.warn('Live-Daten fehlgeschlagen:', err.message);
+    return { game: '?', title: '?', viewers: '?', uptime: '?' };
+  }
+}
+
 /** Führt die Aktionen nacheinander aus. Die Reihenfolge im Overlay und die Abspielsperre sorgen dafür, dass sie nacheinander laufen. */
 export async function runActions(cmd, ctx, settings) {
-  const vars = { user: ctx.user ?? '', args: ctx.args ?? '', channel: ctx.channel ?? '' };
+  const vars = { user: ctx.user ?? '', args: ctx.args ?? '', channel: ctx.channel ?? '', random: String(1 + Math.floor(Math.random() * 100)) };
+  const texts = cmd.actions.map((a) => `${a.text ?? ''} ${a.title ?? ''} ${a.message ?? ''}`).join(' ');
+  if (/\{(game|title|uptime|viewers)\}/.test(texts)) Object.assign(vars, await liveVars());
+  if (/\{count\}/.test(texts)) {
+    const key = `counter/${cmd.id}`;
+    const next = ((await db.get(key)) ?? 0) + 1;
+    if (!ctx.dry) await db.set(key, next); // der Test-Knopf zählt nicht wirklich mit
+    vars.count = String(next);
+  }
   const board = cmd.actions.some((a) => a.type === 'sound') ? await getBoard() : [];
   for (const a of cmd.actions) {
     try {

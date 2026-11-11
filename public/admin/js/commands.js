@@ -28,7 +28,7 @@ function cmdHtml(c) {
            <div><label>Wer darf?</label><select data-f="role">${opts(ROLES, c.role)}</select></div>
            <div><label>Abklingzeit (Sekunden, für alle zusammen)</label><input data-f="cooldown" type="number" min="0" max="86400" value="${c.cooldown}"></div>`}
     </div>
-    <p class="muted" style="margin:10px 0 4px">Aktionen laufen nacheinander. Platzhalter: <code>{user}</code> <code>{args}</code> (Text nach dem Befehl) <code>{channel}</code></p>
+    <p class="muted" style="margin:10px 0 4px">Aktionen laufen nacheinander. Platzhalter: <code>{user}</code> <code>{args}</code> (Text nach dem Befehl) <code>{channel}</code> <code>{game}</code> <code>{title}</code> <code>{uptime}</code> <code>{viewers}</code> (live von Twitch) <code>{random}</code> (Zahl 1–100) <code>{count}</code> (zählt bei jedem Auslösen hoch, z. B. für „!tod“)</p>
     <div class="acts">${c.actions.map(actionHtml).join('')}</div>
     <div class="row" style="margin-top:8px">
       <button class="ghost" data-act="add-chat">+ Chat-Text</button><button class="ghost" data-act="add-alert">+ Alert</button><button class="ghost" data-act="add-sound">+ Sound</button>
