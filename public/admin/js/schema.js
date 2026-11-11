@@ -140,12 +140,18 @@ export const SCHEMA = {
   ],
 
   chatleiste: [
-    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Overlays, Abschnitt Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. <b>!reset</b> setzt alles zurück.', items: [
+    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Overlays, Abschnitt Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. Den Glitzer können sich Zuschauer auch mit Kanalpunkten kaufen (nächster Abschnitt). <b>!reset</b> setzt alles zurück.', items: [
       c('chatOverlayEnabled', false, 'Chat-Leiste aktivieren (braucht den Chat-Webhook)'),
       n('chatOverlayMax', 10, 'Höchstens so viele Nachrichten gleichzeitig', { min: 1, max: 30 }),
       n('chatOverlaySeconds', 0, 'Eine Nachricht verschwindet nach so vielen Sekunden (0 = sie bleibt, bis neue sie wegschieben)', { min: 0, max: 3600 }),
       t('chatOverlayVip', 'ehrlichverwirrt, novelsbyeverly, pyronema, artemis_podowy', 'Namen, die Glitzer und Verlauf auch ohne Abo nutzen dürfen (mit Komma getrennt)', { maxlength: 400 }),
       c('chatOverlayHideCommands', true, 'Befehle (Nachrichten mit !) nicht zeigen'),
+    ] },
+    { title: 'Glitzer als Kanalpunkte-Belohnung', hint: `Zuschauer, die kein Abo haben, können sich den Glitzer in der Chat-Leiste mit Kanalpunkten kaufen: Name und Nachrichten glitzern dann, und mit <b>!glitter</b> schalten sie ihn an und aus. Abos, VIPs und Mods haben den Glitzer ohnehin. Braucht die eingeschaltete Chat-Leiste (oben). Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user', 'until')} (bis wann er gilt, oder „unbegrenzt“).`, items: [
+      c('glitterEnabled', false, 'Reward „Glitzer“ anbieten'),
+      t('glitterRewardTitle', 'Glitzer-Chat', 'Reward-Name', { maxlength: 45 }), n('glitterRewardCost', 5000, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      n('glitterDays', 30, 'Der Glitzer gilt so viele Tage (0 = für immer). Erneutes Einlösen verlängert', { min: 0, max: 3650 }),
+      a('glitterTemplate', '✨ {user} glitzert jetzt bis {until}! Mit !glitter geht der Glitzer an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
     ] },
   ],
 
@@ -236,4 +242,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];

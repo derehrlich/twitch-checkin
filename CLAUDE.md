@@ -43,13 +43,14 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 ```
 - Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/kern/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Neuer fester Chat-Befehl = nur eine Zeile in `BEFEHLE` (`netlify/lib/chat/befehle.mjs`). Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
 - Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
-- Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `modlog/<zeit>`, `modstrike/<id>`, `modlast/<id>`, `modpermit/<login>`, `alpaca-active`, `alpaca-color/<id>`).
+- Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `modlog/<zeit>`, `modstrike/<id>`, `modlast/<id>`, `modpermit/<login>`, `chatstyle/<id>` (Farbe, Glitzer, `glitterUntil`), `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 118 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 119 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
+- Glitzer-Reward (`glitterRewardId`, `handleGlitter` in `netlify/lib/chat/chatlog.mjs`): Kauf setzt `chatstyle/<id>.glitterUntil` (FOREVER = Jahr 3000) und macht den Glitzer an; ab dann darf die Person `!glitter` auch ohne Abo schalten. Ist `glitterUntil` abgelaufen, glitzert nur noch, wer Abo/VIP/Mod ist. Ohne eingeschaltete Chat-Leiste gibt es die Punkte zurück.
 - Neue Twitch-Berechtigungen (`SCOPES` in `netlify/lib/kern/twitch.mjs`) bekommt der Bot erst, wenn Marcel im Admin auf Start → „Mit Twitch verbinden“ klickt; der Status zeigt fehlende an (`missingScopes`). Die Moderation braucht `moderator:manage:chat_messages` und `moderator:manage:banned_users`.
 - Moderation: Broadcaster und Mods werden nie moderiert, VIPs/Abos/Stammgäste nur bei gesperrten Wörtern. Twitch-Clips sind immer erlaubt (`modAllowClips`), Marcel will, dass jeder Clips teilen darf. Neue Regeln zuerst im Testmodus (`modTestMode`, standardmäßig an).
 - Der Twitch-Chat-Text kommt aus Vorlagen in den Einstellungen (`…Template`); neue Platzhalter immer auch im Hinweistext der Gruppe in `schema.js` nennen. Zahlen im Schema brauchen immer `min` und `max`, Text `maxlength` (der Test prüft das).

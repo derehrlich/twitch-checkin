@@ -167,7 +167,7 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adressen |
 | **Zuschauer** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter; Besucher mit Suche, Besuchstagen und Dauer, Besuche nachtragen oder entfernen, Streaks übernehmen, CSV-Export |
 | **Twitch-Ereignisse** | Follow, Sub, Gift-Subs, Bits (Schalter, Chat-Dank, Schilder); Raid-Reaktion mit Shoutout, Clip, Chattext und Schild; Übersicht erfasster Raids, frühere Raids nachtragen |
-| **Chat** | Eigene Commands und Regeln, Chat-Befehle `!streak` und `!top`, Shoutout (`!so`, Auto-Shoutout), Zitate, Moderation mit Protokoll (Links, gesperrte Wörter, Großbuchstaben, Wiederholungen, Emote-Spam; Twitch-Clips immer erlaubt), Chat-Leiste fürs Overlay |
+| **Chat** | Eigene Commands und Regeln, Chat-Befehle `!streak` und `!top`, Shoutout (`!so`, Auto-Shoutout), Zitate, Moderation mit Protokoll (Links, gesperrte Wörter, Großbuchstaben, Wiederholungen, Emote-Spam; Twitch-Clips immer erlaubt), Chat-Leiste fürs Overlay, Glitzer als Kanalpunkte-Reward |
 | **Belohnungen** | Soundboard, Einlaufsound mit Prüfung, Katalog und Top des Monats, Alpakas, Community-Rangliste und verknüpfte Konten |
 | **Overlays** | Abspann, Rangliste und Twitch-Panel, Sport-Scoreboard |
 | **Medien** | Töne und Bilder/GIFs je Alert |
