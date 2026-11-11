@@ -2360,5 +2360,84 @@ await test('Moderation: Admin-Protokoll lesen und leeren, nur mit Login', async 
   assert.deepEqual(sanitize({ modCapsPercent: 5, modTimeoutSeconds: 99999, modWords: '' }), { modCapsPercent: 50, modTimeoutSeconds: 600, modWords: '' });
 });
 
+await test('Glitzer-Reward: Kauf schaltet Glitzer frei (befristet, verlängerbar), !glitter an/aus, läuft ab, ohne Chat-Leiste Punkte zurück', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const put = (b) => admin(adminReq('PUT', 'settings', b, cookie));
+  await put({ chatEnabled: true, chatCommands: true, commandCooldown: 0, chatOverlayEnabled: true, glitterEnabled: true, glitterDays: 30, modEnabled: false });
+  const setup = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(setup.glitter, 'Glitzer-Chat');
+  const state = await db.get('config/state');
+  const reward = rewards.find((r) => r.id === state.glitterRewardId);
+  assert.equal(reward.cost, 5000); assert.ok(subs.some((x) => x.condition.reward_id === state.glitterRewardId), 'Webhook für den Reward');
+  // Beschreibung in Twitch: Anleitung mit Dauer, höchstens 200 Zeichen, folgt der Einstellung
+  const { glitterPrompt } = await import('../netlify/lib/kern/twitch.mjs');
+  const createdGlitter = calls.filter((c) => c.path.endsWith('/custom_rewards') && c.method === 'POST').find((c) => c.body.title === 'Glitzer-Chat');
+  assert.equal(createdGlitter.body.prompt, glitterPrompt(await getSettings()));
+  assert.match(createdGlitter.body.prompt, /30 Tage lang.*!glitter.*an\/aus.*verlängert/);
+  assert.ok(createdGlitter.body.prompt.length <= 200 && createdGlitter.body.prompt.length > 60, `Länge ${createdGlitter.body.prompt.length}`);
+  assert.match(glitterPrompt({ glitterDays: 0 }), /für immer/);
+  assert.ok(glitterPrompt({ glitterDays: 3650 }).length <= 200);
+
+  const msg = (text, id = 'gv1', name = 'Glitzi', badges = []) => ({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges: badges.map((set_id) => ({ set_id })), message_id: crypto.randomUUID(), message: { text, fragments: [{ type: 'text', text }] } });
+  const say = async (text, o = []) => { await handleChat(msg(text, ...o), await getSettings()); };
+  const last = async () => (await db.get('chatlog')).at(-1);
+  const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+  const redeem = async (rid, id = 'gv1', name = 'Glitzi') => {
+    const before = chats().length;
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption(rid, id, name, state.glitterRewardId) }));
+    return chats().slice(before);
+  };
+
+  // vor dem Kauf: !glitter wirkt bei normalen Zuschauern nicht
+  await say('!glitter'); await say('hallo');
+  assert.equal((await last()).s, false);
+
+  const t0 = Date.now();
+  const out = await redeem('gl-1');
+  assert.equal(statusOf('gl-1'), 'FULFILLED');
+  assert.match(out[0], /^✨ Glitzi glitzert jetzt bis \d\d\.\d\d\.\d{4}! Mit !glitter/);
+  const st = await db.get('chatstyle/gv1');
+  assert.equal(st.glitter, true); assert.ok(Math.abs(st.glitterUntil - (t0 + 30 * 86_400_000)) < 5000, '30 Tage');
+  await say('mein Glitzer'); assert.equal((await last()).s, true, 'Nachricht glitzert');
+
+  // an- und ausschalten per !glitter (jetzt erlaubt)
+  await say('!glitter'); await say('ohne'); assert.equal((await last()).s, false);
+  await say('!glitter'); await say('mit'); assert.equal((await last()).s, true);
+  await say('!reset'); await say('nach reset'); assert.equal((await last()).s, false);
+  assert.ok((await db.get('chatstyle/gv1')).glitterUntil > Date.now(), '!reset nimmt den gekauften Glitzer nicht weg');
+  await say('!glitter'); assert.equal((await db.get('chatstyle/gv1')).glitter, true);
+
+  // erneut einlösen verlängert
+  const before = (await db.get('chatstyle/gv1')).glitterUntil;
+  await redeem('gl-2');
+  assert.ok(Math.abs((await db.get('chatstyle/gv1')).glitterUntil - (before + 30 * 86_400_000)) < 1000, 'verlängert um weitere 30 Tage');
+
+  // abgelaufen: kein Glitzer mehr, !glitter geht nicht
+  await db.set('chatstyle/gv1', { hex: null, gradient: false, glitter: true, glitterUntil: Date.now() - 1000 });
+  await say('abgelaufen'); assert.equal((await last()).s, false);
+  await say('!glitter'); assert.equal((await db.get('chatstyle/gv1')).glitter, true, 'unverändert, !glitter wirkt nicht mehr');
+  // Abo/VIP hat Glitzer auch ohne Kauf (wie bisher), auch nach Ablauf
+  await say('!glitter', ['gs1', 'Subby', ['subscriber']]); await say('abo', ['gs1', 'Subby', ['subscriber']]);
+  assert.equal((await last()).s, true);
+
+  // unbegrenzt
+  await put({ glitterDays: 0 });
+  const forever = await redeem('gl-3', 'gv2', 'Ewig');
+  assert.match(forever[0], /Ewig glitzert jetzt bis unbegrenzt!/);
+  assert.ok((await db.get('chatstyle/gv2')).glitterUntil > Date.now() + 365 * 86_400_000 * 100);
+
+  // Chat-Leiste aus: Punkte zurück
+  await put({ chatOverlayEnabled: false });
+  const off = await redeem('gl-4', 'gv3', 'Spät');
+  assert.equal(statusOf('gl-4'), 'CANCELED'); assert.match(off[0], /Spät, die Chat-Leiste ist gerade aus/);
+  assert.equal(await db.get('chatstyle/gv3'), null);
+
+  // ausschalten: Reward wird abgeschaltet
+  await put({ glitterEnabled: false, chatOverlayEnabled: false });
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  assert.equal((await db.get('config/state')).glitterRewardId, undefined);
+  assert.equal(rewards.find((r) => r.id === state.glitterRewardId).is_enabled, false);
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);
