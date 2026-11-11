@@ -55,6 +55,19 @@ export function parseColor(input, rand = Math.random) {
   return null;
 }
 
+/** Bis zu drei Farben aus einem Text („rot blau“, „#ff0000 #00ff00 türkis“, „zufall“). Unbekannte Wörter werden übersprungen, leer = keine. */
+export function parseColors(input, rand = Math.random, max = 3) {
+  const out = [];
+  for (const token of plain(input ?? '').trim().split(/[^a-z0-9#]+/).filter(Boolean)) {
+    if (out.length >= max) break;
+    const hex = /^#?([0-9a-f]{6})$/.exec(token) ?? /^#([0-9a-f]{3})$/.exec(token);
+    if (hex) { out.push(`#${hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1]}`); continue; }
+    if (COLOR_NAMES[token]) out.push(COLOR_NAMES[token]);
+    else if (token === 'zufall' || token === 'zufaellig' || token === 'random') out.push(hslToHex(Math.floor(rand() * 360), 0.7, 0.55));
+  }
+  return out;
+}
+
 /** Eigene Farbe oder, wenn es keine gibt, ein fester natürlicher Ton nach der Twitch-ID. */
 export function colorFor(id, color) {
   if (color) return color;

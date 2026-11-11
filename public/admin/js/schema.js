@@ -153,11 +153,12 @@ export const SCHEMA = {
       n('glitterDays', 30, 'Der Glitzer gilt so viele Tage (0 = für immer). Erneutes Einlösen verlängert', { min: 0, max: 3650 }),
       a('glitterTemplate', '✨ {user} glitzert jetzt bis {until}! Mit !glitter geht der Glitzer an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
     ] },
-    { title: 'Verlauf als Kanalpunkte-Belohnung', hint: `Wie beim Glitzer, nur mit einem <b>Farbverlauf</b> durch mehrere Farben in Name und Nachrichten. Mit <b>!verlauf</b> schalten die Käufer ihn an und aus. Wer beides kauft, hat einen Verlauf mit Glitzer. Braucht die eingeschaltete Chat-Leiste. Nach dem Einschalten oder Ändern von Name, Preis oder Tagen die Rewards abgleichen. Platzhalter: ${code('user', 'until')}.`, items: [
+    { title: 'Verlauf als Kanalpunkte-Belohnung', hint: `Wie beim Glitzer, nur mit einem <b>Farbverlauf</b> durch mehrere Farben in Name und Nachrichten. Beim Einlösen schreiben die Käufer <b>2 oder 3 Farben</b> dazu (z. B. „rot blau“, „türkis rosa gelb“, Hex-Codes wie #ff8800, „zufall“) oder „auto“ für den automatischen Verlauf. Später ändern sie ihn mit <b>!verlauf rot blau</b>; <b>!verlauf</b> allein schaltet ihn an und aus. Unbekannte Farben beim Einlösen: Hinweis im Chat und Punkte zurück. Wer beides kauft, hat einen Verlauf mit Glitzer. Braucht die eingeschaltete Chat-Leiste. Nach dem Einschalten oder Ändern von Name, Preis oder Tagen die Rewards abgleichen. Platzhalter: ${code('user', 'until')}.`, items: [
       c('gradientEnabled', false, 'Reward „Verlauf“ anbieten'),
       t('gradientRewardTitle', 'Verlauf-Chat', 'Reward-Name', { maxlength: 45 }), n('gradientRewardCost', 5000, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       n('gradientDays', 30, 'Der Verlauf gilt so viele Tage (0 = für immer). Erneutes Einlösen verlängert', { min: 0, max: 3650 }),
-      a('gradientTemplate', '🌈 {user} hat jetzt einen Farbverlauf bis {until}! Mit !verlauf geht er an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
+      a('gradientTemplate', '🌈 {user} hat jetzt einen Farbverlauf bis {until}! Mit !verlauf rot blau änderst du die Farben, mit !verlauf allein schaltest du ihn an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
+      a('gradientBadTemplate', '{user}, diese Farben kenne ich nicht 🌈 Schreib beim Einlösen zum Beispiel „rot blau“, „türkis rosa gelb“, Hex-Codes wie #ff8800 oder „auto“. Deine Punkte bekommst du zurück.', 'Nachricht, wenn die Farben unbekannt sind (Punkte werden erstattet)', { user: 'Max' }),
     ] },
   ],
 

@@ -22,9 +22,9 @@
   .text img { height: 1.3em; width: auto; vertical-align: middle; }
   /* Extras (nur Abos und VIPs): Verlauf, und Glitzer als Lichtschein. Der Schein läuft nur bei den jeweils sichtbaren Nachrichten. */
   .fx-gradient .name, .fx-gradient .text, .fx-glitter .name, .fx-glitter .text { -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .8)); }
-  .fx-gradient .name, .fx-gradient .text { background-image: linear-gradient(90deg, var(--c1), var(--c2) 55%, var(--c3)); }
+  .fx-gradient .name, .fx-gradient .text { background-image: var(--grad); }
   .fx-glitter .name, .fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c1) 35%, #fff 48%, #fff 52%, var(--c1) 65%, var(--c1) 100%); background-size: 250% 100%; animation: sweep 2.4s linear infinite; }
-  .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c2) 22%, #fff 48%, #fff 52%, var(--c2) 78%, var(--c3) 100%); }
+  .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: var(--gradglit); }
   @keyframes sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 </style>
 </head>
@@ -74,7 +74,14 @@ function build(m) {
   const base = m.c || hslToHex(hash(m.n.toLowerCase()) % 360, 100, 75); // ohne eigene Farbe: pro Person immer dieselbe
   const el = document.createElement('div');
   el.className = 'bubble' + (m.g ? ' fx-gradient' : '') + (m.s ? ' fx-glitter' : '');
-  el.style.setProperty('--c1', base); el.style.setProperty('--c2', shiftHex(base, 70)); el.style.setProperty('--c3', shiftHex(base, 140));
+  el.style.setProperty('--c1', base);
+  // Verlauffarben: eigene (2 oder 3) oder automatisch aus der Namensfarbe (Farbton +70° und +140°)
+  const own = (m.gc ?? []).filter((c) => /^#[0-9a-f]{6}$/i.test(c));
+  const cols = own.length >= 2 ? own : [own[0] ?? base, shiftHex(own[0] ?? base, 70), shiftHex(own[0] ?? base, 140)];
+  const mid = cols.length > 2 ? `${cols[1]} 24%, ` : '', midEnd = cols.length > 2 ? `, ${cols[1]} 76%` : '';
+  el.style.setProperty('--grad', `linear-gradient(90deg, ${cols.join(', ')})`);
+  el.style.setProperty('--gradglit', `linear-gradient(100deg, ${cols[0]} 0%, ${mid}#fff 48%, #fff 52%${midEnd}, ${cols.at(-1)} 100%)`);
+  el.style.setProperty('--c2', cols[1] ?? base);
   const img = document.createElement('img');
   img.className = 'alpaka'; img.alt = ''; img.src = ALPAKAS[hash(String(m.id)) % ALPAKAS.length];
   const wrap = document.createElement('div'); wrap.className = 'wrap';

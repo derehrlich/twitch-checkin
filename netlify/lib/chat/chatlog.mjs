@@ -2,11 +2,11 @@
 // das Overlay holt sie ab (siehe netlify/functions/chatlog.mjs).
 //
 // Speicher:
-//   chatlog           [ { id, t, n: Name, c: Farbe|'', g: Verlauf, s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
-//   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, glitter, glitterUntil }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
+//   chatlog           [ { id, t, n: Name, c: Farbe|'', g: Verlauf, gc: [Verlauffarben] (optional), s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
+//   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, gradientColors: ['#rrggbb', …]|null, glitter, glitterUntil, gradientUntil }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
 //                     glitterUntil / gradientUntil: bis wann Glitzer bzw. Verlauf gekauft sind (Kanalpunkte-Reward, FOREVER = unbegrenzt); darf dann auch ohne Abo an- und ausgeschaltet werden
 import { db } from '../kern/store.mjs';
-import { parseColor } from '../belohnungen/alpaca.mjs';
+import { parseColor, parseColors } from '../belohnungen/alpaca.mjs';
 import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
 import { fill } from '../zuschauer/checkin.mjs';
 
@@ -46,8 +46,14 @@ async function styleCommand(e, settings, cmd, arg, now = Date.now()) {
   const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
   if (cmd === 'farbe') { const c = parseColor(arg); if (!c) return; st.hex = c; }
   else if (cmd === 'glitter') { if (!allowed && !(st.glitterUntil > now)) return; st.glitter = !st.glitter; }
-  else if (cmd === 'verlauf') { if (!allowed && !(st.gradientUntil > now)) return; st.gradient = !st.gradient; }
-  else { st.hex = null; st.gradient = false; st.glitter = false; } // Gekauftes bleibt gekauft (glitterUntil, gradientUntil)
+  else if (cmd === 'verlauf') {
+    if (!allowed && !(st.gradientUntil > now)) return;
+    const wish = String(arg ?? '').trim();
+    if (!wish) st.gradient = !st.gradient; // ohne Farben: an/aus
+    else if (/^(auto|automatisch)$/i.test(wish)) { st.gradientColors = null; st.gradient = true; } // zurück zum automatischen Verlauf
+    else { const cols = parseColors(wish); if (!cols.length) return; st.gradientColors = cols; st.gradient = true; } // eigene Farben
+  }
+  else { st.hex = null; st.gradient = false; st.glitter = false; st.gradientColors = null; } // Gekauftes bleibt gekauft (glitterUntil, gradientUntil)
   await db.set(`chatstyle/${id}`, st);
 }
 
@@ -71,7 +77,20 @@ export async function handleStyleReward(kind, redemption, settings, now = Date.n
     await setRedemptionStatus(rid, reward.id, 'CANCELED');
     return { ok: false };
   }
+  let colors = null; // nur beim Verlauf: Farben aus dem Text der Einlösung („auto“ oder leer = automatischer Verlauf)
+  if (kind === 'gradient') {
+    const wish = String(redemption.user_input ?? '').trim();
+    if (wish && !/^(auto|automatisch)$/i.test(wish)) {
+      colors = parseColors(wish);
+      if (!colors.length) { // nichts erkannt: Hinweis und Punkte zurück, bevor etwas gutgeschrieben wird
+        if (settings.chatEnabled) await sendChat(fill(settings.gradientBadTemplate, { user: name })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+        await setRedemptionStatus(rid, reward.id, 'CANCELED');
+        return { ok: false };
+      }
+    }
+  }
   const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
+  if (kind === 'gradient') st.gradientColors = colors;
   const days = settings[`${x.prefix}Days`];
   const base = Math.max(now, st[x.until] ?? 0);
   st[x.until] = days > 0 && base < FOREVER ? base + days * DAY : FOREVER;
@@ -79,7 +98,7 @@ export async function handleStyleReward(kind, redemption, settings, now = Date.n
   await db.set(`chatstyle/${id}`, st);
   if (settings.chatEnabled) await sendChat(fill(settings[`${x.prefix}Template`], { user: name, until: untilText(st[x.until], settings) })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
   await setRedemptionStatus(rid, reward.id, 'FULFILLED');
-  return { ok: true, until: st[x.until] };
+  return { ok: true, until: st[x.until], colors };
 }
 export const handleGlitter = (redemption, settings, now) => handleStyleReward('glitter', redemption, settings, now);
 export const handleGradient = (redemption, settings, now) => handleStyleReward('gradient', redemption, settings, now);
@@ -98,7 +117,7 @@ export async function recordChatMessage(e, settings) {
   const id = String(e.message_id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const st = (await db.get(`chatstyle/${e.chatter_user_id}`)) ?? {};
   const list = ((await db.get(LOG_KEY)) ?? []).filter((x) => x.id !== id); // Twitch kann doppelt zustellen
-  list.push({ id, t: Date.now(), n: name, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, e, settings), s: valid(st.glitter, st.glitterUntil, e, settings), m: pieces(e.message) });
+  list.push({ id, t: Date.now(), n: name, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, e, settings), ...(st.gradientColors?.length ? { gc: st.gradientColors } : {}), s: valid(st.glitter, st.glitterUntil, e, settings), m: pieces(e.message) });
   await db.set(LOG_KEY, list.slice(-KEEP));
   return true;
 }
