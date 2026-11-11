@@ -2,7 +2,8 @@
 import { $, api, esc, fill, run, state, toast } from './core.js';
 import { CHECKS, FIELDS, SCHEMA, SYNC_KEYS } from './schema.js';
 
-const attrString = (attrs = {}) => Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ');
+// kind und empty sind Regeln für die Prüfung auf dem Server, keine HTML-Attribute
+const attrString = (attrs = {}) => Object.entries(attrs).filter(([k]) => k !== 'kind' && k !== 'empty').map(([k, v]) => `${k}="${esc(v)}"`).join(' ');
 
 function renderItem(i) {
   if (i.type === 'check') return `<label class="check big"><input id="${i.id}" type="checkbox" data-setting> ${i.label}</label>`;

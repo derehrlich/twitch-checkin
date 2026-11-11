@@ -1,206 +1,212 @@
-// Alle Einstellungsfelder an einer Stelle. Daraus entstehen die Formulare, die Liste der Felder beim Speichern
-// und die Vorschauen. Ein neues Feld braucht hier einen Eintrag, serverseitig steht es in netlify/lib/settings.mjs.
-const t = (id, label, attrs = {}) => ({ id, type: 'text', label, attrs });
-const n = (id, label, attrs = {}) => ({ id, type: 'number', label, attrs });
-const a = (id, label, preview) => ({ id, type: 'area', label, preview, attrs: { maxlength: 400 } });
-const c = (id, label) => ({ id, type: 'check', label });
+// Alle Einstellungen an EINER Stelle. Daraus entstehen die Formulare, die Standardwerte und die Prüfung auf dem Server
+// (netlify/lib/settings.mjs liest diese Datei). Eine neue Einstellung braucht nur eine Zeile:
+//   t('name', 'Standardwert', 'Beschriftung', { maxlength: 60 })     Text (maxlength = längste Eingabe)
+//   a('name', 'Standardwert', 'Beschriftung', { Beispielwerte })    Textvorlage mit Vorschau (höchstens 400 Zeichen)
+//   n('name', 5, 'Beschriftung', { min: 0, max: 10 })               Zahl (immer min und max angeben)
+//   c('name', true, 'Beschriftung')                                  Haken
+// Besondere Regeln in den Eigenschaften: kind: 'command' (Chat-Befehl wie !so), 'timezone', 'levels' (Meilensteine);
+// empty: true erlaubt ein leeres Feld. Ändert eine Einstellung Rewards oder Webhooks, kommt sie zusätzlich in SYNC_KEYS.
+const t = (id, def, label, attrs = {}) => ({ id, type: 'text', def, label, attrs });
+const n = (id, def, label, attrs = {}) => ({ id, type: 'number', def, label, attrs });
+const a = (id, def, label, preview) => ({ id, type: 'area', def, label, preview, attrs: { maxlength: 400 } });
+const c = (id, def, label) => ({ id, type: 'check', def, label });
 const code = (...names) => names.map((x) => `<code>{${x}}</code>`).join(' ');
 
-const SIGN = (kind, label) => [t(`${kind}Title`, `${label}: Titel`, { maxlength: 60 }), t(`${kind}Message`, `${label}: Nachricht unter dem Namen`, { maxlength: 120 })];
+const SIGN = (kind, label, title, message) => [t(`${kind}Title`, title, `${label}: Titel`, { maxlength: 60 }), t(`${kind}Message`, message, `${label}: Nachricht unter dem Namen`, { maxlength: 120, empty: true })];
 const SIGN_HELP = `Platzhalter: ${code('user', 'tier', 'months', 'total', 'bits', 'viewers', 'raids', 'game', 'streak', 'days')}. Die Nachricht darf leer sein. Das Bild oder GIF über dem Schild lädst du unter „Medien“ hoch.`;
 
 export const SCHEMA = {
   checkin: [
     { title: 'Check-in', hint: `Platzhalter: ${code('user')} Name, ${code('count')} Besuche, ${code('streak')} aktuelle Streak, ${code('record')} Rekord. Nach Änderungen an Name oder Preis die Rewards abgleichen.`, items: [
-      t('rewardTitle', 'Reward-Name', { maxlength: 45 }), n('rewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
-      a('chatTemplate', 'Chatnachricht beim Check-in', { user: 'Max', count: 7, streak: 5, record: 9 }),
-      a('duplicateTemplate', 'Nachricht, wenn schon eingecheckt (Punkte werden erstattet)'),
+      t('rewardTitle', 'Check-in', 'Reward-Name', { maxlength: 45 }), n('rewardCost', 1, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      a('chatTemplate', '✅ {user} ist eingecheckt – du warst jetzt schon {count}x dabei! 🎉', 'Chatnachricht beim Check-in', { user: 'Max', count: 7, streak: 5, record: 9 }),
+      a('duplicateTemplate', '{user}, du bist heute schon eingecheckt (Besuch #{count}) ✅ Deine Punkte bekommst du zurück.', 'Nachricht, wenn schon eingecheckt (Punkte werden erstattet)'),
     ] },
     { title: 'Check-out', hint: `Zusätzlicher Platzhalter: ${code('duration')}, z. B. „2 Std 14 Min“. Wer nicht auscheckt, bekommt den Besuch gezählt, aber keine Dauer.`, items: [
-      c('checkoutEnabled', 'Check-out aktivieren (zweiter Reward, speichert die Zeit im Stream)'),
-      t('checkoutRewardTitle', 'Reward-Name', { maxlength: 45 }), n('checkoutRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
-      a('checkoutTemplate', 'Chatnachricht beim Check-out', { user: 'Max', count: 7, duration: '2 Std 14 Min' }),
-      a('checkoutDuplicateTemplate', 'Nachricht, wenn schon ausgecheckt (Punkte werden erstattet)'),
-      a('noCheckinTemplate', 'Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)'),
+      c('checkoutEnabled', true, 'Check-out aktivieren (zweiter Reward, speichert die Zeit im Stream)'),
+      t('checkoutRewardTitle', 'Check-out', 'Reward-Name', { maxlength: 45 }), n('checkoutRewardCost', 1, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      a('checkoutTemplate', '👋 {user} geht – {duration} dabei gewesen. Bis zum nächsten Mal!', 'Chatnachricht beim Check-out', { user: 'Max', count: 7, duration: '2 Std 14 Min' }),
+      a('checkoutDuplicateTemplate', '{user}, du bist heute schon ausgecheckt ✅ Deine Punkte bekommst du zurück.', 'Nachricht, wenn schon ausgecheckt (Punkte werden erstattet)'),
+      a('noCheckinTemplate', '{user}, du bist gerade nicht eingecheckt – zum Auschecken musst du zuerst einchecken. Deine Punkte bekommst du zurück.', 'Nachricht, wenn gar nicht eingecheckt (Punkte werden erstattet)'),
     ] },
     { title: 'Meilensteine', hint: 'Meilensteine zählen die <b>Gesamtbesuche</b> und gehen nie verloren.', items: [
-      c('milestoneEnabled', 'Meilensteine feiern (Sonder-Feuerwerk, eigene Karte und Chattext)'),
-      t('milestoneLevels', 'Bei diesen Gesamtbesuchen (mit Komma getrennt)', { placeholder: '10,25,50,100,250,500,1000' }),
-      a('milestoneTemplate', 'Chatnachricht beim Meilenstein', { user: 'Max', count: 100, streak: 12, record: 15 }),
+      c('milestoneEnabled', true, 'Meilensteine feiern (Sonder-Feuerwerk, eigene Karte und Chattext)'),
+      t('milestoneLevels', '10,25,50,100,250,500,1000', 'Bei diesen Gesamtbesuchen (mit Komma getrennt)', { kind: 'levels', placeholder: '10,25,50,100,250,500,1000' }),
+      a('milestoneTemplate', '🏆 {user} ist zum {count}. Mal dabei – Meilenstein! Danke für deine Treue ❤️', 'Chatnachricht beim Meilenstein', { user: 'Max', count: 100, streak: 12, record: 15 }),
     ] },
     { title: 'Streak und Streak-Retter', hint: `Die <b>Streak</b> zählt Stream-Tage in Folge (ein Stream-Tag ist ein Tag mit mindestens einem Check-in), der Rekord bleibt erhalten. Der Retter schließt nur die jüngste Lücke der letzten 7 Stream-Tage. Platzhalter: ${code('user')} ${code('streak')} ${code('days')} überbrückte Streams.`, items: [
-      n('streakGrace', 'Schonfrist: so viele Streams darf man verpassen', { min: 0, max: 5 }),
-      c('streakRescueEnabled', 'Streak-Retter aktivieren (dritter Kanalpunkte-Reward)'),
-      t('streakRewardTitle', 'Reward-Name', { maxlength: 45 }), n('streakRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
-      n('rescueMaxDays', 'Rettet höchstens so viele verpasste Streams', { min: 1, max: 14 }),
-      a('rescueTemplate', 'Chatnachricht bei erfolgreicher Rettung'),
-      a('rescueNotNeededTemplate', 'Nachricht, wenn die Streak nicht in Gefahr ist (Punkte werden erstattet)'),
-      a('rescueTooLongTemplate', 'Nachricht, wenn die Lücke zu lang oder zu alt ist (Punkte werden erstattet)'),
-      ...SIGN('rescue', 'Streak-Rettung (Schild im Overlay)'),
+      n('streakGrace', 1, 'Schonfrist: so viele Streams darf man verpassen', { min: 0, max: 5 }),
+      c('streakRescueEnabled', true, 'Streak-Retter aktivieren (dritter Kanalpunkte-Reward)'),
+      t('streakRewardTitle', 'Streak-Retter', 'Reward-Name', { maxlength: 45 }), n('streakRewardCost', 500, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      n('rescueMaxDays', 3, 'Rettet höchstens so viele verpasste Streams', { min: 1, max: 14 }),
+      a('rescueTemplate', '🛟 {user} rettet die Streak! {days} verpasste(r) Stream(s) überbrückt – Streak: {streak} 🔥', 'Chatnachricht bei erfolgreicher Rettung'),
+      a('rescueNotNeededTemplate', '{user}, deine Streak ist nicht in Gefahr ✅ Deine Punkte bekommst du zurück.', 'Nachricht, wenn die Streak nicht in Gefahr ist (Punkte werden erstattet)'),
+      a('rescueTooLongTemplate', '{user}, die Lücke ist zu lang oder zu lange her, da kann ich nichts mehr retten. Deine Punkte bekommst du zurück.', 'Nachricht, wenn die Lücke zu lang oder zu alt ist (Punkte werden erstattet)'),
+      ...SIGN('rescue', 'Streak-Rettung (Schild im Overlay)', 'Streak gerettet!', '{days} verpasste(r) Stream(s) überbrückt – Streak: {streak}'),
     ] },
   ],
 
   alerts: [
     { title: 'Alerts', hint: 'Prime-Subs meldet Twitch als Stufe 1. Nach dem Ein- oder Ausschalten die Webhooks abgleichen (Start → „Rewards &amp; Webhooks abgleichen“).', items: [
-      c('alertsEnabled', 'Alerts aktiv – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt'),
-      c('alertFollow', 'Follow'), c('alertSub', 'Sub, Resub und Prime'), c('alertGift', 'Gift-Subs (ein Alert pro Paket)'), c('alertCheer', 'Bits'),
-      n('alertCheerMin', 'Bits-Alert ab (Bits)', { min: 1 }),
-      c('alertChat', 'Zusätzlich eine Dankes-Nachricht im Chat'),
+      c('alertsEnabled', false, 'Alerts aktiv – erst einschalten, wenn das alte Alert-Tool aus ist, sonst kommt alles doppelt'),
+      c('alertFollow', true, 'Follow'), c('alertSub', true, 'Sub, Resub und Prime'), c('alertGift', true, 'Gift-Subs (ein Alert pro Paket)'), c('alertCheer', true, 'Bits'),
+      n('alertCheerMin', 1, 'Bits-Alert ab (Bits)', { min: 1, max: 1000000 }),
+      c('alertChat', false, 'Zusätzlich eine Dankes-Nachricht im Chat'),
     ] },
     { title: 'Chat-Dank', hint: `Platzhalter: ${code('user')} ${code('tier')} ${code('months')} ${code('total')} ${code('bits')}`, items: [
-      a('followTemplate', 'Follow'), a('subTemplate', 'Sub und Resub'), a('giftTemplate', 'Gift-Subs'), a('cheerTemplate', 'Bits'),
+      a('followTemplate', '💜 Danke für den Follow, {user}! Schön, dass du da bist.', 'Follow'), a('subTemplate', '⭐ {user} hat abonniert ({tier}, {months} Monate) – vielen Dank!', 'Sub und Resub'), a('giftTemplate', '🎁 {user} verschenkt {total} Sub(s) – du bist großartig!', 'Gift-Subs'), a('cheerTemplate', '💎 {user} schickt {bits} Bits – danke!', 'Bits'),
     ] },
     { title: 'Schilder im Overlay', hint: `Ist ein hochgeladener Ton länger als die Anzeigedauer, bleibt das Schild bis zum Ende des Tons stehen (höchstens 30 Sekunden). Warten mehrere Ereignisse, gilt die Reihenfolge: Raid, Sub, Cheer, Follow, danach Meilenstein, Check-in und Check-out. ${SIGN_HELP}`, items: [
-      ...SIGN('follow', 'Follow'), ...SIGN('sub', 'Sub / Prime'), ...SIGN('resub', 'Resub'), ...SIGN('gift', 'Gift-Subs'), ...SIGN('cheer', 'Bits'),
-      n('alertDuration', 'Anzeigedauer der Alert-Schilder (ms)', { min: 2000, max: 30000, step: 500 }),
+      ...SIGN('follow', 'Follow', 'Neuer Follower!', ''), ...SIGN('sub', 'Sub / Prime', 'Neues Abo!', 'Tier {tier} ({months} Monate)'), ...SIGN('resub', 'Resub', 'Abo-Treue!', 'Tier {tier} ({months} Monate)'), ...SIGN('gift', 'Gift-Subs', 'Sub-Geschenk!', 'verschenkt {total} Sub(s)!'), ...SIGN('cheer', 'Bits', 'Neuer Cheer!', '{bits} Bits'),
+      n('alertDuration', 8000, 'Anzeigedauer der Alert-Schilder (ms)', { min: 2000, max: 30000, step: 500 }),
     ] },
   ],
 
   raids: [
     { title: 'Raid-Reaktion', hint: 'Twitch erlaubt höchstens einen Shoutout alle 2 Minuten; bei Raids kurz hintereinander bleiben dann nur Chattext und Overlay-Karte. Nach dem Aktivieren oder Ausschalten die Webhooks abgleichen.', items: [
-      c('raidEnabled', 'Auf eingehende Raids reagieren'), c('raidShoutout', 'Offiziellen Twitch-Shoutout auslösen'), c('raidClip', 'Zufälligen Clip des Raiders im Overlay abspielen'),
-      n('raidMinViewers', 'Ab wie vielen Raidern reagieren', { min: 0 }), n('raidClipMaxSeconds', 'Clip höchstens (Sekunden)', { min: 5, max: 60 }),
+      c('raidEnabled', true, 'Auf eingehende Raids reagieren'), c('raidShoutout', true, 'Offiziellen Twitch-Shoutout auslösen'), c('raidClip', true, 'Zufälligen Clip des Raiders im Overlay abspielen'),
+      n('raidMinViewers', 1, 'Ab wie vielen Raidern reagieren', { min: 0, max: 100000 }), n('raidClipMaxSeconds', 30, 'Clip höchstens (Sekunden)', { min: 5, max: 60 }),
     ] },
     { title: 'Chat und Schild', hint: `Platzhalter: ${code('raider')} Name, ${code('viewers')} Zuschauer, ${code('game')} zuletzt gespieltes Spiel, ${code('url')} Kanallink, ${code('raids')} Anzahl der Raids dieses Kanals bei dir, ${code('visit')} fertiger Satzteil („zum ersten Mal bei uns“ / „schon zum 3. Mal bei uns“). Für das Schild gilt ${code('user')} für den Raider.`, items: [
-      a('raidTemplate', 'Chatnachricht beim Raid', { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka', raids: 3, visit: 'schon zum 3. Mal bei uns' }),
-      ...SIGN('raid', 'Raid'), n('raidDuration', 'Anzeigedauer des Raid-Schilds (ms)', { min: 2000, max: 30000, step: 500 }),
+      a('raidTemplate', '💜 RAID! {raider} ist mit {viewers} Leuten da – {visit}, danke dir! Zuletzt gespielt: {game}. Schaut bei {url} vorbei!', 'Chatnachricht beim Raid', { raider: 'Akinasuka', viewers: 42, game: 'Just Chatting', url: 'twitch.tv/akinasuka', raids: 3, visit: 'schon zum 3. Mal bei uns' }),
+      ...SIGN('raid', 'Raid', 'Raid-Alarm!', 'Bringt {viewers} Leute mit!'), n('raidDuration', 11_000, 'Anzeigedauer des Raid-Schilds (ms)', { min: 2000, max: 30000, step: 500 }),
     ] },
   ],
 
   soundboard: [
     { title: 'Chat beim Soundboard', hint: `Platzhalter: ${code('user')} Name, ${code('title')} Name des Eintrags.`, items: [
-      c('soundboardChat', 'Bei einer Einlösung eine Nachricht im Chat schreiben'),
-      t('soundboardTemplate', 'Chatnachricht', { maxlength: 200 }),
+      c('soundboardChat', false, 'Bei einer Einlösung eine Nachricht im Chat schreiben'),
+      t('soundboardTemplate', '🔊 {user} spielt „{title}“', 'Chatnachricht', { maxlength: 200 }),
     ] },
   ],
 
   einlaufsound: [
     { title: 'Einlaufsound: Preise und Laufzeit', hint: 'Der <b>Kauf</b> gilt die eingestellten Monate. <b>Verlängern</b> bringt anteilig Monate (Verlängern-Preis ÷ Kaufpreis × Kauf-Monate). Die genaue Monatszahl setzt die Stadtwache selbst in Reward-Name und Beschreibung. Nach Änderungen die Rewards abgleichen.', items: [
-      c('entrySoundEnabled', 'Einlaufsound aktivieren (zwei Rewards: Kauf und Verlängern)'),
-      t('entrySoundBuyTitle', 'Kauf: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundBuyCost', 'Kauf: Preis (Kanalpunkte)', { min: 1 }),
-      n('entrySoundBuyMonths', 'Kauf: gilt so viele Monate', { min: 1, max: 36 }),
-      t('entrySoundExtendTitle', 'Verlängern: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundExtendCost', 'Verlängern: Preis (Kanalpunkte)', { min: 1 }),
-      n('entrySoundMaxMonths', 'Höchste Restlaufzeit in Monaten (darüber hinaus wird nicht verlängert)', { min: 1, max: 60 }),
-      n('entrySoundKeepMonths', 'Abgelaufene Sounds so viele Monate aufbewahren (in der Zeit verlängerbar)', { min: 0, max: 24 }),
-      n('entrySoundMaxSeconds', 'Längster Sound in Sekunden (das Overlay schneidet längere ab)', { min: 1, max: 30 }),
-      n('entrySoundUploadDays', 'Frist für den Upload nach dem Kauf in Tagen (danach Punkte zurück)', { min: 1, max: 90 }),
+      c('entrySoundEnabled', false, 'Einlaufsound aktivieren (zwei Rewards: Kauf und Verlängern)'),
+      t('entrySoundBuyTitle', 'Eigener Einlaufsound', 'Kauf: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundBuyCost', 75_000, 'Kauf: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      n('entrySoundBuyMonths', 6, 'Kauf: gilt so viele Monate', { min: 1, max: 36 }),
+      t('entrySoundExtendTitle', 'Einlaufsound verlängern', 'Verlängern: Reward-Name (die Monate kommen automatisch dahinter)', { maxlength: 30 }), n('entrySoundExtendCost', 25_000, 'Verlängern: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      n('entrySoundMaxMonths', 12, 'Höchste Restlaufzeit in Monaten (darüber hinaus wird nicht verlängert)', { min: 1, max: 60 }),
+      n('entrySoundKeepMonths', 3, 'Abgelaufene Sounds so viele Monate aufbewahren (in der Zeit verlängerbar)', { min: 0, max: 24 }),
+      n('entrySoundMaxSeconds', 5, 'Längster Sound in Sekunden (das Overlay schneidet längere ab)', { min: 1, max: 30 }),
+      n('entrySoundUploadDays', 14, 'Frist für den Upload nach dem Kauf in Tagen (danach Punkte zurück)', { min: 1, max: 90 }),
     ] },
     { title: 'Top des Monats: Sound aus dem Katalog', hint: `Die Besten des Vormonats (Monatsrangliste, nur Verknüpfte) suchen sich einen Sound aus dem Katalog aus (unten pflegen). Gleichstand auf dem letzten Platz: alle mit derselben Punktzahl. Wer nicht wählt, behält den normalen Ton, ein gekaufter Sound hat Vorrang. Der Monat wird ab dem 2. des Folgemonats von selbst abgeschlossen. Platzhalter: ${code('user')} ${code('n')} ${code('month')} ${code('list')} ${code('url')} ${code('until')} ${code('sound')}.`, items: [
-      c('awardEnabled', 'Auswahl der Top des Monats aktivieren (braucht die aktive Community-Rangliste)'),
-      n('awardSize', 'Wie viele Plätze (bei Gleichstand mehr)', { min: 1, max: 10 }), n('awardDays', 'Frist zum Wählen in Tagen', { min: 1, max: 30 }),
-      n('awardMonths', 'Der Sound gilt so viele Monate ab der ersten Auswahl', { min: 1, max: 12 }),
-      a('awardAnnounceTemplate', 'Chat-Nachricht beim Monatsabschluss', { n: 3, month: 'Oktober 2026', list: '1. Anna · 2. Ben · 3. Cleo', url: 'https://…/einlaufsound', until: '07.11.2026' }),
-      a('awardTipTemplate', 'Erinnerung beim Check-in, solange nicht gewählt', { user: 'Max', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
-      a('awardRerollTemplate', 'Nachricht, wenn für einen Gewinner neu gezogen wurde', { user: 'Max', old: 'Moritz', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
-      a('awardChosenTemplate', 'Nachricht, wenn gewählt wurde', { user: 'Max', sound: 'Fanfare', until: '07.12.2026' }),
+      c('awardEnabled', false, 'Auswahl der Top des Monats aktivieren (braucht die aktive Community-Rangliste)'),
+      n('awardSize', 3, 'Wie viele Plätze (bei Gleichstand mehr)', { min: 1, max: 10 }), n('awardDays', 7, 'Frist zum Wählen in Tagen', { min: 1, max: 30 }),
+      n('awardMonths', 1, 'Der Sound gilt so viele Monate ab der ersten Auswahl', { min: 1, max: 12 }),
+      a('awardAnnounceTemplate', '🏆 Die Top {n} im {month}: {list}! Ihr dürft euch einen Einlaufsound aussuchen: {url} (bis {until})', 'Chat-Nachricht beim Monatsabschluss', { n: 3, month: 'Oktober 2026', list: '1. Anna · 2. Ben · 3. Cleo', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardTipTemplate', '🏆 {user}, du warst im {month} unter den Top {n}! Such dir deinen Einlaufsound aus: {url} (noch bis {until})', 'Erinnerung beim Check-in, solange nicht gewählt', { user: 'Max', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardRerollTemplate', '🎲 Neu gezogen: @{user} rückt für {old} in die Top {n} im {month} nach! Such dir deinen Einlaufsound aus: {url} (bis {until})', 'Nachricht, wenn für einen Gewinner neu gezogen wurde', { user: 'Max', old: 'Moritz', n: 3, month: 'Oktober 2026', url: 'https://…/einlaufsound', until: '07.11.2026' }),
+      a('awardChosenTemplate', '🔊 {user} hat sich den Einlaufsound „{sound}“ ausgesucht, gültig bis {until}!', 'Nachricht, wenn gewählt wurde', { user: 'Max', sound: 'Fanfare', until: '07.12.2026' }),
     ] },
     { title: 'Einlaufsound: Chat-Texte', hint: `Platzhalter: ${code('user')} Name, ${code('months')} Monate, ${code('until')} gültig bis, ${code('url')} Upload-Seite, ${code('days')} Frist, ${code('rest')} Restlaufzeit, ${code('max')} Obergrenze, ${code('reason')} Ablehnungsgrund. Nachrichten mit „Punkte zurück“ erstatten die Einlösung.`, items: [
-      a('entrySoundBuyTemplate', 'Nach dem Kauf', { user: 'Max', months: '6 Monate', url: 'https://…/einlaufsound', days: 14 }),
-      a('entrySoundHasTemplate', 'Kauf, obwohl schon ein Sound gilt', { user: 'Max', until: '14.04.2027' }),
-      a('entrySoundOpenTemplate', 'Kauf oder Verlängern, obwohl ein Kauf noch offen ist', { user: 'Max', url: 'https://…/einlaufsound' }),
-      a('entrySoundNoneTemplate', 'Verlängern ohne gekauften Sound', { user: 'Max' }),
-      a('entrySoundExtendTemplate', 'Nach dem Verlängern', { user: 'Max', months: '2 Monate', until: '14.04.2027', url: 'https://…/einlaufsound' }),
-      a('entrySoundTooMuchTemplate', 'Verlängern über der Obergrenze', { user: 'Max', max: '12 Monate', rest: '11,5 Monate' }),
-      a('entrySoundBusyTemplate', 'Gleichzeitige Einlösung'),
-      a('entrySoundApprovedTemplate', 'Sound freigegeben', { user: 'Max', until: '14.04.2027' }),
-      a('entrySoundRejectedTemplate', 'Sound abgelehnt, neuer Upload möglich', { user: 'Max', reason: 'zu laut', url: 'https://…/einlaufsound' }),
-      a('entrySoundRefundTemplate', 'Sound abgelehnt, Punkte zurück', { user: 'Max', reason: 'enthält Musik' }),
-      a('entrySoundExpiredTemplate', 'Upload-Frist abgelaufen, Punkte zurück', { user: 'Max' }),
+      a('entrySoundBuyTemplate', '🔊 {user}, danke! Lade deinen Einlaufsound hier hoch: {url} (innerhalb von {days} Tagen). Nach der Prüfung gilt er {months}. Gefällt er nicht, bekommst du deine Punkte zurück.', 'Nach dem Kauf', { user: 'Max', months: '6 Monate', url: 'https://…/einlaufsound', days: 14 }),
+      a('entrySoundHasTemplate', '{user}, du hast schon einen Einlaufsound (gültig bis {until}) – zum Verlängern nimm bitte „Einlaufsound verlängern“. Deine Punkte bekommst du zurück.', 'Kauf, obwohl schon ein Sound gilt', { user: 'Max', until: '14.04.2027' }),
+      a('entrySoundOpenTemplate', '{user}, dein Kauf wartet noch auf deinen Upload oder auf die Prüfung: {url} Deine Punkte bekommst du zurück.', 'Kauf oder Verlängern, obwohl ein Kauf noch offen ist', { user: 'Max', url: 'https://…/einlaufsound' }),
+      a('entrySoundNoneTemplate', '{user}, du hast noch keinen Einlaufsound gekauft – nimm zuerst „Eigener Einlaufsound“. Deine Punkte bekommst du zurück.', 'Verlängern ohne gekauften Sound', { user: 'Max' }),
+      a('entrySoundExtendTemplate', '🔊 {user} verlängert den Einlaufsound um {months} – gültig bis {until}. Einen neuen Sound kannst du hier hochladen: {url}', 'Nach dem Verlängern', { user: 'Max', months: '2 Monate', until: '14.04.2027', url: 'https://…/einlaufsound' }),
+      a('entrySoundTooMuchTemplate', '{user}, mehr als {max} Restlaufzeit geht nicht (aktuell noch {rest}). Deine Punkte bekommst du zurück.', 'Verlängern über der Obergrenze', { user: 'Max', max: '12 Monate', rest: '11,5 Monate' }),
+      a('entrySoundBusyTemplate', '{user}, gerade läuft schon eine Einlösung für dich – bitte gleich noch einmal versuchen. Deine Punkte bekommst du zurück.', 'Gleichzeitige Einlösung'),
+      a('entrySoundApprovedTemplate', '🔊 {user}, dein Einlaufsound ist freigegeben und gilt bis {until}!', 'Sound freigegeben', { user: 'Max', until: '14.04.2027' }),
+      a('entrySoundRejectedTemplate', '{user}, dein Einlaufsound wurde leider abgelehnt ({reason}). Lade hier einen anderen hoch: {url}', 'Sound abgelehnt, neuer Upload möglich', { user: 'Max', reason: 'zu laut', url: 'https://…/einlaufsound' }),
+      a('entrySoundRefundTemplate', '{user}, dein Einlaufsound wurde abgelehnt ({reason}). Deine Punkte bekommst du zurück.', 'Sound abgelehnt, Punkte zurück', { user: 'Max', reason: 'enthält Musik' }),
+      a('entrySoundExpiredTemplate', '{user}, du hast deinen Einlaufsound nicht rechtzeitig hochgeladen. Deine Punkte bekommst du zurück.', 'Upload-Frist abgelaufen, Punkte zurück', { user: 'Max' }),
     ] },
   ],
 
   community: [
     { title: 'Community-Rangliste des Monats', hint: 'Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. <b>Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.</b> Voraussetzung ist das Geheimwort <code>LINK_SECRET</code> in der Stadtwache-App (und beim Bot). Nach dem Ein- oder Ausschalten die Webhooks abgleichen.', items: [
-      c('communityEnabled', 'Community-Rangliste aktivieren (Zählen, Verknüpfen, Monatsrangliste)'),
-      n('communityWeightMsg', 'Punkte je Nachricht', { min: 0, max: 1000 }), n('communityWeightDay', 'Punkte je aktivem Tag (Twitch und Discord getrennt gezählt)', { min: 0, max: 1000 }),
-      n('communityWeightCheckin', 'Punkte je Check-in-Tag', { min: 0, max: 1000 }),
-      n('communityMsgCap', 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
-      n('communityMsgGap', 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
-      t('communityCommand', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, placeholder: '!verknuepfen' }),
-      t('communityRankCommand', 'Chat-Befehl für die Monatsrangliste', { maxlength: 26, placeholder: '!rangliste' }), n('communityRankSize', 'Wie viele Plätze im Chat zeigen', { min: 1, max: 10 }),
-      t('communityHint', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
-      t('communityBonusNote', 'Zeile zu Bonuspunkten in der Legende der Rangliste', { maxlength: 400 }),
+      c('communityEnabled', false, 'Community-Rangliste aktivieren (Zählen, Verknüpfen, Monatsrangliste)'),
+      n('communityWeightMsg', 1, 'Punkte je Nachricht', { min: 0, max: 1000 }), n('communityWeightDay', 10, 'Punkte je aktivem Tag (Twitch und Discord getrennt gezählt)', { min: 0, max: 1000 }),
+      n('communityWeightCheckin', 20, 'Punkte je Check-in-Tag', { min: 0, max: 1000 }),
+      n('communityMsgCap', 30, 'Gezählte Nachrichten pro Tag und Plattform (höchstens)', { min: 1, max: 500 }),
+      n('communityMsgGap', 60, 'Mindestabstand zwischen zwei gezählten Nachrichten (Sekunden)', { min: 0, max: 3600 }),
+      t('communityCommand', '!verknuepfen', 'Chat-Befehl, der die Verknüpfung erklärt', { maxlength: 26, kind: 'command', placeholder: '!verknuepfen' }),
+      t('communityRankCommand', '!rangliste', 'Chat-Befehl für die Monatsrangliste', { maxlength: 26, kind: 'command', placeholder: '!rangliste' }), n('communityRankSize', 5, 'Wie viele Plätze im Chat zeigen', { min: 1, max: 10 }),
+      t('communityHint', 'Nur verknüpfte Konten erscheinen hier. So geht’s: im Discord /verknuepfen tippen oder im Chat !verknuepfen.', 'Hinweis unter der Rangliste und im Twitch-Panel', { maxlength: 400 }),
+      t('communityBonusNote', 'Bonuspunkte gibt es für besondere Taten, zum Beispiel +40 Punkte für den Clip der Woche im Discord.', 'Zeile zu Bonuspunkten in der Legende der Rangliste', { maxlength: 400 }),
     ] },
     { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
-      c('communityTip', 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
-      c('clipHintEnabled', 'Unter geteilten Clips einen Hinweis schreiben (nur wenn der Ersteller noch nicht verknüpft ist)'),
-      t('discordInvite', 'Discord-Einladungslink für den Clip-Hinweis', { maxlength: 200, placeholder: 'https://discord.gg/…' }),
-      a('clipHintTemplate', 'Hinweis unter einem Clip', { creator: 'Fan', user: 'Max', discord: 'https://discord.gg/…' }),
-      a('communityTipTemplate', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
-      a('communityLinkTemplate', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
-      a('communityRankTemplate', 'Antwort auf den Rangliste-Befehl', { month: 'Oktober 2026', list: '1. Anna (120) · 2. Ben (80)', me: ' · Du: Platz 7 (45)', url: 'https://…/rangliste' }),
-      a('communityRankEmpty', 'Antwort, wenn noch niemand Punkte hat', { month: 'Oktober 2026', url: 'https://…/rangliste' }),
+      c('communityTip', true, 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
+      c('clipHintEnabled', true, 'Unter geteilten Clips einen Hinweis schreiben (nur wenn der Ersteller noch nicht verknüpft ist)'),
+      t('discordInvite', 'https://discord.gg/qxPqqhYwtJ', 'Discord-Einladungslink für den Clip-Hinweis', { maxlength: 200, placeholder: 'https://discord.gg/…' }),
+      a('clipHintTemplate', '🎬 Starker Clip, {creator}! Komm ins Dorf ({discord}) und tippe hier !verknuepfen: Dann kannst du im Discord ClipMaster werden und bekommst Bonuspunkte für die Rangliste. 🏆', 'Hinweis unter einem Clip', { creator: 'Fan', user: 'Max', discord: 'https://discord.gg/…' }),
+      a('communityTipTemplate', '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityLinkTemplate', '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
+      a('communityRankTemplate', '🏆 Dorf-Rangliste {month}: {list}{me} · Alle Plätze: {url}', 'Antwort auf den Rangliste-Befehl', { month: 'Oktober 2026', list: '1. Anna (120) · 2. Ben (80)', me: ' · Du: Platz 7 (45)', url: 'https://…/rangliste' }),
+      a('communityRankEmpty', '🏆 In der Dorf-Rangliste {month} stehen noch keine Punkte. Verknüpfe dich mit !verknuepfen und leg los! {url}', 'Antwort, wenn noch niemand Punkte hat', { month: 'Oktober 2026', url: 'https://…/rangliste' }),
     ] },
   ],
 
   chatleiste: [
     { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Overlays, Abschnitt Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. <b>!reset</b> setzt alles zurück.', items: [
-      c('chatOverlayEnabled', 'Chat-Leiste aktivieren (braucht den Chat-Webhook)'),
-      n('chatOverlayMax', 'Höchstens so viele Nachrichten gleichzeitig', { min: 1, max: 30 }),
-      n('chatOverlaySeconds', 'Eine Nachricht verschwindet nach so vielen Sekunden (0 = sie bleibt, bis neue sie wegschieben)', { min: 0, max: 3600 }),
-      t('chatOverlayVip', 'Namen, die Glitzer und Verlauf auch ohne Abo nutzen dürfen (mit Komma getrennt)', { maxlength: 400 }),
-      c('chatOverlayHideCommands', 'Befehle (Nachrichten mit !) nicht zeigen'),
+      c('chatOverlayEnabled', false, 'Chat-Leiste aktivieren (braucht den Chat-Webhook)'),
+      n('chatOverlayMax', 10, 'Höchstens so viele Nachrichten gleichzeitig', { min: 1, max: 30 }),
+      n('chatOverlaySeconds', 0, 'Eine Nachricht verschwindet nach so vielen Sekunden (0 = sie bleibt, bis neue sie wegschieben)', { min: 0, max: 3600 }),
+      t('chatOverlayVip', 'ehrlichverwirrt, novelsbyeverly, pyronema, artemis_podowy', 'Namen, die Glitzer und Verlauf auch ohne Abo nutzen dürfen (mit Komma getrennt)', { maxlength: 400 }),
+      c('chatOverlayHideCommands', true, 'Befehle (Nachrichten mit !) nicht zeigen'),
     ] },
   ],
 
   alpakas: [
     { title: 'Alpakas im Overlay', hint: `Jede Person, die im Chat schreibt, läuft als Pixel-Alpaka durchs Bild, bis sie länger nichts mehr geschrieben hat. Ohne Reward haben alle einen natürlichen Fellton (weiß, beige, braun, grau). Mit dem Reward „Alpaka färben“ schreibt man die Farbe beim Einlösen dazu: einen Namen wie rot, türkis oder rosa, einen Hex-Code wie #ff8800 oder „zufall“. Die Farbe bleibt dauerhaft. Nach dem Ein- oder Ausschalten und nach Änderungen an Name oder Preis die Rewards abgleichen. Platzhalter der Texte: ${code('user')} ${code('color')}.`, items: [
-      c('alpacaEnabled', 'Alpakas aktivieren (braucht den Chat-Webhook und legt den Reward „Alpaka färben“ an)'),
-      n('alpacaMax', 'Höchstens so viele Alpakas gleichzeitig (die zuletzt aktiven)', { min: 1, max: 60 }),
-      n('alpacaMinutes', 'Alpaka läuft so viele Minuten nach der letzten Nachricht weiter', { min: 5, max: 720 }),
-      t('alpacaRewardTitle', 'Reward-Name', { maxlength: 45 }), n('alpacaRewardCost', 'Preis (Kanalpunkte)', { min: 1 }),
-      a('alpacaTemplate', 'Chatnachricht nach dem Färben', { user: 'Max', color: 'türkis' }),
-      a('alpacaBadTemplate', 'Nachricht, wenn die Farbe unbekannt ist (Punkte werden erstattet)', { user: 'Max' }),
+      c('alpacaEnabled', false, 'Alpakas aktivieren (braucht den Chat-Webhook und legt den Reward „Alpaka färben“ an)'),
+      n('alpacaMax', 30, 'Höchstens so viele Alpakas gleichzeitig (die zuletzt aktiven)', { min: 1, max: 60 }),
+      n('alpacaMinutes', 90, 'Alpaka läuft so viele Minuten nach der letzten Nachricht weiter', { min: 5, max: 720 }),
+      t('alpacaRewardTitle', 'Alpaka färben', 'Reward-Name', { maxlength: 45 }), n('alpacaRewardCost', 500, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      a('alpacaTemplate', '🦙 {user} färbt sein Alpaka: {color}!', 'Chatnachricht nach dem Färben', { user: 'Max', color: 'türkis' }),
+      a('alpacaBadTemplate', '{user}, diese Farbe kenne ich nicht 🦙 Schreib beim Einlösen zum Beispiel „rot“, „türkis“, „rosa“, einen Hex-Code wie #ff8800 oder „zufall“. Deine Punkte bekommst du zurück.', 'Nachricht, wenn die Farbe unbekannt ist (Punkte werden erstattet)', { user: 'Max' }),
     ] },
   ],
 
   chat: [
     { title: 'Chat-Befehle', hint: `Die Befehle laufen über den Chat-Webhook. Nach dem Ein- oder Ausschalten die Webhooks abgleichen. Platzhalter für <b>!streak</b>: ${code('user')} ${code('count')} Besuche, ${code('streak')} ${code('record')}, ${code('time')} Gesamtzeit, ${code('rank')} Platz, ${code('total')} Besucher gesamt. Für <b>!top</b>: ${code('n')} und ${code('list')}. Die Abklingzeit gilt je Befehl für den ganzen Chat.`, items: [
-      c('chatCommands', 'Chat-Befehle aktivieren'),
-      t('streakCommand', 'Befehl für die eigenen Zahlen', { maxlength: 26, placeholder: '!streak' }), t('topCommand', 'Befehl für die Bestenliste', { maxlength: 26, placeholder: '!top' }),
-      n('commandCooldown', 'Abklingzeit (Sekunden)', { min: 0, max: 600 }), n('topSize', 'Plätze in der Bestenliste', { min: 1, max: 10 }),
-      a('streakCmdTemplate', 'Antwort auf !streak', { user: 'Max', count: 24, streak: 5, record: 9, time: '18 Std 40 Min', rank: 3, total: 120 }),
-      a('streakCmdNone', 'Antwort, wenn noch kein Check-in vorhanden ist', { user: 'Max' }),
-      a('topTemplate', 'Antwort auf !top', { n: 5, list: '1. Anna (42) · 2. Max (37) · 3. Kai (30)' }),
+      c('chatCommands', true, 'Chat-Befehle aktivieren'),
+      t('streakCommand', '!streak', 'Befehl für die eigenen Zahlen', { maxlength: 26, kind: 'command', placeholder: '!streak' }), t('topCommand', '!top', 'Befehl für die Bestenliste', { maxlength: 26, kind: 'command', placeholder: '!top' }),
+      n('commandCooldown', 10, 'Abklingzeit (Sekunden)', { min: 0, max: 600 }), n('topSize', 5, 'Plätze in der Bestenliste', { min: 1, max: 10 }),
+      a('streakCmdTemplate', '📊 {user}: {count} Besuche · 🔥 Streak {streak} (Rekord {record}) · {time} im Stream · Platz {rank} von {total}', 'Antwort auf !streak', { user: 'Max', count: 24, streak: 5, record: 9, time: '18 Std 40 Min', rank: 3, total: 120 }),
+      a('streakCmdNone', '{user}, ich habe noch keinen Check-in von dir – löse den Check-in-Reward ein ✅', 'Antwort, wenn noch kein Check-in vorhanden ist', { user: 'Max' }),
+      a('topTemplate', '🏆 Top {n} Stammgäste: {list}', 'Antwort auf !top', { n: 5, list: '1. Anna (42) · 2. Max (37) · 3. Kai (30)' }),
     ] },
     { title: 'Shoutout und Zitate', hint: `Beides ist standardmäßig aus. <b>!so name</b> dürfen Mods und du nutzen, der Bot macht den offiziellen Twitch-Shoutout und schreibt eine Nachricht (Platzhalter ${code('name')} ${code('game')} ${code('url')}). Twitch erlaubt Shoutouts nur, solange du live bist, und höchstens einen alle 2 Minuten. Der <b>Auto-Shoutout</b> gilt für die Namen in der Liste, einmal pro Stream-Tag beim ersten Chat-Beitrag. <b>Zitate:</b> jeder kann <b>!quote</b> (oder <b>!quote 3</b>) nutzen, Mods speichern mit <b>!addquote Text</b> und löschen mit <b>!delquote 3</b>. Platzhalter ${code('n')} ${code('text')} ${code('by')} ${code('date')}.`, items: [
-      c('soEnabled', '!so (Shoutout per Befehl) aktivieren'), t('soCommand', 'Befehl für den Shoutout', { maxlength: 26, placeholder: '!so' }),
-      a('soTemplate', 'Nachricht beim Shoutout', { name: 'RaiderIn', game: 'Hades', url: 'twitch.tv/raiderin' }),
-      c('autoShoutoutEnabled', 'Auto-Shoutout für Stammgäste aktivieren'), t('autoShoutoutUsers', 'Namen für den Auto-Shoutout (mit Komma getrennt)', { maxlength: 400 }),
-      c('quoteEnabled', 'Zitate aktivieren'),
-      t('quoteCommand', 'Befehl zum Anzeigen', { maxlength: 26, placeholder: '!quote' }), t('quoteAddCommand', 'Befehl zum Speichern (Mods)', { maxlength: 26, placeholder: '!addquote' }), t('quoteDelCommand', 'Befehl zum Löschen (Mods)', { maxlength: 26, placeholder: '!delquote' }),
-      a('quoteTemplate', 'Anzeige eines Zitats', { n: 3, text: 'Das war Absicht!', by: 'Max', date: '11.11.2026' }),
-      a('quoteAddedTemplate', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
-      a('quoteNoneTemplate', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
+      c('soEnabled', false, '!so (Shoutout per Befehl) aktivieren'), t('soCommand', '!so', 'Befehl für den Shoutout', { maxlength: 26, kind: 'command', placeholder: '!so' }),
+      a('soTemplate', '📣 Schaut bei {name} vorbei: {url} – zuletzt gespielt: {game} 💜', 'Nachricht beim Shoutout', { name: 'RaiderIn', game: 'Hades', url: 'twitch.tv/raiderin' }),
+      c('autoShoutoutEnabled', false, 'Auto-Shoutout für Stammgäste aktivieren'), t('autoShoutoutUsers', '', 'Namen für den Auto-Shoutout (mit Komma getrennt)', { maxlength: 400 }),
+      c('quoteEnabled', false, 'Zitate aktivieren'),
+      t('quoteCommand', '!quote', 'Befehl zum Anzeigen', { maxlength: 26, kind: 'command', placeholder: '!quote' }), t('quoteAddCommand', '!addquote', 'Befehl zum Speichern (Mods)', { maxlength: 26, kind: 'command', placeholder: '!addquote' }), t('quoteDelCommand', '!delquote', 'Befehl zum Löschen (Mods)', { maxlength: 26, kind: 'command', placeholder: '!delquote' }),
+      a('quoteTemplate', '💬 Zitat #{n}: „{text}“ ({date})', 'Anzeige eines Zitats', { n: 3, text: 'Das war Absicht!', by: 'Max', date: '11.11.2026' }),
+      a('quoteAddedTemplate', '✅ Zitat #{n} gespeichert.', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
+      a('quoteNoneTemplate', '{user}, ich kenne noch kein Zitat. Mods können mit !addquote eins anlegen.', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
     ] },
   ],
 
   abspann: [
     { title: 'Abspann', hint: 'Der Abspann sammelt pro Stream-Tag automatisch, wer geschrieben, gefolgt, abonniert, Bits geschickt oder geraidet hat – auch wenn die Alerts ausgeschaltet sind. Nach dem Einschalten die Webhooks abgleichen, sonst werden keine Ereignisse empfangen. Bots stehen nicht im Abspann.', items: [
-      c('creditsEnabled', 'Abspann-Daten sammeln'),
-      t('creditsTitle', 'Überschrift', { maxlength: 80 }), t('creditsOutro', 'Schlusszeile', { maxlength: 80 }),
-      n('creditsSpeed', 'Lauftempo (Pixel pro Sekunde)', { min: 20, max: 300 }),
-      c('creditsChatters', 'Chatter nennen'), c('creditsFollows', 'Neue Follower nennen'), c('creditsSubs', 'Abonnenten und Sub-Geschenke nennen'), c('creditsBits', 'Bits nennen'), c('creditsRaids', 'Raids nennen'),
-      t('creditsIgnore', 'Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen (mit Komma getrennt)', { maxlength: 400 }),
+      c('creditsEnabled', true, 'Abspann-Daten sammeln'),
+      t('creditsTitle', 'Danke fürs Zuschauen!', 'Überschrift', { maxlength: 80 }), t('creditsOutro', 'Bis zum nächsten Mal! 💜', 'Schlusszeile', { maxlength: 80 }),
+      n('creditsSpeed', 70, 'Lauftempo (Pixel pro Sekunde)', { min: 20, max: 300 }),
+      c('creditsChatters', true, 'Chatter nennen'), c('creditsFollows', true, 'Neue Follower nennen'), c('creditsSubs', true, 'Abonnenten und Sub-Geschenke nennen'), c('creditsBits', true, 'Bits nennen'), c('creditsRaids', true, 'Raids nennen'),
+      t('creditsIgnore', 'nightbot, streamelements, moobot, streamlabs, fossabot', 'Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen (mit Komma getrennt)', { maxlength: 400 }),
     ] },
     { title: 'Rangliste', hint: 'Die Rangliste (Seite und Twitch-Panel) zeigt nur Namen und Zahlen: Besuche, Chat-Nachrichten, Streaks und Zeit im Stream. Sie ist ohne Anmeldung erreichbar. Die Chat-Zählung beginnt beim Einschalten, Twitch liefert keinen Verlauf. Dein eigener Name und die Bots oben werden nicht gezählt.', items: [
-      c('leaderboardPublic', 'Rangliste öffentlich anzeigen'), c('chatStats', 'Chat-Nachrichten zählen (für die Chatter-Rangliste, braucht den Chat-Webhook)'),
-      n('leaderboardSize', 'Plätze je Liste', { min: 3, max: 25 }),
+      c('leaderboardPublic', true, 'Rangliste öffentlich anzeigen'), c('chatStats', true, 'Chat-Nachrichten zählen (für die Chatter-Rangliste, braucht den Chat-Webhook)'),
+      n('leaderboardSize', 10, 'Plätze je Liste', { min: 3, max: 25 }),
     ] },
   ],
 
   allgemein: [
     { title: 'Allgemein', hint: 'Der Stream-Tag wechselt zur eingestellten Uhrzeit, damit Streams nach Mitternacht nicht doppelt zählen.', items: [
-      n('volume', 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
-      n('duration', 'Anzeigedauer Check-in, Check-out und Meilenstein (ms)', { min: 2000, max: 30000, step: 500 }),
-      t('timezone', 'Zeitzone'), n('dayRolloverHour', 'Neuer Stream-Tag ab (Uhr)', { min: 0, max: 23 }),
-      c('chatEnabled', 'Chatnachrichten senden (ausgeschaltet schreibt der Bot gar nichts)'),
+      n('volume', 0.6, 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
+      n('duration', 5000, 'Anzeigedauer Check-in, Check-out und Meilenstein (ms)', { min: 2000, max: 30000, step: 500 }),
+      t('timezone', 'Europe/Berlin', 'Zeitzone', { kind: 'timezone' }), n('dayRolloverHour', 5, 'Neuer Stream-Tag ab (Uhr)', { min: 0, max: 23 }),
+      c('chatEnabled', true, 'Chatnachrichten senden (ausgeschaltet schreibt der Bot gar nichts)'),
     ] },
     { title: 'Automatische Sicherung', hint: 'Die Stadtwache sichert sich jede Nacht selbst in den Backup-Ordner auf dem Server (siehe Backup &amp; Wiederherstellen unten). Am besten liegt der Ordner auf einem anderen Gerät, zum Beispiel einer Freigabe deines NAS.', items: [
-      c('backupAutoEnabled', 'Jede Nacht automatisch sichern'),
-      n('backupHour', 'Sichern um (Uhr)', { min: 0, max: 23 }),
-      n('backupKeep', 'So viele Sicherungen aufheben', { min: 1, max: 90 }),
-      c('backupMedia', 'Mit Tönen und Bildern sichern'),
+      c('backupAutoEnabled', true, 'Jede Nacht automatisch sichern'),
+      n('backupHour', 3, 'Sichern um (Uhr)', { min: 0, max: 23 }),
+      n('backupKeep', 7, 'So viele Sicherungen aufheben', { min: 1, max: 90 }),
+      c('backupMedia', true, 'Mit Tönen und Bildern sichern'),
     ] },
   ],
 };
