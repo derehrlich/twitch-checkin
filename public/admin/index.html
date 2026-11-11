@@ -152,7 +152,7 @@
     </div>
 
     <div class="tab-panel hidden" data-panel="chat">
-      <p class="muted intro">Alles, was im Twitch-Chat passiert: eigene Commands, Befehle wie !streak, Shoutout, Zitate und die Chat-Leiste fürs Overlay.</p>
+      <p class="muted intro">Alles, was im Twitch-Chat passiert: eigene Commands, Befehle wie !streak, Shoutout, Zitate, Moderation (Links, Spam, gesperrte Wörter) und die Chat-Leiste fürs Overlay.</p>
       <section class="card">
         <h2>Commands und Regeln</h2>
         <p>Eigene Chat-Befehle, Stichwörter und Zeitsteuerung. Jeder Command löst eine oder mehrere <b>Aktionen nacheinander</b> aus: Chat-Text, Overlay-Alert oder ein Sound aus dem Soundboard (Sounds und Alerts spielen nach der gemeinsamen Reihenfolge, nichts überlagert sich).</p>
@@ -178,6 +178,12 @@
         </div>
       </section>
       <div data-schema="chatleiste" style="display:grid; gap:22px;"></div>
+      <section class="card" id="modCard">
+        <h2>Moderation: Protokoll</h2>
+        <p class="muted">Hier steht, was der Bot zuletzt gelöscht hat (die letzten 100 Einträge). Im Testmodus steht „Test“ dabei: Die Nachricht ist stehen geblieben, der Bot hätte sie aber gelöscht. Passt eine Regel nicht, stell sie oben ein oder aus.</p>
+        <div id="modLog"></div>
+        <div class="row" style="margin-top:12px"><button id="modReload" class="ghost">Aktualisieren</button><button id="modClear" class="danger">Protokoll leeren</button></div>
+      </section>
     </div>
 
     <div class="tab-panel hidden" data-panel="belohnungen">

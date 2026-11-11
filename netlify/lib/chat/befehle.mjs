@@ -13,6 +13,7 @@ import { linkReply, rankReply } from '../belohnungen/community.mjs';
 import { allUsers } from '../admin/common.mjs';
 import { addQuote, deleteQuote, pickQuote, quoteText, shoutChannel } from './extras.mjs';
 import { allowed } from './commands.mjs';
+import { PERMIT_SECONDS, permit } from './moderation.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -79,6 +80,15 @@ export const BEFEHLE = [
       const num = /^#?(\d+)$/.exec(args)?.[1];
       if (!num || !(await deleteQuote(num))) return `${e.chatter_user_name}, dieses Zitat gibt es nicht. Beispiel: ${settings.quoteDelCommand} 3`;
       return `🗑️ Zitat #${num} ist gelöscht.`;
+    },
+  },
+  {
+    id: 'permit', wort: (s) => s.modPermitCommand, aktiv: (s) => s.modEnabled, rolle: 'mod',
+    async run({ e, args, settings }) {
+      const login = args.split(/\s+/)[0]?.replace(/^@/, '').toLowerCase();
+      if (!login) return `${e.chatter_user_name}, für wen? Zum Beispiel ${settings.modPermitCommand} name`;
+      await permit(login);
+      return `✅ @${login} darf in den nächsten ${PERMIT_SECONDS} Sekunden einen Link posten.`;
     },
   },
 ];

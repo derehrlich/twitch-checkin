@@ -179,6 +179,26 @@ export const SCHEMA = {
       a('quoteAddedTemplate', '✅ Zitat #{n} gespeichert.', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
       a('quoteNoneTemplate', '{user}, ich kenne noch kein Zitat. Mods können mit !addquote eins anlegen.', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
     ] },
+    { title: 'Moderation', hint: `Löscht Nachrichten, die gegen eine Regel verstoßen, und warnt kurz im Chat. <b>Nie betroffen:</b> du und deine Mods. VIPs, Abonnenten und Stammgäste (ab der eingestellten Zahl an Check-ins) dürfen Links, Großbuchstaben, Wiederholungen und Emotes, nur gesperrte Wörter gelten für sie auch. <b>Twitch-Clips</b> darf jeder teilen. Mit <b>!permit name</b> erlauben Mods jemandem 60 Sekunden lang einen Link. Fang mit dem <b>Testmodus</b> an: Dann schreibt der Bot nur ins Protokoll (Reiter Chat, unten), was er gelöscht <i>hätte</i>. Der Bot braucht dafür neue Rechte von Twitch: einmal auf Start → „Mit Twitch verbinden“ klicken. Platzhalter der Warnung: ${code('user', 'reason', 'n')}.`, items: [
+      c('modEnabled', false, 'Moderation aktivieren'),
+      c('modTestMode', true, 'Testmodus: nur ins Protokoll schreiben, nichts löschen'),
+      c('modLinks', true, 'Links löschen'),
+      c('modAllowClips', true, 'Twitch-Clips immer erlauben (clips.twitch.tv und twitch.tv/…/clip/…)'),
+      t('modLinkAllow', 'youtube.com, youtu.be', 'Weitere erlaubte Adressen für Links (mit Komma getrennt)', { maxlength: 400, empty: true }),
+      t('modWords', '', 'Gesperrte Wörter (mit Komma getrennt, gilt auch für VIPs, Abonnenten und Stammgäste)', { maxlength: 400, empty: true }),
+      c('modCaps', true, 'Zu viele Großbuchstaben löschen'),
+      n('modCapsMin', 15, 'Erst prüfen ab so vielen Buchstaben', { min: 5, max: 200 }), n('modCapsPercent', 70, 'Anteil Großbuchstaben ab (Prozent)', { min: 50, max: 100 }),
+      c('modRepeat', true, 'Wiederholungen löschen'),
+      n('modRepeatCount', 3, 'Dieselbe Nachricht so oft hintereinander, dann wird sie gelöscht', { min: 2, max: 10 }),
+      c('modEmotes', true, 'Emote-Spam löschen'),
+      n('modEmoteMax', 10, 'Mehr als so viele Emotes in einer Nachricht', { min: 3, max: 50 }),
+      n('modTrustVisits', 5, 'Stammgast ab so vielen Check-ins (0 = niemand)', { min: 0, max: 1000 }),
+      n('modTimeoutAfter', 0, 'Timeout ab dem so vielten Verstoß (0 = nie, nur löschen und warnen)', { min: 0, max: 10 }),
+      n('modTimeoutSeconds', 30, 'Dauer des ersten Timeouts in Sekunden (verdoppelt sich, höchstens 600)', { min: 1, max: 600 }),
+      n('modStrikeMinutes', 30, 'Verstöße zählen so viele Minuten lang zusammen', { min: 1, max: 1440 }),
+      t('modPermitCommand', '!permit', 'Befehl für die Link-Erlaubnis (nur Mods)', { maxlength: 26, kind: 'command', placeholder: '!permit' }),
+      a('modWarnTemplate', '⚠️ {user}, {reason}', 'Warnung im Chat', { user: 'Max', reason: 'bitte keine Links hier', n: 1 }),
+    ] },
   ],
 
   abspann: [
@@ -216,4 +236,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];

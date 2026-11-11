@@ -167,13 +167,24 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Start** | Status (Variablen, Twitch-Verbindung, Rewards, Webhooks), „Mit Twitch verbinden“, „Rewards & Webhooks abgleichen“, Überblick, OBS-Adressen |
 | **Zuschauer** | Check-in, Check-out, Meilensteine, Streak und Streak-Retter; Besucher mit Suche, Besuchstagen und Dauer, Besuche nachtragen oder entfernen, Streaks übernehmen, CSV-Export |
 | **Twitch-Ereignisse** | Follow, Sub, Gift-Subs, Bits (Schalter, Chat-Dank, Schilder); Raid-Reaktion mit Shoutout, Clip, Chattext und Schild; Übersicht erfasster Raids, frühere Raids nachtragen |
-| **Chat** | Eigene Commands und Regeln, Chat-Befehle `!streak` und `!top`, Shoutout (`!so`, Auto-Shoutout), Zitate, Chat-Leiste fürs Overlay |
+| **Chat** | Eigene Commands und Regeln, Chat-Befehle `!streak` und `!top`, Shoutout (`!so`, Auto-Shoutout), Zitate, Moderation mit Protokoll (Links, gesperrte Wörter, Großbuchstaben, Wiederholungen, Emote-Spam; Twitch-Clips immer erlaubt), Chat-Leiste fürs Overlay |
 | **Belohnungen** | Soundboard, Einlaufsound mit Prüfung, Katalog und Top des Monats, Alpakas, Community-Rangliste und verknüpfte Konten |
 | **Overlays** | Abspann, Rangliste und Twitch-Panel, Sport-Scoreboard |
 | **Medien** | Töne und Bilder/GIFs je Alert |
 | **System** | Updates, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, automatische Sicherung, Backup & Wiederherstellen, Tests |
 
 Alte Adressen wie `/admin/#abspann` oder `#besucher` führen automatisch zum neuen Reiter.
+
+## Moderation
+
+Im Admin unter *Chat → Moderation*. Standardmäßig **aus** und im **Testmodus** (der Bot schreibt nur ins Protokoll, was er gelöscht hätte).
+
+- **Regeln:** Links (außer Twitch-Clips und Adressen auf deiner Liste), gesperrte Wörter, zu viele Großbuchstaben, dieselbe Nachricht mehrmals hintereinander, Emote-Spam.
+- **Ausnahmen:** Du und deine Mods nie. VIPs, Abonnenten und Stammgäste (ab einstellbarer Zahl Check-ins) dürfen Links, Großbuchstaben, Wiederholungen und Emotes. Gesperrte Wörter gelten für alle außer dir und den Mods.
+- **Twitch-Clips** (`clips.twitch.tv/…`, `twitch.tv/…/clip/…`) darf jeder teilen.
+- **Folgen:** Nachricht löschen und im Chat warnen. Optional Timeout ab dem x-ten Verstoß (verdoppelt sich, höchstens 600 Sekunden).
+- **`!permit name`** (Mods): erlaubt jemandem 60 Sekunden lang einen Link.
+- **Berechtigungen:** Einmal im Admin auf Start → „Mit Twitch verbinden“ klicken, damit der Bot löschen und stummschalten darf.
 
 ## Backup & Wiederherstellen
 
