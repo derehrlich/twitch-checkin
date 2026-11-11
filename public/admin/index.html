@@ -378,6 +378,16 @@
     <div class="tab-panel hidden" data-panel="allgemein">
       <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
 
+      <section class="card" id="updateCard">
+        <h2>Updates</h2>
+        <p class="muted">Läuft gerade: <b id="updVersion">…</b>. Ein Klick auf den Knopf schaut nach, ob es eine neuere Version gibt, lädt sie und startet die Stadtwache neu. Dabei ist die Seite etwa eine halbe Minute nicht erreichbar, die Daten bleiben erhalten.</p>
+        <div class="row">
+          <button id="updBtn">Auf Updates prüfen</button>
+          <span id="updStatus" class="muted"></span>
+        </div>
+        <p class="muted hidden" id="updSetup">Noch nicht eingerichtet: Dafür muss in CasaOS die App „Watchtower“ laufen und in der Stadtwache-App <code>WATCHTOWER_URL</code> und <code>WATCHTOWER_TOKEN</code> stehen (Anleitung: <code>docs/casaos.md</code>).</p>
+      </section>
+
       <section class="card" id="backupCard">
         <h2>Backup &amp; Wiederherstellen</h2>
         <p class="muted">Die Sicherung enthält Besucher mit Streaks und Dauer, alle Einstellungen, das Soundboard, Raid-Zähler und Reward-IDs. Die Twitch-Verbindung ist bewusst nicht dabei, nach dem Wiederherstellen einmal „Mit Twitch verbinden“ und „Rewards &amp; Webhooks abgleichen“ klicken. Praktisch auch für den Umzug auf einen anderen Server.</p>

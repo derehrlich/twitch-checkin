@@ -12,6 +12,11 @@ COPY server.mjs netlify.toml ./
 COPY netlify ./netlify
 COPY public ./public
 
+# Stand des Images, wird vom Bau (GitHub Action) gesetzt und im Admin als Version angezeigt
+ARG BUILD_SHA=
+ARG BUILD_DATE=
+ENV BUILD_SHA=$BUILD_SHA BUILD_DATE=$BUILD_DATE
+
 VOLUME /data
 EXPOSE 3000
 

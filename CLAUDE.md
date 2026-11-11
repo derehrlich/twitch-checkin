@@ -12,7 +12,7 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
   - Stadtwache: Punkte und Monatsrangliste (Twitch-Chat, Check-ins, Discord-Zahlen vom Bot), Konto-Verknüpfung (`/verknuepfen`), **Top des Monats** (Gewinner, Katalog-Sound, Wahl, Frist, Neu ziehen, Broadcaster gewinnt nie), Einlaufsound (Kauf, Freigabe, von Hand vergeben), alle Twitch-Chat-Nachrichten.
   - VerwirrBot: Discord-Nachrichten zählen und melden, **Hall of Fame** im Discord, die **Goldene Kelle** (= Rolle für den Monatssieger, Einstellungen dort: Ausnahmen, Neu ziehen), ClipMaster, Erwähnung und Erinnerung der Top des Monats im Discord (fragt `GET award` ab; „erneut ankündigen“ ruft `POST award/announce`).
 - **Reihenfolge beim Ausliefern:** erst die Stadtwache (Merge in `main`, die Action baut das Image, Marcel lädt es in CasaOS neu), dann den VerwirrBot einspielen (ZIP im Dashboard unter System → Update einspielen). Die ZIP baut die GitHub Action im Bot-Repo bei jedem Stand von `main`.
-- **Was ich nicht von hier aus kann:** Den Bot auf dem NAS einspielen (macht Marcel im Dashboard) und die Live-Seiten per `curl` prüfen (Proxy blockt). Die Stadtwache auf dem NAS neu laden macht ebenfalls Marcel (siehe `docs/casaos.md`). Ob das Image gebaut wurde, sehe ich in der GitHub Action `docker-image.yml`.
+- **Was ich nicht von hier aus kann:** Den Bot auf dem NAS einspielen (macht Marcel im Dashboard) und die Live-Seiten per `curl` prüfen (Proxy blockt). Die Stadtwache auf dem NAS aktualisiert Marcel selbst per Knopf im Admin (siehe `docs/casaos.md`). Ob das Image gebaut wurde, sehe ich in der GitHub Action `docker-image.yml`.
 
 ## Betrieb zu Hause (CasaOS)
 - `server.mjs` + `Dockerfile` + `docker-compose.yml` lassen dieselben Functions auf Marcels NAS laufen (Dateispeicher in `/data`, Port 3000). Die Action `.github/workflows/docker-image.yml` baut bei jedem Stand von `main` das Image `ghcr.io/derehrlich/twitch-checkin`. Schritt-für-Schritt-Anleitung für Marcel: `docs/casaos.md`.
@@ -21,7 +21,7 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 - Test: `npm test` führt auch `test/server.mjs` aus.
 
 ## Ausliefern
-- Branch → Pull Request → Merge in `main` → GitHub Action baut das Image `ghcr.io/derehrlich/twitch-checkin` → Marcel lädt es in CasaOS neu (`docs/casaos.md`). Nie ohne Marcels Auftrag mergen.
+- Branch → Pull Request → Merge in `main` → GitHub Action baut das Image `ghcr.io/derehrlich/twitch-checkin` → Marcel drückt im Admin (Allgemein → Updates) „Auf Updates prüfen“, Watchtower lädt das Image und startet die Stadtwache neu (`docs/casaos.md`, Route `netlify/lib/admin/update.mjs`). Nie ohne Marcels Auftrag mergen.
 - Neue Funktionen sind standardmäßig **ausgeschaltet** und werden im Admin eingeschaltet.
 
 ## Technik und Ordner
@@ -36,7 +36,7 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 108 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 109 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen

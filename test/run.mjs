@@ -24,11 +24,17 @@ let clips = [
 let clipDb = []; // Clips, die der simulierte Twitch einzeln (per id) herausgibt
 let subs = []; // aktive Webhook-Subscriptions
 const failSubTypes = new Set(); // Typen, deren Abo der simulierte Twitch mit 403 ablehnt
+let wtMode = 'ok'; // so verhält sich der simulierte Watchtower: ok, slow (antwortet nicht) oder down
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
-  const entry = { method: init.method || 'GET', path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body && !String(init.body).includes('=') ? JSON.parse(init.body) : init.body };
+  const entry = { headers: init.headers, method: init.method || 'GET', path: u.pathname, query: Object.fromEntries(u.searchParams), body: init.body && !String(init.body).includes('=') ? JSON.parse(init.body) : init.body };
   calls.push(entry);
   const ok = (data, status = 200) => new Response(JSON.stringify(data), { status });
+  if (u.hostname === 'watchtower.test') {
+    if (wtMode === 'slow') return new Promise(() => {});
+    if (wtMode === 'down') throw new TypeError('fetch failed');
+    return entry.headers?.authorization === 'Bearer wt-geheim' ? ok({}) : ok({ error: 'nein' }, 401);
+  }
   if (u.host === 'id.twitch.tv') {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
@@ -1900,6 +1906,29 @@ await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten'
   for (const e of st.log) st = await sp('DELETE', `/log/${e.id}`);
   assert.equal(st.log.length, 0);
   await db.delete('sport/config');
+});
+
+// ---- Update-Knopf
+await test('Updates: Version anzeigen, ohne Einrichtung gesperrt, Watchtower anstoßen (fertig, läuft, Fehler)', async () => {
+  const upd = (m) => admin(adminReq(m, 'update', m === 'GET' ? null : {}, cookie));
+  assert.equal((await admin(adminReq('GET', 'update'))).status, 401, 'nur mit Anmeldung');
+  assert.deepEqual(await (await upd('GET')).json(), { commit: null, builtAt: null, configured: false });
+  assert.equal((await upd('POST')).status, 503, 'ohne WATCHTOWER_URL nichts zu tun');
+  Object.assign(process.env, { BUILD_SHA: 'abc1234def', BUILD_DATE: '2026-11-11T18:00:00Z', WATCHTOWER_URL: 'http://watchtower.test:8081/', WATCHTOWER_TOKEN: 'wt-geheim', WATCHTOWER_WAIT_MS: '50' });
+  assert.deepEqual(await (await upd('GET')).json(), { commit: 'abc1234def', builtAt: '2026-11-11T18:00:00Z', configured: true });
+  const before = calls.length;
+  assert.deepEqual(await (await upd('POST')).json(), { done: true });
+  assert.equal(calls[before].path, '/v1/update');
+  wtMode = 'slow';
+  assert.deepEqual(await (await upd('POST')).json(), { started: true }, 'wird die Stadtwache ersetzt, antwortet Watchtower nie');
+  wtMode = 'down';
+  assert.equal((await upd('POST')).status, 502, 'Watchtower nicht erreichbar');
+  wtMode = 'ok';
+  process.env.WATCHTOWER_TOKEN = 'falsch';
+  const bad = await upd('POST');
+  assert.equal(bad.status, 502);
+  assert.match((await bad.json()).error, /Schlüssel/);
+  for (const k of ['BUILD_SHA', 'BUILD_DATE', 'WATCHTOWER_URL', 'WATCHTOWER_TOKEN', 'WATCHTOWER_WAIT_MS']) delete process.env[k];
 });
 
 // ---- Chat-Leiste (/chat)

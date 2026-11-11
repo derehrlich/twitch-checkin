@@ -27,6 +27,9 @@ services:
       SITE_URL: https://wache.ehrlichverwirrt.de
       # Gemeinsames Geheimwort mit dem VerwirrBot (wie bisher in Netlify und in verwirrbot.env)
       LINK_SECRET: HIER_LINK_SECRET
+      # Update-Knopf im Admin: Adresse von Watchtower (siehe docker-compose.watchtower.yml) und derselbe Schlüssel wie dort
+      WATCHTOWER_URL: http://192.168.178.144:8081
+      WATCHTOWER_TOKEN: HIER_UPDATE_SCHLUESSEL
     # Nur nötig, was die Stadtwache wirklich braucht
     read_only: true
     tmpfs:
