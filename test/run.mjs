@@ -33,7 +33,8 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.hostname === 'watchtower.test') {
     if (wtMode === 'slow') return new Promise(() => {});
     if (wtMode === 'down') throw new TypeError('fetch failed');
-    return entry.headers?.authorization === 'Bearer wt-geheim' ? ok({}) : ok({ error: 'nein' }, 401);
+    if (entry.headers?.authorization !== 'Bearer wt-geheim') return ok({ error: 'nein' }, 401);
+    return wtMode === 'empty' ? ok({ summary: { scanned: 0, updated: 0, failed: 0 } }) : ok({});
   }
   if (u.host === 'id.twitch.tv') {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
@@ -1958,6 +1959,10 @@ await test('Updates: Version anzeigen, ohne Einrichtung gesperrt, Watchtower ans
   assert.deepEqual(await (await upd('POST')).json(), { started: true }, 'wird die Stadtwache ersetzt, antwortet Watchtower nie');
   wtMode = 'down';
   assert.equal((await upd('POST')).status, 502, 'Watchtower nicht erreichbar');
+  wtMode = 'empty';
+  const none = await upd('POST');
+  assert.equal(none.status, 502, 'nichts gefunden darf nicht als „aktuell“ gelten');
+  assert.match((await none.json()).error, /keinen Container/);
   wtMode = 'ok';
   process.env.WATCHTOWER_TOKEN = 'falsch';
   const bad = await upd('POST');
