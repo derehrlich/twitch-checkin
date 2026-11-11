@@ -1,6 +1,6 @@
 # Stadtwache auf dem eigenen CasaOS-Server
 
-Die Stadtwache läuft wahlweise auf Netlify **oder** zu Hause auf dem NAS. Der Code ist derselbe: `server.mjs` lädt die vorhandenen Functions, liefert `public/` aus und speichert die Daten in einem Ordner (`/data`). Gebaut wird ein Docker-Image (`Dockerfile`), das die GitHub Action `docker-image.yml` nach `ghcr.io/derehrlich/twitch-checkin` legt.
+Die Stadtwache läuft zu Hause auf dem NAS (früher auch auf Netlify). Der Code ist derselbe: `server.mjs` lädt die vorhandenen Functions, liefert `public/` aus und speichert die Daten in einem Ordner (`/data`). Gebaut wird ein Docker-Image (`Dockerfile`), das die GitHub Action `docker-image.yml` nach `ghcr.io/derehrlich/twitch-checkin` legt.
 
 Warum zu Hause: Das Overlay fragt alle 3 Sekunden nach. Auf Netlify zählt jede Abfrage gegen das Kontingent, zu Hause kostet sie nichts.
 
@@ -60,7 +60,8 @@ Cloudflare → Zero Trust → Access → Anwendungen → *Selbst gehostet*: Anwe
 
 ## Betrieb
 
-- **Update:** Nach jedem Merge in `main` baut GitHub ein neues Image. In CasaOS die App neu erstellen bzw. das Image neu laden (oder später Watchtower einsetzen). Die Daten bleiben, sie liegen im Ordner `data`.
+- **Update (automatisch):** Einmalig in CasaOS die Datei `docker-compose.watchtower.yml` als benutzerdefinierte App installieren. Watchtower prüft alle 5 Minuten, ob es nach einem Merge in `main` ein neues Image gibt, und startet die Stadtwache damit neu. Dafür muss die Stadtwache das Etikett `com.centurylinklabs.watchtower.enable` aus `docker-compose.yml` tragen (bei einer älteren Installation die App einmal neu anlegen). Die Daten bleiben, sie liegen im Ordner `data`. Nach einem Merge dauert es also etwa 1 Minute für den Bau plus bis zu 5 Minuten, dann läuft die neue Version.
+- **Update von Hand** (falls Watchtower nicht läuft): per SSH `docker pull ghcr.io/derehrlich/twitch-checkin:latest`, dann die App in CasaOS neu erstellen.
 - **Server war aus:** Nach einem längeren Ausfall kann Twitch die Webhooks abgeschaltet haben. Admin → **Rewards & Webhooks abgleichen**.
 - **Gesundheit:** `/healthz` antwortet mit `ok`; Docker prüft das selbst.
 - **Sicherung:** Der Ordner `/DATA/AppData/stadtwache/data` enthält auch die Twitch-Tokens (Dateirechte nur für den Besitzer). Nicht öffentlich teilen. Das Admin-Backup enthält sie nicht.
