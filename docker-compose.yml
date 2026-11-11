@@ -13,8 +13,12 @@ services:
     volumes:
       # Hier liegen alle Daten (Besucher, Einstellungen, Töne). Dieser Ordner kommt ins Backup und wird nie überschrieben.
       - /DATA/AppData/stadtwache/data:/data
+      # Hier landen die nächtlichen Sicherungen. Besser auf einer Freigabe des NAS (anderes Gerät), also den Teil vor dem Doppelpunkt anpassen,
+      # z. B. /media/NAS/stadtwache-backups (so heißt die Freigabe in CasaOS unter Dateien → Netzwerk).
+      - /DATA/AppData/stadtwache/backups:/backups
     environment:
       LOCAL_STORE_DIR: /data
+      BACKUP_DIR: /backups
       TZ: Europe/Berlin
       # Von https://dev.twitch.tv/console/apps
       TWITCH_CLIENT_ID: HIER_CLIENT_ID

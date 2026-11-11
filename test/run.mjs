@@ -1908,6 +1908,41 @@ await test('Sport: Einheiten eintragen, Zeiträume, Summen und Scoreboard-Daten'
   await db.delete('sport/config');
 });
 
+// ---- Automatische Sicherung
+await test('Auto-Sicherung: einmal pro Tag ab der Uhrzeit, alte werden gelöscht, Status und Knopf im Admin', async () => {
+  const ab = await import('../netlify/lib/autobackup.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wache-backup-'));
+  process.env.BACKUP_DIR = dir;
+  await admin(adminReq('PUT', 'settings', { backupKeep: 2, backupHour: 3 }, cookie));
+  const at = (iso) => new Date(iso);
+  assert.equal(await ab.backupTick(at('2026-11-12T01:00:00Z')), null, 'vor 3 Uhr (Berliner Zeit 2 Uhr) nichts');
+  assert.deepEqual(await ab.backupTick(at('2026-11-12T10:00:00Z')), { ok: true, name: 'stadtwache-2026-11-12.json' });
+  assert.equal(await ab.backupTick(at('2026-11-12T20:00:00Z')), null, 'am selben Tag nur einmal');
+  for (const d of ['13', '14', '15']) await ab.backupTick(at(`2026-11-${d}T10:00:00Z`));
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['stadtwache-2026-11-14.json', 'stadtwache-2026-11-15.json'], 'nur die letzten zwei bleiben');
+  const saved = JSON.parse(fs.readFileSync(path.join(dir, 'stadtwache-2026-11-15.json'), 'utf8'));
+  assert.equal(saved.format, 'stadtwache-backup');
+  assert.ok(saved.entries['config/settings'], 'Einstellungen sind drin');
+
+  const st = await (await admin(adminReq('GET', 'backup/status', null, cookie))).json();
+  assert.equal(st.available, true); assert.equal(st.dir, dir); assert.equal(st.files.length, 2); assert.equal(st.files[0].name, 'stadtwache-2026-11-15.json'); assert.equal(st.lastError, null);
+  assert.equal((await admin(adminReq('GET', 'backup/status'))).status, 401, 'nur mit Anmeldung');
+  const now = await (await admin(adminReq('POST', 'backup/now', {}, cookie))).json();
+  assert.equal(now.ok, true);
+
+  fs.chmodSync(dir, 0o500); // Ordner nicht beschreibbar: Fehler wird gemerkt und angezeigt
+  if (process.getuid?.() !== 0) {
+    assert.equal((await ab.runBackupNow(at('2026-11-20T10:00:00Z'))).ok, false);
+    assert.match((await (await admin(adminReq('GET', 'backup/status', null, cookie))).json()).lastError, /EACCES|permission/i);
+  }
+  fs.chmodSync(dir, 0o700);
+  await admin(adminReq('PUT', 'settings', { backupAutoEnabled: false }, cookie));
+  assert.equal(await ab.backupTick(at('2026-12-01T10:00:00Z')), null, 'ausgeschaltet');
+  await admin(adminReq('PUT', 'settings', { backupAutoEnabled: true, backupKeep: 7 }, cookie));
+  delete process.env.BACKUP_DIR;
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // ---- Update-Knopf
 await test('Updates: Version anzeigen, ohne Einrichtung gesperrt, Watchtower anstoßen (fertig, läuft, Fehler)', async () => {
   const upd = (m) => admin(adminReq(m, 'update', m === 'GET' ? null : {}, cookie));

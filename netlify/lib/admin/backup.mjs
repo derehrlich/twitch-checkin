@@ -1,9 +1,10 @@
 // /api/admin/backup: Sicherung als JSON herunterladen (GET) und wieder einspielen (POST).
 // Enthalten: Besucher, Einstellungen, Soundboard, Raid-Zähler, Stream-Tage, Reward-IDs, Einlaufsound-Einträge, Verknüpfungen und Monatszahlen.
 // Nie enthalten: Twitch-Tokens (nach einem Restore neu verbinden) und kurzlebige Daten (event/, seen/).
-// Töne und Bilder (auch die des Soundboards) sind groß und deshalb nur mit ?media=1 dabei (Netlify-Functions schaffen höchstens ca. 6 MB je Anfrage).
+// Töne und Bilder (auch die des Soundboards) sind groß und deshalb nur mit ?media=1 dabei (ein Download über den Browser wird sonst sehr groß).
 import { db } from '../store.mjs';
 import { json } from '../http.mjs';
+import { backupStatus, runBackupNow } from '../autobackup.mjs';
 
 const FORMAT = 'stadtwache-backup';
 const DATA_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/', 'entrysound/', 'link/', 'cmonth/', 'dmonth/', 'award/', 'awardsound/', 'sport/', 'alpaca-color/'];
@@ -18,16 +19,25 @@ async function keysOf(media) {
   return keys;
 }
 
-export async function backup({ method, body, req }) {
+/** Die Sicherung als Objekt (für den Download und für die automatische Sicherung). */
+export async function buildBackup(media) {
+  const entries = {};
+  const keys = await keysOf(media);
+  for (let i = 0; i < keys.length; i += 25) {
+    await Promise.all(keys.slice(i, i + 25).map(async (k) => { const v = await db.get(k); if (v != null) entries[k] = v; }));
+  }
+  return { format: FORMAT, version: 1, created: new Date().toISOString(), media, entries };
+}
+
+export async function backup({ method, body, req, route }) {
+  // Automatische Sicherung auf dem Heimserver: Status ansehen und von Hand auslösen
+  if (route?.[1] === 'status' && method === 'GET') return json(await backupStatus());
+  if (route?.[1] === 'now' && method === 'POST') return json(await runBackupNow(), 200);
+
   if (method === 'GET') {
     const media = new URL(req.url).searchParams.get('media') === '1';
-    const entries = {};
-    const keys = await keysOf(media);
-    for (let i = 0; i < keys.length; i += 25) {
-      await Promise.all(keys.slice(i, i + 25).map(async (k) => { const v = await db.get(k); if (v != null) entries[k] = v; }));
-    }
-    const stamp = new Date().toISOString();
-    const file = { format: FORMAT, version: 1, created: stamp, media, entries };
+    const file = await buildBackup(media);
+    const stamp = file.created;
     return new Response(JSON.stringify(file), {
       status: 200,
       headers: {

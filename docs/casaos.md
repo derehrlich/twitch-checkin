@@ -66,6 +66,7 @@ Cloudflare → Zero Trust → Access → Anwendungen → *Selbst gehostet*: Anwe
 - **Update von Hand** (falls der Knopf nicht geht): per SSH `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/nicholas-fedor/watchtower:latest --run-once --cleanup stadtwache`.
 - **Server war aus:** Nach einem längeren Ausfall kann Twitch die Webhooks abgeschaltet haben. Admin → **Rewards & Webhooks abgleichen**.
 - **Gesundheit:** `/healthz` antwortet mit `ok`; Docker prüft das selbst.
+- **Automatische Sicherung:** Jede Nacht ab 3 Uhr (einstellbar im Admin unter *Allgemein → Automatische Sicherung*) legt die Stadtwache eine Datei `stadtwache-JJJJ-MM-TT.json` im Backup-Ordner ab, mit Tönen und Bildern, und hebt die letzten 7 auf. Im Admin unter *Allgemein → Backup & Wiederherstellen* siehst du die letzte Sicherung und kannst mit „Jetzt sichern“ eine auslösen. **Der Ordner sollte auf einem anderen Gerät liegen**, zum Beispiel einer Freigabe deines NAS: In CasaOS unter *Dateien → Netzwerk → Freigabe hinzufügen* verbinden (sie erscheint dann unter `/media/<Name>`), dann in der Stadtwache-App beim Speicher `/DATA/AppData/stadtwache/backups` durch den Ordner auf der Freigabe ersetzen (rechts steht weiter `:/backups`). Zurückspielen: Datei im Admin bei *Wiederherstellen* auswählen.
 - **Sicherung:** Der Ordner `/DATA/AppData/stadtwache/data` enthält auch die Twitch-Tokens (Dateirechte nur für den Besitzer). Nicht öffentlich teilen. Das Admin-Backup enthält sie nicht.
 
 ## Lokal ausprobieren (Entwickler)
