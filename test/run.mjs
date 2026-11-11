@@ -15,6 +15,7 @@ Object.assign(process.env, {
 const calls = [];
 const rewards = []; // vom Mock angelegte Rewards
 let shoutoutFails = false;
+let modFails = false; // simulierter Twitch lehnt das Löschen ab (Berechtigung fehlt)
 let deletedRewards = 0; // damit neue Reward-IDs nie mit gelöschten kollidieren
 let clipsFail = false, channelsFail = false;
 let clips = [
@@ -40,6 +41,8 @@ globalThis.fetch = async (url, init = {}) => {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
   }
+  if (u.pathname.endsWith('/moderation/chat')) return modFails ? ok({ error: 'Forbidden' }, 403) : new Response(null, { status: 204 });
+  if (u.pathname.endsWith('/moderation/bans')) return ok({ data: [{}] });
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
   if (u.pathname.endsWith('/helix/channels') && channelsFail) return ok({ error: 'boom' }, 500);
@@ -161,7 +164,7 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
   assert.ok((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes.includes('moderator:manage:shoutouts'), 'Tokens ohne scopes');
-  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'] });
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users'] });
   assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
@@ -2205,7 +2208,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2243,6 +2246,118 @@ await test('Webhook-Abgleich: alte Anmeldung unter anderer Adresse (409) wird er
   const again = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
   assert.equal(again.notes, undefined);
   assert.equal(again.warnings, undefined);
+});
+
+await test('Moderation: Links (Clips erlaubt), Wörter, Großbuchstaben, Wiederholung, Emotes, Ausnahmen, Stufen, Testmodus, Permit', async () => {
+  const mod = await import('../netlify/lib/chat/moderation.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const put = (b) => admin(adminReq('PUT', 'settings', b, cookie));
+  await put({ chatEnabled: true, chatCommands: true, commandCooldown: 0, modEnabled: true, modTestMode: false, modLinks: true, modAllowClips: true, modLinkAllow: 'youtube.com', modWords: 'Doofkopf', modCaps: true, modRepeat: true, modRepeatCount: 3, modEmotes: true, modEmoteMax: 3, modTrustVisits: 5, modTimeoutAfter: 0, modWarnTemplate: '⚠️ {user}, {reason}' });
+  const s0 = await getSettings();
+  // Erkennung
+  assert.equal(mod.badLinks('schau https://clips.twitch.tv/FunnyClipName-abc123 an', s0).length, 0, 'Clip erlaubt');
+  assert.equal(mod.badLinks('https://www.twitch.tv/anna/clip/CoolerMomentXYZ123', s0).length, 0, 'Clip mit Kanal erlaubt');
+  assert.equal(mod.badLinks('https://twitch.tv/anna', s0).length, 1, 'Kanalseite ist kein Clip');
+  assert.equal(mod.badLinks('https://www.youtube.com/watch?v=abc und youtube.com/x', s0).length, 0, 'Erlaubnisliste (auch Unterseiten und www)');
+  assert.equal(mod.badLinks('kauf hier billig-sachen.shop/rabatt', s0).length, 1, 'Link ohne https');
+  assert.equal(mod.badLinks('hallo, das war toll. bis dann', s0).length, 0, 'Satzzeichen sind kein Link');
+  assert.equal(mod.badLinks('https://clips.twitch.tv/FunnyClipName-abc123', { ...s0, modAllowClips: false }).length, 1, 'Clips lassen sich abschalten');
+  assert.equal(mod.badWord('du Doofkopf!', s0), 'doofkopf'); assert.equal(mod.badWord('Doofköpfe', s0), null, 'ganze Wörter');
+  assert.equal(mod.tooManyCaps('DAS IST ALLES GROSS GESCHRIEBEN', s0), true); assert.equal(mod.tooManyCaps('KURZ', s0), false); assert.equal(mod.tooManyCaps('Ganz normaler Satz mit Text', s0), false);
+
+  const msg = (text, o = {}) => ({ broadcaster_user_id: '999', chatter_user_id: o.id ?? 'z1', chatter_user_name: o.name ?? 'Zuschauer', chatter_user_login: (o.name ?? 'Zuschauer').toLowerCase(), badges: (o.badges ?? []).map((set_id) => ({ set_id })), message_id: crypto.randomUUID(), message: { text, fragments: o.fragments ?? [{ type: 'text', text }] } });
+  const dels = () => calls.filter((c) => c.method === 'DELETE' && c.path.endsWith('/moderation/chat'));
+  const bans = () => calls.filter((c) => c.path.endsWith('/moderation/bans'));
+  const run = async (text, o) => handleChat(msg(text, o), await getSettings());
+  await mod.clearLog();
+
+  // Clip von Neuling: erlaubt und ganz normal verarbeitet
+  let d = dels().length;
+  assert.equal((await run('Mega! https://clips.twitch.tv/FunnyClipName-abc123')).moderated, undefined);
+  assert.equal(dels().length, d, 'Clip bleibt stehen');
+  // Link von Neuling: gelöscht und gewarnt
+  let r = await run('billig kaufen www.spam-shop.de');
+  assert.equal(r.moderated, 'link'); assert.equal(dels().length, d + 1);
+  assert.equal(dels().at(-1).query.moderator_id, '999'); assert.ok(dels().at(-1).query.message_id);
+  assert.match(chats().at(-1), /^⚠️ Zuschauer, bitte keine Links hier \(Twitch-Clips sind erlaubt/);
+  // Ausnahmen: Mod, Sub, Stammgast, Bot aus der Ignorierliste, Broadcaster
+  d = dels().length;
+  await run('www.spam-shop.de', { id: 'm9', name: 'Moddi', badges: ['moderator'] });
+  await run('www.spam-shop.de', { id: 's9', name: 'Subby', badges: ['subscriber'] });
+  await db.set('user/t9', { name: 'Stammi', count: 5, days: [] });
+  await run('www.spam-shop.de', { id: 't9', name: 'Stammi' });
+  await run('www.spam-shop.de', { id: 'n9', name: 'Nightbot' });
+  await run('www.spam-shop.de', { id: '999', name: 'Streamerin' });
+  assert.equal(dels().length, d, 'Ausnahmen werden nie moderiert');
+  await run('Doofkopf!', { id: 's9', name: 'Subby', badges: ['subscriber'] });
+  assert.equal(dels().length, d + 1, 'Gesperrte Wörter gelten auch für Abonnenten');
+  // Großbuchstaben, Emotes, Wiederholung
+  assert.equal((await run('DAS IST ECHT ALLES GROSS GESCHRIEBEN', { id: 'c1', name: 'Caps' })).moderated, 'caps');
+  const emotes = Array.from({ length: 4 }, () => ({ type: 'emote', text: 'Kappa' }));
+  assert.equal((await run('Kappa Kappa Kappa Kappa', { id: 'e1', name: 'Emo', fragments: emotes })).moderated, 'emotes');
+  for (const i of [1, 2]) assert.equal((await run('immer das gleiche', { id: 'r1', name: 'Rep' })).moderated, undefined, `Nachricht ${i} bleibt`);
+  assert.equal((await run('immer das gleiche', { id: 'r1', name: 'Rep' })).moderated, 'repeat', 'dritte gleiche Nachricht wird gelöscht');
+
+  // Stufen: ab dem 2. Verstoß Timeout (verdoppelt), Warnung nur ohne Timeout
+  await put({ modTimeoutAfter: 2, modTimeoutSeconds: 30 });
+  const b = bans().length;
+  await db.delete('cooldown/modwarn-x1');
+  await run('www.a-spam.de', { id: 'x1', name: 'Xaver' });
+  assert.equal(bans().length, b, 'erster Verstoß: nur löschen');
+  await run('www.b-spam.de', { id: 'x1', name: 'Xaver' });
+  assert.equal(bans().length, b + 1); assert.equal(bans().at(-1).body.data.duration, 30); assert.equal(bans().at(-1).body.data.user_id, 'x1');
+  await run('www.c-spam.de', { id: 'x1', name: 'Xaver' });
+  assert.equal(bans().at(-1).body.data.duration, 60, 'verdoppelt');
+  await put({ modTimeoutAfter: 0 });
+
+  // Permit: Mod erlaubt einen Link für kurze Zeit
+  const before = chats().length;
+  await run('!permit Pia', { id: 'm9', name: 'Moddi', badges: ['moderator'] });
+  assert.match(chats().at(-1), /@pia darf in den nächsten 60 Sekunden einen Link posten/);
+  d = dels().length;
+  await run('hier mein Kanal www.pias-seite.de', { id: 'p1', name: 'Pia' });
+  assert.equal(dels().length, d, 'mit Permit erlaubt');
+  await db.set('modpermit/pia', { until: Date.now() - 1000 });
+  await run('nochmal www.pias-seite.de', { id: 'p1', name: 'Pia' });
+  assert.equal(dels().length, d + 1, 'Permit abgelaufen');
+  await run('!permit Pia', { id: 'v1', name: 'Viewer' }); // kein Mod
+  assert.ok((await db.get('modpermit/pia')).until < Date.now(), 'Zuschauer darf nichts erlauben, die abgelaufene Erlaubnis bleibt abgelaufen');
+
+  // Löschen scheitert (Berechtigung fehlt): Protokoll sagt es, kein Absturz
+  modFails = true; r = await run('www.fehler-spam.de', { id: 'f1', name: 'Fehler' }); modFails = false;
+  assert.equal(r.moderated, undefined);
+  assert.match((await mod.readLog())[0].action, /Löschen fehlgeschlagen/);
+
+  // Testmodus: nichts löschen, aber ins Protokoll; Nachricht wird normal weiterverarbeitet
+  await put({ modTestMode: true });
+  d = dels().length; await mod.clearLog();
+  r = await run('www.test-spam.de', { id: 'q1', name: 'Quentin' });
+  assert.equal(r.moderated, undefined); assert.equal(dels().length, d);
+  const log = await mod.readLog();
+  assert.equal(log.length, 1); assert.equal(log[0].rule, 'link'); assert.equal(log[0].user, 'Quentin'); assert.match(log[0].action, /^Test/);
+  // Ausgeschaltet: nichts
+  await put({ modEnabled: false }); await mod.clearLog();
+  await run('www.test-spam.de', { id: 'q1', name: 'Quentin' });
+  assert.equal((await mod.readLog()).length, 0);
+  // Protokoll bleibt begrenzt
+  for (let i = 0; i < mod.LOG_MAX + 5; i++) await mod.writeLog({ user: 'u' + i, rule: 'link', text: 'x', action: 'gelöscht' });
+  assert.equal((await mod.readLog()).length, mod.LOG_MAX);
+  await mod.clearLog();
+});
+
+await test('Moderation: Admin-Protokoll lesen und leeren, nur mit Login', async () => {
+  const mod = await import('../netlify/lib/chat/moderation.mjs');
+  await mod.clearLog();
+  await mod.writeLog({ user: 'Max', rule: 'link', text: 'www.spam.de', action: 'gelöscht' });
+  assert.equal((await admin(adminReq('GET', 'moderation'))).status, 401);
+  const got = await (await admin(adminReq('GET', 'moderation', null, cookie))).json();
+  assert.equal(got.log.length, 1); assert.equal(got.log[0].user, 'Max');
+  assert.deepEqual((await (await admin(adminReq('DELETE', 'moderation', {}, cookie))).json()).log, []);
+  assert.equal((await mod.readLog()).length, 0);
+  // Einstellungen: Standard ist aus und im Testmodus, ungültige Werte werden begrenzt
+  const { DEFAULTS, sanitize } = await import('../netlify/lib/kern/settings.mjs');
+  assert.equal(DEFAULTS.modEnabled, false); assert.equal(DEFAULTS.modTestMode, true); assert.equal(DEFAULTS.modAllowClips, true);
+  assert.deepEqual(sanitize({ modCapsPercent: 5, modTimeoutSeconds: 99999, modWords: '' }), { modCapsPercent: 50, modTimeoutSeconds: 600, modWords: '' });
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

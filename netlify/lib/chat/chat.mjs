@@ -10,6 +10,7 @@ import { recordChatMessage } from './chatlog.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
 import { autoShoutout } from './extras.mjs';
 import { cooling, fuehreAus } from './befehle.mjs';
+import { moderate } from './moderation.mjs';
 
 // Links zu Clips: clips.twitch.tv/<Kennung> oder twitch.tv/<Kanal>/clip/<Kennung>
 const CLIP_LINK = /(?:clips\.twitch\.tv\/|twitch\.tv\/\w+\/clip\/)([A-Za-z0-9_-]{8,100})/i;
@@ -35,6 +36,11 @@ export async function clipHint(e, settings, text) {
 export async function handleChat(e, settings) {
   const id = e.chatter_user_id, name = e.chatter_user_name;
   if (!id) return { ok: false };
+  // Moderation zuerst: eine gelöschte Nachricht zählt nicht und löst keine Befehle aus (im Testmodus läuft alles normal weiter)
+  if (settings.modEnabled) {
+    const hit = await moderate(e, settings).catch((err) => { console.warn('Moderation fehlgeschlagen:', err.message); return null; });
+    if (hit?.deleted) return { ok: true, moderated: hit.rule };
+  }
   const ignore = String(settings.creditsIgnore ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean);
   const counted = id !== e.broadcaster_user_id && !ignore.includes(String(name).toLowerCase()); // Bots und der Kanalinhaber zählen nicht
   if (counted && (settings.creditsEnabled || settings.chatStats)) {

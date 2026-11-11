@@ -15,6 +15,7 @@ import { users, exportCsv } from '../lib/admin/users.mjs';
 import { backup } from '../lib/admin/backup.mjs';
 import { sport } from '../lib/admin/sport.mjs';
 import { update } from '../lib/admin/update.mjs';
+import { moderation } from '../lib/admin/moderation.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -37,6 +38,7 @@ const ROUTES = {
   backup,
   sport,
   update,
+  moderation,
 };
 
 export default async (req) => {

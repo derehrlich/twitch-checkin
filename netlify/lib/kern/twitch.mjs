@@ -1,6 +1,6 @@
 import { db } from './store.mjs';
 
-export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot'];
+export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users'];
 
 export const siteUrl = (req) =>
   (process.env.SITE_URL || process.env.URL || (req ? new URL(req.url).origin : '')).replace(/\/$/, '');
@@ -60,6 +60,20 @@ export async function helix(method, endpoint, { query, body, as = 'user' } = {})
 export async function sendChat(message) {
   const { user_id } = await userToken();
   await helix('POST', 'chat/messages', { body: { broadcaster_id: user_id, sender_id: user_id, message: message.slice(0, 500) } });
+}
+
+// Moderation: Nachricht löschen und Zuschauer für eine Zeit stummschalten (Timeout). Der Bot handelt als Kanalinhaber.
+export async function deleteChatMessage(messageId) {
+  const { user_id } = await userToken();
+  await helix('DELETE', 'moderation/chat', { query: { broadcaster_id: user_id, moderator_id: user_id, message_id: messageId } });
+}
+
+export async function timeoutChatter(userId, seconds, reason) {
+  const { user_id } = await userToken();
+  await helix('POST', 'moderation/bans', {
+    query: { broadcaster_id: user_id, moderator_id: user_id },
+    body: { data: { user_id: userId, duration: seconds, reason: String(reason).slice(0, 500) } },
+  });
 }
 
 export async function setRedemptionStatus(redemptionId, rewardId, status) {
