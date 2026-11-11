@@ -1,0 +1,68 @@
+// Chat-Overlay (/chat): die letzten Chatnachrichten als waagerechte Leiste. Der Chat-Webhook legt jede Nachricht hier ab,
+// das Overlay holt sie ab (siehe netlify/functions/chatlog.mjs).
+//
+// Speicher:
+//   chatlog           [ { id, t, n: Name, c: Farbe|'', g: Verlauf, s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
+//   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, glitter }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
+import { db } from './store.mjs';
+import { parseColor } from './alpaca.mjs';
+
+export const LOG_KEY = 'chatlog';
+const KEEP = 40; // so viele Nachrichten hält die Liste höchstens
+const MAX_TEXT = 200; // längere Nachrichten werden gekürzt
+
+// Nachricht in Text- und Emote-Stücke zerlegen. Twitch liefert die Stücke fertig (fragments).
+export function pieces(message) {
+  const out = [];
+  let left = MAX_TEXT;
+  for (const f of message?.fragments ?? [{ type: 'text', text: message?.text ?? '' }]) {
+    if (left <= 0) break;
+    if (f.type === 'emote' && f.emote?.id) { out.push({ e: String(f.emote.id) }); left -= 3; continue; }
+    const text = String(f.text ?? '').slice(0, left);
+    if (text) { out.push({ x: text }); left -= text.length; }
+  }
+  return out;
+}
+
+const STYLE_CMD = /^!(farbe|glitter|verlauf|reset)(?:\s+(.*))?$/i;
+const EXTRA_BADGES = ['subscriber', 'founder', 'vip', 'moderator', 'broadcaster']; // diese Abzeichen dürfen Glitzer und Verlauf
+
+// Eigene Farbe und Extras per Chatbefehl. Farbe darf jede Person, Glitzer und Verlauf nur Abos, VIPs, Mods, der Kanalinhaber und die Namen aus der Einstellung.
+async function styleCommand(e, settings, cmd, arg) {
+  const id = e.chatter_user_id;
+  const vip = String(settings.chatOverlayVip ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean);
+  const allowed = (e.badges ?? []).some((b) => EXTRA_BADGES.includes(b.set_id)) || vip.includes(String(e.chatter_user_name).toLowerCase());
+  const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
+  if (cmd === 'farbe') { const c = parseColor(arg); if (!c) return; st.hex = c; }
+  else if (cmd === 'glitter') { if (!allowed) return; st.glitter = !st.glitter; }
+  else if (cmd === 'verlauf') { if (!allowed) return; st.gradient = !st.gradient; }
+  else { st.hex = null; st.gradient = false; st.glitter = false; }
+  await db.set(`chatstyle/${id}`, st);
+}
+
+/** Nachricht merken, wenn das Overlay an ist. Befehle (!…) und ignorierte Namen (Bots) bleiben draußen. */
+export async function recordChatMessage(e, settings) {
+  if (!settings.chatOverlayEnabled) return false;
+  const text = String(e.message?.text ?? '').trim();
+  const name = String(e.chatter_user_name ?? '');
+  if (!text || !name) return false;
+  const ignore = String(settings.creditsIgnore ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean);
+  if (ignore.includes(name.toLowerCase())) return false;
+  const cmd = STYLE_CMD.exec(text);
+  if (cmd) { if (!e.message_id || await db.setIfNew(`seen/chatstyle-${e.message_id}`, Date.now())) await styleCommand(e, settings, cmd[1].toLowerCase(), cmd[2] ?? ''); return false; }
+  if (settings.chatOverlayHideCommands && text.startsWith('!')) return false;
+  const id = String(e.message_id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const st = (await db.get(`chatstyle/${e.chatter_user_id}`)) ?? {};
+  const list = ((await db.get(LOG_KEY)) ?? []).filter((x) => x.id !== id); // Twitch kann doppelt zustellen
+  list.push({ id, t: Date.now(), n: name, c: st.hex ?? '', g: Boolean(st.gradient), s: Boolean(st.glitter), m: pieces(e.message) });
+  await db.set(LOG_KEY, list.slice(-KEEP));
+  return true;
+}
+
+/** Für das Overlay: Nachrichten, die noch angezeigt werden sollen. */
+export async function publicView(settings, now = Date.now()) {
+  if (!settings.chatOverlayEnabled) return { enabled: false, seconds: settings.chatOverlaySeconds, max: settings.chatOverlayMax, messages: [] };
+  const cutoff = settings.chatOverlaySeconds ? now - settings.chatOverlaySeconds * 1000 : 0; // 0 = bleibt stehen, bis neue kommen
+  const messages = ((await db.get(LOG_KEY)) ?? []).filter((x) => x.t >= cutoff).slice(-settings.chatOverlayMax);
+  return { enabled: true, seconds: settings.chatOverlaySeconds, max: settings.chatOverlayMax, messages };
+}

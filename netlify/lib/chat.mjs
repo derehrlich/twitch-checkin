@@ -8,6 +8,7 @@ import { allUsers } from './admin/common.mjs';
 import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from './community.mjs';
 import { ensureAward } from './award.mjs';
 import { touchAlpaca } from './alpaca.mjs';
+import { recordChatMessage } from './chatlog.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -78,6 +79,7 @@ export async function handleChat(e, settings) {
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
+  await recordChatMessage(e, settings).catch((err) => console.warn('Chat-Overlay fehlgeschlagen:', err.message));
   if (settings.chatCommands) {
     // Eigene Commands, Stichwörter und die Aktivität für zeitgesteuerte Regeln (siehe commands.mjs)
     if (counted) await recordPulse().catch(() => {});

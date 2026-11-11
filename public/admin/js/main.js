@@ -40,6 +40,7 @@ async function init() {
 
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
+$('chatUrl').textContent = location.origin + '/chat';
 initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));

@@ -36,6 +36,11 @@
   status = 200
 
 [[redirects]]
+  from = "/chat"
+  to = "/chat.html"
+  status = 200
+
+[[redirects]]
   from = "/sport"
   to = "/sport.html"
   status = 200
