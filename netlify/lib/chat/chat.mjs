@@ -1,48 +1,15 @@
-// Chat-Webhook (channel.chat.message): merkt sich Chatter für den Abspann und beantwortet !streak und !top.
+// Chat-Webhook (channel.chat.message): merkt sich Chatter für den Abspann, zählt für die Ranglisten und führt Befehle aus (siehe befehle.mjs).
 import { db } from '../kern/store.mjs';
-import { fill, fmtDuration, streamDay } from '../zuschauer/checkin.mjs';
-import { computeStreak, getStreamDays } from '../zuschauer/streak.mjs';
+import { fill, streamDay } from '../zuschauer/checkin.mjs';
 import { clipById, sendChat } from '../kern/twitch.mjs';
 import { countChat, recordChatter } from '../overlays/credits.mjs';
-import { allUsers } from '../admin/common.mjs';
-import { countCommunityChat, linkByTwitch, linkReply, rankReply, secretSet } from '../belohnungen/community.mjs';
+import { countCommunityChat, linkByTwitch, secretSet } from '../belohnungen/community.mjs';
 import { ensureAward } from '../belohnungen/award.mjs';
 import { touchAlpaca } from '../belohnungen/alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
 import { handleCustom, recordPulse } from './commands.mjs';
-import { autoShoutout, handleExtras } from './extras.mjs';
-
-const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
-
-// Nutzer nach Besuchen sortieren (bei Gleichstand: längere Gesamtzeit, dann Name)
-const ranked = (users) => [...users].sort((a, b) => b.count - a.count || minutesOf(b) - minutesOf(a) || a.name.localeCompare(b.name, 'de'));
-
-export async function streakReply(userId, userName, settings, users) {
-  const list = ranked(users);
-  const me = list.find((u) => u.id === userId);
-  if (!me) return fill(settings.streakCmdNone, { user: userName });
-  const today = streamDay(settings);
-  const { current, record } = computeStreak(me, await getStreamDays(), today, settings.streakGrace);
-  const mins = minutesOf(me);
-  return fill(settings.streakCmdTemplate, {
-    user: me.name, count: me.count, streak: current, record, time: mins ? fmtDuration(mins) : 'noch keine Zeit', rank: list.indexOf(me) + 1, total: list.length,
-  });
-}
-
-export function topReply(settings, users) {
-  const n = settings.topSize;
-  const list = ranked(users).slice(0, n).map((u, i) => `${i + 1}. ${u.name} (${u.count})`);
-  return fill(settings.topTemplate, { n, list: list.join(' · ') || 'noch niemand' });
-}
-
-// Befehle haben eine gemeinsame Abklingzeit, damit der Chat nicht zugespammt wird
-async function cooling(cmd, seconds) {
-  if (!seconds) return false;
-  const last = await db.get(`cooldown/${cmd}`);
-  if (last && Date.now() - last < seconds * 1000) return true;
-  await db.set(`cooldown/${cmd}`, Date.now());
-  return false;
-}
+import { autoShoutout } from './extras.mjs';
+import { cooling, fuehreAus } from './befehle.mjs';
 
 // Links zu Clips: clips.twitch.tv/<Kennung> oder twitch.tv/<Kanal>/clip/<Kennung>
 const CLIP_LINK = /(?:clips\.twitch\.tv\/|twitch\.tv\/\w+\/clip\/)([A-Za-z0-9_-]{8,100})/i;
@@ -89,22 +56,5 @@ export async function handleChat(e, settings) {
   if (counted) await autoShoutout(e, settings).catch((err) => console.warn('Auto-Shoutout fehlgeschlagen:', err.message));
   if (counted) await clipHint(e, settings, text).catch((err) => console.warn('Clip-Hinweis fehlgeschlagen:', err.message));
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
-  const cmd = text.split(/\s+/)[0].toLowerCase();
-  if (settings.chatEnabled && [settings.soCommand, settings.quoteCommand, settings.quoteAddCommand, settings.quoteDelCommand].includes(cmd)) {
-    if (await cooling(cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
-    const reply = await handleExtras(e, text, cmd, settings).catch((err) => { console.warn('Befehl fehlgeschlagen:', err.message); return null; });
-    return { ok: true, reply };
-  }
-  if (cmd !== settings.streakCommand && cmd !== settings.topCommand && !(settings.communityEnabled && (cmd === settings.communityCommand || cmd === settings.communityRankCommand))) return { ok: true };
-  // Twitch kann Nachrichten doppelt zustellen
-  if (e.message_id && !(await db.setIfNew(`seen/chat-${e.message_id}`, Date.now()))) return { ok: true };
-  if (await cooling(cmd, settings.commandCooldown)) return { ok: true, cooldown: true };
-  if (!settings.chatEnabled) return { ok: true };
-
-  if (cmd === settings.communityCommand) { const reply = linkReply(settings, name); await sendChat(reply); return { ok: true, reply }; }
-  if (cmd === settings.communityRankCommand) { const reply = await rankReply(settings, id); await sendChat(reply); return { ok: true, reply }; }
-  const users = await allUsers();
-  const reply = cmd === settings.streakCommand ? await streakReply(id, name, settings, users) : topReply(settings, users);
-  await sendChat(reply);
-  return { ok: true, reply };
+  return (await fuehreAus(e, text, settings)) ?? { ok: true };
 }

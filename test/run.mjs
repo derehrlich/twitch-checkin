@@ -2198,5 +2198,32 @@ await test('Einstellungen: Schema ist die einzige Quelle (Standardwerte, Grenzen
   assert.equal(sanitize({ followTitle: 'x'.repeat(200) }).followTitle.length, 60);
 });
 
+await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer verbrauchen die Pause von Mod-Befehlen nicht', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
+  const s = await getSettings();
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote']);
+  assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
+  assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
+  assert.equal(findeBefehl('!so', s).id, 'so');
+  const msg = (text, mod = false) => ({ broadcaster_user_id: '999', chatter_user_id: mod ? 'm2' : 'v2', chatter_user_name: mod ? 'Moddi' : 'Viewer', badges: mod ? [{ set_id: 'moderator' }] : [], message_id: crypto.randomUUID(), message: { text } });
+  await db.delete('cooldown/!so');
+  const before = chats().length;
+  await handleChat(msg('!so raiderin'), s); // Zuschauer: still ignoriert, keine Pause verbraucht
+  assert.equal(chats().length, before);
+  const r = await handleChat(msg('!so raiderin', true), s);
+  assert.equal(r.cooldown, undefined);
+  assert.equal(chats().length, before + 1, 'Mod darf sofort');
+  assert.equal((await handleChat(msg('!so raiderin', true), s)).cooldown, true, 'danach gilt die Pause');
+  await handleChat(msg('!quote'), s); await handleChat(msg('!addquote x', true), s);
+  assert.equal(chats().length, before + 1, 'ausgeschaltete Befehle schweigen');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: false }, cookie));
+  await db.delete('cooldown/!streak');
+  const quiet = chats().length; await handleChat(msg('!streak'), await getSettings());
+  assert.equal(chats().length, quiet, 'ohne Chat-Erlaubnis schreibt der Bot nichts');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, soEnabled: false, commandCooldown: 10 }, cookie));
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

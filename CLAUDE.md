@@ -19,7 +19,7 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 - Geplante Adresse: `https://wache.ehrlichverwirrt.de` über einen Cloudflare Tunnel (Domain `ehrlichverwirrt.de`, DNS bei Cloudflare). Cloudflare Access nur vor `/admin` und `/api/admin`, **nie** vor Webhook, Auth, Overlay, Rangliste oder `/api/community/*`.
 - Neue Functions brauchen nichts am Server: `export const config = { path: ... }` genügt, `server.mjs` findet sie. Neue Weiterleitungen in `netlify.toml` werden ebenfalls übernommen (nur `from`/`to`/`status`).
 - Test: `npm test` führt auch `test/server.mjs` aus.
-- Nächtliche Sicherung: `netlify/lib/autobackup.mjs` (Timer in `server.mjs`, Ordner `BACKUP_DIR`, Admin-Routen `backup/status` und `backup/now`).
+- Nächtliche Sicherung: `netlify/lib/system/autobackup.mjs` (Timer in `server.mjs`, Ordner `BACKUP_DIR`, Admin-Routen `backup/status` und `backup/now`).
 
 ## Ausliefern
 - Branch → Pull Request → Merge in `main` → GitHub Action baut das Image `ghcr.io/derehrlich/twitch-checkin` → Marcel drückt im Admin (Allgemein → Updates) „Auf Updates prüfen“, Watchtower lädt das Image und startet die Stadtwache neu (`docs/casaos.md`, Route `netlify/lib/admin/update.mjs`). Nie ohne Marcels Auftrag mergen.
@@ -28,17 +28,25 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 ## Technik und Ordner
 ```
 netlify/functions/   die HTTP-Endpunkte (admin, auth, community, einlaufsound, overlay, twitch-webhook …)
-netlify/lib/         Logik: checkin, streak, award (Top des Monats), entrysound, community, settings, twitch, store …
+netlify/lib/         Logik, ein Ordner je Admin-Reiter:
+  kern/                store, http, settings, twitch (Grundlagen für alles)
+  zuschauer/           checkin, streak
+  ereignisse/          alerts, raid
+  chat/                chat (Webhook), befehle (feste Befehle als Liste BEFEHLE), commands (eigene Commands), extras (Shoutout, Zitate), chatlog
+  belohnungen/         soundboard, playlock, entrysound, award (Top des Monats), community, alpaca
+  overlays/            credits (Abspann), sport
+  medien/              images, sounds
+  system/              autobackup
 netlify/lib/admin/   Admin-Routen je Reiter
 public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html), Alpaka-Leiste (alpakas.html), waagerechter Chat (chat.html, Daten aus `netlify/lib/chatlog.mjs`, Schlüssel `chatlog`)
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
-- Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
+- Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/kern/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Neuer fester Chat-Befehl = nur eine Zeile in `BEFEHLE` (`netlify/lib/chat/befehle.mjs`). Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
 - Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
-- Speicher: `netlify/lib/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `alpaca-active`, `alpaca-color/<id>`).
+- Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 114 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 115 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
@@ -46,4 +54,4 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Chat-Nachrichten dürfen höchstens 500 Zeichen haben (wird gekürzt).
 - Ein ewiger Einlaufsound hat `validUntil` 2999-12-31 und `permanent: true`; `fmtDate` zeigt „unbegrenzt“.
 - Neu gezogene Gewinner haben eine eigene Frist (`winner.deadline`), die Auswahl-Frist gilt also je Gewinner.
-- Streaks werden nicht gespeichert, sondern in `computeStreak` (`netlify/lib/streak.mjs`) aus den Besuchstagen berechnet. Von Hand übernommene Streaks (Admin → Besucher → „Streaks übernehmen“, `POST /api/admin/users/streaks`) liegen als `user.streakImport = { count, asOf }` am Nutzer und werden dort mit eingerechnet, nicht in den Besuchen.
+- Streaks werden nicht gespeichert, sondern in `computeStreak` (`netlify/lib/zuschauer/streak.mjs`) aus den Besuchstagen berechnet. Von Hand übernommene Streaks (Admin → Besucher → „Streaks übernehmen“, `POST /api/admin/users/streaks`) liegen als `user.streakImport = { count, asOf }` am Nutzer und werden dort mit eingerechnet, nicht in den Besuchen.
