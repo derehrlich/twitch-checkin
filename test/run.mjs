@@ -2439,5 +2439,100 @@ await test('Glitzer-Reward: Kauf schaltet Glitzer frei (befristet, verlängerbar
   assert.equal(rewards.find((r) => r.id === state.glitterRewardId).is_enabled, false);
 });
 
+await test('Verlauf-Reward: wie Glitzer, aber getrennt (eigene Dauer, !verlauf, beides kombinierbar, Ablauf)', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const { gradientPrompt } = await import('../netlify/lib/kern/twitch.mjs');
+  const put = (b) => admin(adminReq('PUT', 'settings', b, cookie));
+  await put({ chatEnabled: true, chatCommands: true, commandCooldown: 0, chatOverlayEnabled: true, glitterEnabled: true, glitterDays: 30, gradientEnabled: true, gradientDays: 14 });
+  const setup = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(setup.gradient, 'Verlauf-Chat');
+  const state = await db.get('config/state');
+  assert.ok(state.gradientRewardId && state.gradientRewardId !== state.glitterRewardId);
+  assert.ok(subs.some((x) => x.condition.reward_id === state.gradientRewardId), 'Webhook für den Reward');
+  const createdG = calls.filter((c) => c.path.endsWith('/custom_rewards') && c.method === 'POST').find((c) => c.body.title === 'Verlauf-Chat');
+  assert.equal(createdG.body.prompt, gradientPrompt(await getSettings()));
+  assert.match(createdG.body.prompt, /14 Tage lang.*2-3 Farben.*!verlauf rot blau.*verlängert/);
+  assert.equal(createdG.body.is_user_input_required, true, 'Käufer schreibt die Farben dazu');
+  assert.ok(createdG.body.prompt.length <= 200 && createdG.body.prompt.length > 60);
+  assert.match(gradientPrompt({ gradientDays: 0 }), /für immer/);
+
+  const msg = (text, id = 'vv1', name = 'Verlaufi') => ({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges: [], message_id: crypto.randomUUID(), message: { text, fragments: [{ type: 'text', text }] } });
+  const say = async (text, id, name) => { await handleChat(msg(text, id, name), await getSettings()); };
+  const last = async () => (await db.get('chatlog')).at(-1);
+  const redeem = async (rid, rewardId, id = 'vv1', name = 'Verlaufi', input = 'auto') => {
+    const before = chats().length;
+    const ev = redemption(rid, id, name, rewardId); ev.event.user_input = input;
+    await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...ev }));
+    return chats().slice(before);
+  };
+  const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+
+  await say('!verlauf'); await say('vorher'); assert.deepEqual([(await last()).g, (await last()).s], [false, false], 'ohne Kauf wirkt !verlauf nicht');
+  const t0 = Date.now();
+  const out = await redeem('gr-1', state.gradientRewardId);
+  assert.equal(statusOf('gr-1'), 'FULFILLED');
+  assert.match(out[0], /^🌈 Verlaufi hat jetzt einen Farbverlauf bis \d\d\.\d\d\.\d{4}! Mit !verlauf/);
+  let st = await db.get('chatstyle/vv1');
+  assert.equal(st.gradient, true); assert.ok(Math.abs(st.gradientUntil - (t0 + 14 * 86_400_000)) < 5000, '14 Tage');
+  assert.equal(st.glitterUntil, undefined, 'Glitzer bleibt ungekauft');
+  await say('bunt'); assert.deepEqual([(await last()).g, (await last()).s], [true, false], 'nur Verlauf');
+  await say('!glitter'); assert.equal((await db.get('chatstyle/vv1')).glitter, false, 'Glitzer lässt sich damit nicht schalten');
+
+  // an/aus, dann beides kaufen: Verlauf mit Glitzer
+  await say('!verlauf'); await say('aus'); assert.equal((await last()).g, false);
+  await say('!verlauf');
+  await redeem('gl-v', state.glitterRewardId);
+  await say('beides'); assert.deepEqual([(await last()).g, (await last()).s], [true, true], 'Verlauf und Glitzer zusammen');
+
+  // Verlängern und Ablauf (nur der Verlauf läuft ab, der Glitzer bleibt)
+  const before = (await db.get('chatstyle/vv1')).gradientUntil;
+  await redeem('gr-2', state.gradientRewardId);
+  assert.ok(Math.abs((await db.get('chatstyle/vv1')).gradientUntil - (before + 14 * 86_400_000)) < 1000);
+  st = await db.get('chatstyle/vv1');
+  await db.set('chatstyle/vv1', { ...st, gradientUntil: Date.now() - 1000 });
+  await say('nur noch glitzern'); assert.deepEqual([(await last()).g, (await last()).s], [false, true]);
+
+  // unbegrenzt, Chat-Leiste aus
+  await put({ gradientDays: 0 });
+  assert.match((await redeem('gr-3', state.gradientRewardId, 'vv2', 'Ewig'))[0], /Ewig hat jetzt einen Farbverlauf bis unbegrenzt!/);
+  await put({ chatOverlayEnabled: false });
+  const off = await redeem('gr-4', state.gradientRewardId, 'vv3', 'Spät');
+  assert.equal(statusOf('gr-4'), 'CANCELED'); assert.match(off[0], /Spät, die Chat-Leiste ist gerade aus, der Farbverlauf hätte nichts bewirkt/);
+  assert.equal(await db.get('chatstyle/vv3'), null);
+
+  // Eigene Farben beim Kauf, später ändern, zurück zu auto
+  await put({ chatOverlayEnabled: true, gradientDays: 14 });
+  const al = await import('../netlify/lib/belohnungen/alpaca.mjs');
+  assert.deepEqual(al.parseColors('Rot, blau'), ['#e03a3a', '#3a7bff']);
+  assert.deepEqual(al.parseColors('#ff8800 türkis und rosa gelb'), ['#ff8800', '#27c9c0', '#ff8fc0'], 'höchstens drei, Füllwörter egal');
+  assert.deepEqual(al.parseColors('#f80'), ['#ff8800']); assert.deepEqual(al.parseColors('durchsichtig'), []);
+  assert.equal(al.parseColors('zufall zufall', () => 0.5).length, 2);
+  const bad = await redeem('gr-bad', state.gradientRewardId, 'vc1', 'Farbi', 'durchsichtig');
+  assert.equal(statusOf('gr-bad'), 'CANCELED'); assert.match(bad[0], /^Farbi, diese Farben kenne ich nicht/);
+  assert.equal(await db.get('chatstyle/vc1'), null, 'nichts gutgeschrieben');
+  await redeem('gr-c1', state.gradientRewardId, 'vc1', 'Farbi', 'rot blau');
+  assert.equal(statusOf('gr-c1'), 'FULFILLED');
+  assert.deepEqual((await db.get('chatstyle/vc1')).gradientColors, ['#e03a3a', '#3a7bff']);
+  await say('bunt', 'vc1', 'Farbi');
+  assert.deepEqual((await last()).gc, ['#e03a3a', '#3a7bff'], 'das Overlay bekommt die Farben'); assert.equal((await last()).g, true);
+  await say('!verlauf türkis rosa gelb', 'vc1', 'Farbi');
+  assert.deepEqual((await db.get('chatstyle/vc1')).gradientColors, ['#27c9c0', '#ff8fc0', '#ffd93d'], 'später ändern');
+  await say('!verlauf', 'vc1', 'Farbi'); assert.equal((await db.get('chatstyle/vc1')).gradient, false, 'ohne Farben: aus');
+  assert.deepEqual((await db.get('chatstyle/vc1')).gradientColors, ['#27c9c0', '#ff8fc0', '#ffd93d'], 'Farben bleiben gemerkt');
+  await say('!verlauf durchsichtig', 'vc1', 'Farbi'); assert.equal((await db.get('chatstyle/vc1')).gradient, false, 'unbekannte Farben: nichts passiert');
+  await say('!verlauf auto', 'vc1', 'Farbi');
+  st = await db.get('chatstyle/vc1'); assert.equal(st.gradientColors, null); assert.equal(st.gradient, true);
+  await say('automatisch', 'vc1', 'Farbi'); assert.equal((await last()).gc, undefined, 'ohne eigene Farben schickt das Overlay keine');
+  await say('!verlauf grün gelb', 'vx9', 'Fremd'); assert.equal(await db.get('chatstyle/vx9'), null, 'ohne Kauf geht das nicht');
+  await say('!reset', 'vc1', 'Farbi'); assert.equal((await db.get('chatstyle/vc1')).gradientColors, null);
+  await put({ chatOverlayEnabled: false });
+
+  // ausschalten
+  await put({ gradientEnabled: false, glitterEnabled: false });
+  await admin(adminReq('POST', 'setup', {}, cookie));
+  const after = await db.get('config/state');
+  assert.equal(after.gradientRewardId, undefined); assert.equal(rewards.find((r) => r.id === state.gradientRewardId).is_enabled, false);
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

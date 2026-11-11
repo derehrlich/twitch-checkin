@@ -93,6 +93,9 @@ export async function setRedemptionStatus(redemptionId, rewardId, status) {
 export const glitterPrompt = (settings) =>
   `✨ Dein Name und deine Chat-Nachrichten glitzern in der Chat-Leiste im Stream, ${settings.glitterDays > 0 ? `${settings.glitterDays} Tage lang` : 'für immer'}. Mit !glitter im Chat schaltest du es an/aus. Nochmal einlösen verlängert.`.slice(0, 200);
 
+export const gradientPrompt = (settings) =>
+  `🌈 Farbverlauf für Name und Chat-Nachrichten in der Chat-Leiste, ${settings.gradientDays > 0 ? `${settings.gradientDays} Tage lang` : 'für immer'}. Schreib 2-3 Farben dazu, z. B. rot blau, oder auto. Ändern mit !verlauf rot blau. Nochmal einlösen verlängert.`.slice(0, 200);
+
 // Legt die Rewards an (oder passt Preis/Namen an) und merkt sich die IDs.
 // Check-out nur, wenn aktiviert; ein früher angelegter Check-out-Reward wird dann in Twitch deaktiviert.
 export async function ensureRewards(settings, entry = null) {
@@ -161,8 +164,16 @@ export async function ensureRewards(settings, entry = null) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.glitterRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.glitterRewardId;
   }
+  // Verlauf-Chat: schaltet den Farbverlauf in der Chat-Leiste frei
+  let gradient = null;
+  if (settings.gradientEnabled) {
+    gradient = await make({ stateKey: 'gradientRewardId', title: settings.gradientRewardTitle, cost: settings.gradientRewardCost, prompt: gradientPrompt(settings), color: '#9146FF', syncPrompt: true, extra: { is_user_input_required: true } });
+  } else if (state.gradientRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gradientRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.gradientRewardId;
+  }
   await db.set('config/state', state);
-  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter };
+  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge
