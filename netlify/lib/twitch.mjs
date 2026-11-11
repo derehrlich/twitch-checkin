@@ -252,6 +252,16 @@ export async function channelInfo(broadcasterId) {
   return { id: broadcasterId, login: u.login ?? c.broadcaster_login, name: c.broadcaster_name ?? u.display_name, game: c.game_name || '', avatar: u.profile_image_url ?? null };
 }
 
+// Live-Daten des Kanals (für Platzhalter in Commands): läuft der Stream, seit wann, Zuschauer, Spiel und Titel
+export async function streamInfo(broadcasterId) {
+  const [st, ch] = await Promise.all([
+    helix('GET', 'streams', { as: 'app', query: { user_id: broadcasterId } }),
+    helix('GET', 'channels', { as: 'app', query: { broadcaster_id: broadcasterId } }),
+  ]);
+  const s = st.data?.[0], c = ch.data?.[0] ?? {};
+  return { live: Boolean(s), game: s?.game_name || c.game_name || '', title: s?.title || c.title || '', viewers: s?.viewer_count ?? 0, startedAt: s?.started_at ?? null };
+}
+
 export async function userByLogin(login) {
   const { data } = await helix('GET', 'users', { as: 'app', query: { login } });
   return data?.[0] ?? null;

@@ -43,6 +43,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/helix/users')) return ok({ data: [{ id: entry.query.id ?? '777', login: entry.query.login ?? 'raiderin', display_name: 'RaiderIn', profile_image_url: 'https://img/a.png' }] });
   if (u.pathname.endsWith('/helix/channels') && channelsFail) return ok({ error: 'boom' }, 500);
+  if (u.pathname.endsWith('/helix/streams')) return ok({ data: [{ started_at: new Date(Date.now() - 134 * 60_000).toISOString(), viewer_count: 12, game_name: 'Hades', title: 'Testtitel' }] });
   if (u.pathname.endsWith('/helix/clips') && entry.query.id) return ok({ data: clipDb.filter((c) => c.id === entry.query.id) });
   if (u.pathname.endsWith('/helix/clips') && clipsFail) return ok({ error: 'boom' }, 500);
   if (u.pathname.endsWith('/helix/channels')) return ok({ data: [{ broadcaster_name: 'RaiderIn', broadcaster_login: 'raiderin', game_name: 'Hades' }] });
@@ -2104,6 +2105,72 @@ await test('Alpakas: Farben erkennen, Chatter laufen mit, Reward färbt, unbekan
   assert.equal((await db.get('config/state')).alpacaRewardId, undefined, 'Reward wird beim Ausschalten abgeschaltet');
   assert.equal(rewards.find((r) => r.id === state.alpacaRewardId).is_enabled, false);
   await db.delete('alpaca-active');
+});
+
+await test('Commands: Platzhalter {game} {title} {uptime} {viewers} {random} {count}', async () => {
+  const { runActions } = await import('../netlify/lib/commands.mjs');
+  const settings = await getSettings();
+  const cmd = { id: 'cafe0001', name: 'info', actions: [{ type: 'chat', text: '{game}|{title}|{uptime}|{viewers}|{random}|#{count}' }] };
+  await db.delete('counter/cafe0001');
+  await runActions(cmd, { user: 'Max' }, settings);
+  await runActions(cmd, { user: 'Max' }, settings);
+  await runActions(cmd, { user: 'Max', dry: true }, settings); // Test-Knopf: zeigt die nächste Zahl, zählt aber nicht
+  const [first, second, dry] = chats().slice(-3);
+  assert.match(first, /^Hades\|Testtitel\|2 Std 1\d Min\|12\|\d{1,3}\|#1$/);
+  assert.match(second, /\|#2$/);
+  assert.match(dry, /\|#3$/);
+  assert.equal(await db.get('counter/cafe0001'), 2);
+});
+
+await test('Zitate: speichern und löschen nur Mods, anzeigen alle, !so nur Mods', async () => {
+  const { handleChat } = await import('../netlify/lib/chat.mjs');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, quoteEnabled: true, soEnabled: true, commandCooldown: 0 }, cookie));
+  const s = await getSettings();
+  const msg = (text, mod = false) => ({ broadcaster_user_id: '999', chatter_user_id: mod ? 'm1' : 'v1', chatter_user_name: mod ? 'Moddi' : 'Viewer', badges: mod ? [{ set_id: 'moderator' }] : [], message_id: crypto.randomUUID(), message: { text } });
+  const before = chats().length;
+  await handleChat(msg('!addquote Das war Absicht'), s); // kein Mod: nichts passiert
+  assert.equal(chats().length, before);
+  await handleChat(msg('!addquote Das war Absicht', true), s);
+  assert.equal(chats().at(-1), '✅ Zitat #1 gespeichert.');
+  await handleChat(msg('!quote 1'), s);
+  assert.match(chats().at(-1), /^💬 Zitat #1: „Das war Absicht“ \(\d\d\.\d\d\.\d{4}\)$/);
+  await handleChat(msg('!quote'), s);
+  assert.match(chats().at(-1), /Zitat #1/);
+  await handleChat(msg('!delquote 1'), s); // kein Mod
+  assert.ok(await db.get('quote/1'));
+  await handleChat(msg('!delquote 1', true), s);
+  assert.equal(await db.get('quote/1'), null);
+  await handleChat(msg('!quote'), s);
+  assert.match(chats().at(-1), /noch kein Zitat/);
+  await handleChat(msg('!addquote Zweites', true), s);
+  assert.equal(chats().at(-1), '✅ Zitat #2 gespeichert.', 'Nummern werden nicht neu vergeben');
+
+  // !so
+  const shouts = () => calls.filter((c) => c.path.endsWith('/chat/shoutouts')).length;
+  const sBefore = shouts();
+  await handleChat(msg('!so raiderin'), s);
+  assert.equal(shouts(), sBefore, 'Zuschauer dürfen nicht');
+  await handleChat(msg('!so raiderin', true), s);
+  assert.equal(shouts(), sBefore + 1);
+  assert.match(chats().at(-1), /twitch\.tv\/raiderin – zuletzt gespielt: Hades/);
+  await handleChat(msg('!so', true), s);
+  assert.match(chats().at(-1), /wen soll ich shouten/);
+});
+
+await test('Auto-Shoutout: nur Listen-Namen, einmal pro Stream-Tag', async () => {
+  const { autoShoutout } = await import('../netlify/lib/extras.mjs');
+  await admin(adminReq('PUT', 'settings', { chatEnabled: true, autoShoutoutEnabled: true, autoShoutoutUsers: 'Stammi, @Anna' }, cookie));
+  const s = await getSettings();
+  const ev = (name) => ({ chatter_user_id: 'id-' + name, chatter_user_name: name, chatter_user_login: name.toLowerCase() });
+  const shouts = () => calls.filter((c) => c.path.endsWith('/chat/shoutouts')).length;
+  const before = shouts();
+  assert.equal(await autoShoutout(ev('Fremder'), s), false);
+  assert.equal(await autoShoutout(ev('Stammi'), s), true);
+  assert.equal(await autoShoutout(ev('Stammi'), s), false, 'am selben Tag nur einmal');
+  assert.equal(await autoShoutout(ev('Anna'), s), true, '@ und Groß-/Kleinschreibung egal');
+  assert.equal(shouts(), before + 2);
+  await admin(adminReq('PUT', 'settings', { autoShoutoutEnabled: false }, cookie));
+  assert.equal(await autoShoutout(ev('Stammi'), await getSettings(), new Date(Date.now() + 86_400_000 * 2)), false, 'ausgeschaltet');
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

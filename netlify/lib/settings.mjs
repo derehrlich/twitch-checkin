@@ -83,6 +83,20 @@ export const DEFAULTS = {
   topCommand: '!top',
   topSize: 5,
   topTemplate: '🏆 Top {n} Stammgäste: {list}', // {list} = "1. Max (42) · 2. Anna (37) ..."
+  // Shoutout: !so <Kanal> (Mods) und automatisch für Stammgäste. Platzhalter: {name} {game} {url}
+  soEnabled: false,
+  soCommand: '!so',
+  soTemplate: '📣 Schaut bei {name} vorbei: {url} – zuletzt gespielt: {game} 💜',
+  autoShoutoutEnabled: false,
+  autoShoutoutUsers: '', // Namen mit Komma getrennt, einmal pro Stream-Tag beim ersten Chat-Beitrag
+  // Zitate: !quote [Nummer] für alle, !addquote und !delquote für Mods. Platzhalter: {n} {text} {by} {date} {user}
+  quoteEnabled: false,
+  quoteCommand: '!quote',
+  quoteAddCommand: '!addquote',
+  quoteDelCommand: '!delquote',
+  quoteTemplate: '💬 Zitat #{n}: „{text}“ ({date})',
+  quoteAddedTemplate: '✅ Zitat #{n} gespeichert.',
+  quoteNoneTemplate: '{user}, ich kenne noch kein Zitat. Mods können mit !addquote eins anlegen.',
   // Abspann (/abspann): sammelt pro Stream-Tag Chatter, Follows, Subs, Bits und Raids und lässt sie als Scrolltext laufen
   creditsEnabled: true,
   creditsTitle: 'Danke fürs Zuschauen!',
@@ -208,10 +222,11 @@ function sanitize(input) {
     str(k + 'Title', 60);
     if (typeof input[k + 'Message'] === 'string') out[k + 'Message'] = input[k + 'Message'].trim().slice(0, 120); // darf leer sein
   }
-  for (const k of ['streakCommand', 'topCommand']) {
+  for (const k of ['streakCommand', 'topCommand', 'soCommand', 'quoteCommand', 'quoteAddCommand', 'quoteDelCommand']) {
     if (typeof input[k] === 'string') { const v = input[k].trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out[k] = v; }
   }
-  for (const k of ['streakCmdTemplate', 'streakCmdNone', 'topTemplate']) str(k, 400);
+  for (const k of ['streakCmdTemplate', 'streakCmdNone', 'topTemplate', 'soTemplate', 'quoteTemplate', 'quoteAddedTemplate', 'quoteNoneTemplate']) str(k, 400);
+  str('autoShoutoutUsers', 400);
   str('creditsTitle', 80); str('creditsOutro', 80); str('creditsIgnore', 400);
   for (const k of ['entrySoundBuyTemplate', 'entrySoundHasTemplate', 'entrySoundOpenTemplate', 'entrySoundNoneTemplate', 'entrySoundExtendTemplate', 'entrySoundTooMuchTemplate', 'entrySoundBusyTemplate', 'entrySoundApprovedTemplate', 'entrySoundRejectedTemplate', 'entrySoundRefundTemplate', 'entrySoundExpiredTemplate']) str(k, 400);
   str('entrySoundBuyTitle', 30); str('entrySoundExtendTitle', 30); // Platz für die Monate hinter dem Namen (Twitch erlaubt 45 Zeichen)
@@ -254,7 +269,7 @@ function sanitize(input) {
   num('volume', 0, 1, false);
   num('duration', 2000, 30_000);
   if (typeof input.chatEnabled === 'boolean') out.chatEnabled = input.chatEnabled;
-  for (const k of ['backupAutoEnabled', 'backupMedia', 'chatOverlayEnabled', 'chatOverlayHideCommands', 'alpacaEnabled', 'awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['backupAutoEnabled', 'backupMedia', 'chatOverlayEnabled', 'chatOverlayHideCommands', 'alpacaEnabled', 'awardEnabled', 'communityEnabled', 'communityTip', 'clipHintEnabled', 'entrySoundEnabled', 'soundboardChat', 'milestoneEnabled', 'streakRescueEnabled', 'raidEnabled', 'raidShoutout', 'raidClip', 'alertsEnabled', 'alertFollow', 'alertSub', 'alertGift', 'alertCheer', 'alertChat', 'chatCommands', 'creditsEnabled', 'creditsChatters', 'creditsFollows', 'creditsSubs', 'creditsBits', 'creditsRaids', 'leaderboardPublic', 'chatStats', 'soEnabled', 'autoShoutoutEnabled', 'quoteEnabled']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.checkoutEnabled === 'boolean') out.checkoutEnabled = input.checkoutEnabled;
   if (typeof input.timezone === 'string') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }); out.timezone = input.timezone; } catch { /* ungültig, ignorieren */ }
