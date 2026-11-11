@@ -6,8 +6,6 @@ services:
     image: ghcr.io/derehrlich/twitch-checkin:latest
     container_name: stadtwache
     restart: unless-stopped
-    labels:
-      com.centurylinklabs.watchtower.enable: "true" # Watchtower (docker-compose.watchtower.yml) aktualisiert nur Apps mit diesem Etikett
     ports:
       - "3000:3000"
     volumes:
