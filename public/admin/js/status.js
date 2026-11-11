@@ -34,7 +34,7 @@ async function syncRewards() {
     const r = await api('POST', 'setup', {});
     const names = [r.reward, r.checkout, r.streak].filter(Boolean).map((x) => `„${x}“`).join(', ');
     if (r.warnings?.length) toast(`Abgleich nur teilweise geglückt: ${r.warnings.join(' · ')}`, true, 20000);
-    else toast(`Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓`);
+    else toast(`Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓${r.notes?.length ? ` (${r.notes.join(' · ')})` : ''}`, false, r.notes?.length ? 12000 : undefined);
     $('syncHint').classList.add('hidden');
     await loadStatus();
     document.dispatchEvent(new Event('admin:synced'));

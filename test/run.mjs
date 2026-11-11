@@ -64,10 +64,12 @@ globalThis.fetch = async (url, init = {}) => {
   }
   if (u.pathname.endsWith('/redemptions')) return ok({ data: [{}] });
   if (u.pathname.endsWith('/eventsub/subscriptions')) {
-    if (entry.method === 'GET') return ok({ data: subs });
+    if (entry.method === 'GET') return ok({ data: entry.query.type ? subs.filter((x) => x.type === entry.query.type) : subs });
     if (entry.method === 'DELETE') { subs = subs.filter((x) => x.id !== entry.query.id); return ok({}); }
     if (failSubTypes.has(entry.body.type)) return ok({ error: 'Forbidden', status: 403, message: 'subscription missing proper authorization' }, 403);
-    const sub = { id: 's' + (subs.length + 1) + calls.length, status: 'webhook_callback_verification_pending', condition: entry.body.condition, transport: entry.body.transport };
+    const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+    if (subs.some((x) => x.type === entry.body.type && x.version === entry.body.version && same(x.condition, entry.body.condition))) return ok({ error: 'Conflict', status: 409, message: 'subscription already exists' }, 409);
+    const sub = { id: 's' + (subs.length + 1) + calls.length, type: entry.body.type, version: entry.body.version, status: 'webhook_callback_verification_pending', condition: entry.body.condition, transport: entry.body.transport };
     subs.push(sub);
     return ok({ data: [sub] });
   }
@@ -2223,6 +2225,24 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const quiet = chats().length; await handleChat(msg('!streak'), await getSettings());
   assert.equal(chats().length, quiet, 'ohne Chat-Erlaubnis schreibt der Bot nichts');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, soEnabled: false, commandCooldown: 10 }, cookie));
+});
+
+await test('Webhook-Abgleich: alte Anmeldung unter anderer Adresse (409) wird ersetzt', async () => {
+  // Eine Bits-Anmeldung von früher (andere Adresse) blockiert bei Twitch die neue
+  const old = { id: 'alt-cheer', type: 'channel.cheer', version: '1', status: 'enabled', condition: { broadcaster_user_id: '999' }, transport: { method: 'webhook', callback: 'https://alt.beispiel.de/api/twitch-webhook' } };
+  subs = subs.filter((x) => x.type !== 'channel.cheer'); subs.push(old);
+  await admin(adminReq('PUT', 'settings', { alertsEnabled: true }, cookie));
+  const r = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(r.ok, true);
+  assert.equal(r.warnings, undefined, 'kein Fehler mehr');
+  assert.match(r.notes.join(' '), /Alte Anmeldung für Bits bei alt\.beispiel\.de ersetzt/);
+  const cheer = subs.filter((x) => x.type === 'channel.cheer');
+  assert.equal(cheer.length, 1);
+  assert.equal(cheer[0].transport.callback, 'https://beispiel.netlify.app/api/twitch-webhook', 'jetzt unter der richtigen Adresse');
+  // Beim nächsten Abgleich ist nichts mehr zu ersetzen
+  const again = await (await admin(adminReq('POST', 'setup', {}, cookie))).json();
+  assert.equal(again.notes, undefined);
+  assert.equal(again.warnings, undefined);
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
