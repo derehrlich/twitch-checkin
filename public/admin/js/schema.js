@@ -110,7 +110,7 @@ export const SCHEMA = {
   ],
 
   community: [
-    { title: 'Community-Rangliste des Monats', hint: 'Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. <b>Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.</b> Voraussetzung ist das Geheimwort <code>LINK_SECRET</code> in Netlify (und beim Bot). Nach dem Ein- oder Ausschalten die Webhooks abgleichen.', items: [
+    { title: 'Community-Rangliste des Monats', hint: 'Twitch-Chat, Check-ins und Discord (vom VerwirrBot gemeldet) zählen zusammen. <b>Öffentlich erscheinen nur Konten, die sich selbst verknüpft haben.</b> Voraussetzung ist das Geheimwort <code>LINK_SECRET</code> in der Stadtwache-App (und beim Bot). Nach dem Ein- oder Ausschalten die Webhooks abgleichen.', items: [
       c('communityEnabled', 'Community-Rangliste aktivieren (Zählen, Verknüpfen, Monatsrangliste)'),
       n('communityWeightMsg', 'Punkte je Nachricht', { min: 0, max: 1000 }), n('communityWeightDay', 'Punkte je aktivem Tag (Twitch und Discord getrennt gezählt)', { min: 0, max: 1000 }),
       n('communityWeightCheckin', 'Punkte je Check-in-Tag', { min: 0, max: 1000 }),
@@ -179,6 +179,12 @@ export const SCHEMA = {
       n('duration', 'Anzeigedauer Check-in, Check-out und Meilenstein (ms)', { min: 2000, max: 30000, step: 500 }),
       t('timezone', 'Zeitzone'), n('dayRolloverHour', 'Neuer Stream-Tag ab (Uhr)', { min: 0, max: 23 }),
       c('chatEnabled', 'Chatnachrichten senden (ausgeschaltet schreibt der Bot gar nichts)'),
+    ] },
+    { title: 'Automatische Sicherung', hint: 'Die Stadtwache sichert sich jede Nacht selbst in den Backup-Ordner auf dem Server (siehe Backup &amp; Wiederherstellen unten). Am besten liegt der Ordner auf einem anderen Gerät, zum Beispiel einer Freigabe deines NAS.', items: [
+      c('backupAutoEnabled', 'Jede Nacht automatisch sichern'),
+      n('backupHour', 'Sichern um (Uhr)', { min: 0, max: 23 }),
+      n('backupKeep', 'So viele Sicherungen aufheben', { min: 1, max: 90 }),
+      c('backupMedia', 'Mit Tönen und Bildern sichern'),
     ] },
   ],
 };

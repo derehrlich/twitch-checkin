@@ -10,7 +10,7 @@ export async function loadStatus() {
   const sub = s.subscription;
   const reward = (id, on, label) => (on ? check(id ? 'ok' : 'warn', id ? `${label}-Reward angelegt` : `${label}-Reward noch nicht angelegt (bitte abgleichen)`) : check('', `${label} ist ausgeschaltet`));
   $('checks').innerHTML =
-    check(envOk ? 'ok' : 'bad', envOk ? 'Netlify-Variablen gesetzt' : `Fehlende Netlify-Variablen: <b>${esc(missing)}</b>`) +
+    check(envOk ? 'ok' : 'bad', envOk ? 'Umgebungsvariablen gesetzt' : `Fehlende Umgebungsvariablen: <b>${esc(missing)}</b>`) +
     check(s.connectedAs ? 'ok' : 'bad', s.connectedAs ? `Mit Twitch verbunden als <b>${esc(s.connectedAs)}</b>` : 'Noch nicht mit Twitch verbunden') +
     (s.missingScopes.length ? check('warn', `Es fehlen Twitch-Berechtigungen (${esc(s.missingScopes.join(', '))}) – bitte „Mit Twitch verbinden“ erneut klicken`) : '') +
     reward(s.rewardId, true, 'Check-in') + reward(s.checkoutRewardId, s.checkoutEnabled, 'Check-out') + reward(s.streakRewardId, s.streakRescueEnabled, 'Streak-Retter') + reward(s.entryRewardId, s.entrySoundEnabled, 'Einlaufsound') +

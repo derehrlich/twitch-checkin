@@ -288,7 +288,7 @@
           <thead><tr><th>Twitch</th><th>Discord</th><th>Seit</th><th></th></tr></thead>
           <tbody id="comRows"></tbody>
         </table></div>
-        <p class="muted">Verknüpft wird nur freiwillig: im Discord <code>/verknuepfen</code>, dann Anmeldung mit Twitch und ausdrückliche Zustimmung auf <code id="comUrl"></code>. Wer die Verknüpfung löschen lässt, verschwindet sofort aus der öffentlichen Rangliste. Zum Einrichten braucht es das Geheimwort <code>LINK_SECRET</code> in Netlify und beim VerwirrBot.</p>
+        <p class="muted">Verknüpft wird nur freiwillig: im Discord <code>/verknuepfen</code>, dann Anmeldung mit Twitch und ausdrückliche Zustimmung auf <code id="comUrl"></code>. Wer die Verknüpfung löschen lässt, verschwindet sofort aus der öffentlichen Rangliste. Zum Einrichten braucht es das Geheimwort <code>LINK_SECRET</code> in der Stadtwache-App und beim VerwirrBot.</p>
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards &amp; Webhooks abgleichen</button></div>
       </section>
       <div data-schema="community" style="display:grid; gap:22px;"></div>
@@ -395,7 +395,10 @@
           <a class="btn" href="/api/admin/backup" download>Backup herunterladen</a>
           <a class="btn ghost" href="/api/admin/backup?media=1" download>Backup mit Tönen &amp; Bildern</a>
         </div>
-        <p class="muted">Die Variante mit Medien kann bei vielen oder großen Dateien an die Grenze von Netlify (ca. 6 MB) stoßen. Dann lieber ohne Medien sichern und die Dateien selbst aufheben.</p>
+        <p class="muted">Die Variante mit Medien kann bei vielen oder großen Dateien sehr groß werden. Dann lieber ohne Medien sichern und die Dateien selbst aufheben.</p>
+        <h3>Automatische Sicherung</h3>
+        <p class="muted" id="autoInfo">…</p>
+        <div class="row"><button id="autoNow" class="ghost">Jetzt sichern</button></div>
         <h3>Wiederherstellen</h3>
         <div class="row">
           <div><label for="restoreFile">Backup-Datei (.json)</label><input id="restoreFile" type="file" accept="application/json,.json"></div>

@@ -11,7 +11,7 @@ import { initCatalog, loadCatalog } from './catalog.js';
 import { initVisitors, loadUsers } from './visitors.js';
 import { initTests } from './tests.js';
 import { initRaids, loadRaids } from './raids.js';
-import { initBackup } from './backup.js';
+import { initBackup, loadAutoBackup } from './backup.js';
 import { initUpdate, loadUpdate } from './update.js';
 import { initSport, loadSport } from './sport.js';
 
@@ -26,13 +26,13 @@ function showTab(name) {
 
 function showLogin(disabled) {
   $('login').classList.remove('hidden'); $('app').classList.add('hidden'); $('logout').classList.add('hidden');
-  $('loginHint').textContent = disabled ? 'Die Umgebungsvariable ADMIN_PASSWORD ist in Netlify noch nicht gesetzt.' : '';
+  $('loginHint').textContent = disabled ? 'Die Umgebungsvariable ADMIN_PASSWORD ist noch nicht gesetzt.' : '';
 }
 
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadUpdate()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadUpdate(), loadAutoBackup()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
