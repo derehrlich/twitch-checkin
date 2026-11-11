@@ -1,0 +1,35 @@
+# Update-Helfer für die Stadtwache. In CasaOS: App-Store → „Benutzerdefinierte App installieren“ → diese Datei einfügen. Nur einmal nötig.
+# Watchtower tut nichts von allein. Im Admin (Allgemein → Updates) auf „Auf Updates prüfen“ drücken: dann schaut es, ob es ein neueres Image
+# gibt (nach jedem Merge in main baut GitHub eins), lädt es und startet die Stadtwache mit denselben Einstellungen neu.
+# Es berührt nur Apps mit dem Etikett „com.centurylinklabs.watchtower.enable=true“, sonst nichts.
+# HIER_UPDATE_SCHLUESSEL durch ein langes Geheimwort ersetzen (nur Buchstaben und Zahlen). Derselbe Wert kommt bei der Stadtwache als WATCHTOWER_TOKEN hinein.
+# Die Daten der Stadtwache liegen im Ordner /DATA/AppData/stadtwache/data und bleiben dabei erhalten.
+name: watchtower
+services:
+  watchtower:
+    image: ghcr.io/nicholas-fedor/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    ports:
+      - "8081:8080" # nur im Heimnetz erreichbar, Befehle nimmt es nur mit dem Schlüssel an
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: Europe/Berlin
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_TOKEN: HIER_UPDATE_SCHLUESSEL
+      WATCHTOWER_CLEANUP: "true"
+x-casaos:
+  architectures:
+    - amd64
+  main: watchtower
+  author: Marcel Ehrlich
+  category: Twitch
+  description:
+    de_de: Spielt Updates der Stadtwache auf Knopfdruck im Admin ein
+    en_us: Installs Stadtwache updates on a button press in the admin
+  title:
+    custom: Watchtower
+  port_map: ""
+  index: /

@@ -1,6 +1,6 @@
 # Stadtwache auf dem eigenen CasaOS-Server
 
-Die Stadtwache läuft wahlweise auf Netlify **oder** zu Hause auf dem NAS. Der Code ist derselbe: `server.mjs` lädt die vorhandenen Functions, liefert `public/` aus und speichert die Daten in einem Ordner (`/data`). Gebaut wird ein Docker-Image (`Dockerfile`), das die GitHub Action `docker-image.yml` nach `ghcr.io/derehrlich/twitch-checkin` legt.
+Die Stadtwache läuft zu Hause auf dem NAS (früher auch auf Netlify). Der Code ist derselbe: `server.mjs` lädt die vorhandenen Functions, liefert `public/` aus und speichert die Daten in einem Ordner (`/data`). Gebaut wird ein Docker-Image (`Dockerfile`), das die GitHub Action `docker-image.yml` nach `ghcr.io/derehrlich/twitch-checkin` legt.
 
 Warum zu Hause: Das Overlay fragt alle 3 Sekunden nach. Auf Netlify zählt jede Abfrage gegen das Kontingent, zu Hause kostet sie nichts.
 
@@ -60,7 +60,10 @@ Cloudflare → Zero Trust → Access → Anwendungen → *Selbst gehostet*: Anwe
 
 ## Betrieb
 
-- **Update:** Nach jedem Merge in `main` baut GitHub ein neues Image. In CasaOS die App neu erstellen bzw. das Image neu laden (oder später Watchtower einsetzen). Die Daten bleiben, sie liegen im Ordner `data`.
+- **Update per Knopf:** Im Admin unter *Allgemein → Updates* steht die laufende Version und der Knopf **„Auf Updates prüfen“**. Er bittet Watchtower, nachzusehen, ob nach einem Merge in `main` ein neues Image da ist. Wenn ja, lädt Watchtower es und startet die Stadtwache neu (die Seite ist etwa eine halbe Minute weg, die Daten bleiben). Wenn nein, steht dort „Bereits aktuell“.
+  - **Einmalig einrichten:** 1. Ein langes Geheimwort ausdenken (Buchstaben und Zahlen). 2. In CasaOS die App aus `docker-compose.watchtower.yml` installieren, `HIER_UPDATE_SCHLUESSEL` durch das Geheimwort ersetzen. 3. In der Stadtwache-App `WATCHTOWER_TOKEN` auf dasselbe Geheimwort setzen und `WATCHTOWER_URL` auf `http://<NAS-Adresse>:8081`. 4. Die Stadtwache muss das Etikett `com.centurylinklabs.watchtower.enable` aus `docker-compose.yml` tragen (bei einer älteren Installation die App einmal neu anlegen).
+  - Die Version kommt aus dem Bau des Images (`BUILD_SHA`, gesetzt von der GitHub Action). Nach einem Merge dauert der Bau etwa eine Minute, erst danach findet der Knopf etwas Neues.
+- **Update von Hand** (falls der Knopf nicht geht): per SSH `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/nicholas-fedor/watchtower:latest --run-once --cleanup stadtwache`.
 - **Server war aus:** Nach einem längeren Ausfall kann Twitch die Webhooks abgeschaltet haben. Admin → **Rewards & Webhooks abgleichen**.
 - **Gesundheit:** `/healthz` antwortet mit `ok`; Docker prüft das selbst.
 - **Sicherung:** Der Ordner `/DATA/AppData/stadtwache/data` enthält auch die Twitch-Tokens (Dateirechte nur für den Besitzer). Nicht öffentlich teilen. Das Admin-Backup enthält sie nicht.

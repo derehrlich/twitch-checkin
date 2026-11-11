@@ -12,6 +12,7 @@ import { initVisitors, loadUsers } from './visitors.js';
 import { initTests } from './tests.js';
 import { initRaids, loadRaids } from './raids.js';
 import { initBackup } from './backup.js';
+import { initUpdate, loadUpdate } from './update.js';
 import { initSport, loadSport } from './sport.js';
 
 const TABS = ['start', 'checkin', 'alerts', 'raids', 'abspann', 'sport', 'alpakas', 'soundboard', 'commands', 'einlaufsound', 'community', 'medien', 'besucher', 'tests', 'allgemein'];
@@ -31,7 +32,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadUpdate()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -41,7 +42,7 @@ async function init() {
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
-initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initUpdate();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
