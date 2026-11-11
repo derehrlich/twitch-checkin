@@ -164,8 +164,9 @@ export const DEFAULTS = {
   alpacaRewardCost: 500,
   alpacaMax: 30, // so viele Alpakas gleichzeitig (die zuletzt aktiven)
   chatOverlayEnabled: false, // waagerechtes Chat-Overlay (/chat)
-  chatOverlaySeconds: 60, // so lange bleibt eine Nachricht sichtbar
-  chatOverlayMax: 12, // höchstens so viele Nachrichten gleichzeitig
+  chatOverlaySeconds: 0, // so lange bleibt eine Nachricht sichtbar (0 = bis neue sie wegschieben)
+  chatOverlayMax: 10, // höchstens so viele Nachrichten gleichzeitig
+  chatOverlayVip: 'ehrlichverwirrt, novelsbyeverly, pyronema, artemis_podowy', // dürfen Glitzer und Verlauf auch ohne Abo
   chatOverlayHideCommands: true, // Nachrichten mit ! am Anfang nicht zeigen
   alpacaMinutes: 90, // so lange nach der letzten Nachricht läuft das Alpaka weiter
   // Platzhalter: {user} {color}
@@ -219,7 +220,7 @@ function sanitize(input) {
   num('communityRankSize', 1, 10);
   if (typeof input.communityRankCommand === 'string') { const v = input.communityRankCommand.trim().toLowerCase().replace(/\s+/g, ''); if (/^!\w{1,25}$/.test(v)) out.communityRankCommand = v; }
   str('alpacaRewardTitle', 45); str('alpacaTemplate', 400); str('alpacaBadTemplate', 400);
-  num('chatOverlaySeconds', 5, 600); num('chatOverlayMax', 1, 30);
+  num('chatOverlaySeconds', 0, 3600); str('chatOverlayVip', 400); num('chatOverlayMax', 1, 30);
   num('alpacaRewardCost', 1, 1_000_000); num('alpacaMax', 1, 60); num('alpacaMinutes', 5, 720);
   for (const k of ['awardAnnounceTemplate', 'awardTipTemplate', 'awardChosenTemplate', 'awardRerollTemplate']) str(k, 400);
   num('awardSize', 1, 10); num('awardDays', 1, 30); num('awardMonths', 1, 12);

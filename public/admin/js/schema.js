@@ -134,10 +134,11 @@ export const SCHEMA = {
   ],
 
   alpakas: [
-    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Chat &amp; Abspann) erscheinen nicht.', items: [
+    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Chat &amp; Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. <b>!reset</b> setzt alles zurück.', items: [
       c('chatOverlayEnabled', 'Chat-Leiste aktivieren (braucht den Chat-Webhook)'),
-      n('chatOverlaySeconds', 'Eine Nachricht bleibt so viele Sekunden sichtbar', { min: 5, max: 600 }),
       n('chatOverlayMax', 'Höchstens so viele Nachrichten gleichzeitig', { min: 1, max: 30 }),
+      n('chatOverlaySeconds', 'Eine Nachricht verschwindet nach so vielen Sekunden (0 = sie bleibt, bis neue sie wegschieben)', { min: 0, max: 3600 }),
+      t('chatOverlayVip', 'Namen, die Glitzer und Verlauf auch ohne Abo nutzen dürfen (mit Komma getrennt)', { maxlength: 400 }),
       c('chatOverlayHideCommands', 'Befehle (Nachrichten mit !) nicht zeigen'),
     ] },
     { title: 'Alpakas im Overlay', hint: `Jede Person, die im Chat schreibt, läuft als Pixel-Alpaka durchs Bild, bis sie länger nichts mehr geschrieben hat. Ohne Reward haben alle einen natürlichen Fellton (weiß, beige, braun, grau). Mit dem Reward „Alpaka färben“ schreibt man die Farbe beim Einlösen dazu: einen Namen wie rot, türkis oder rosa, einen Hex-Code wie #ff8800 oder „zufall“. Die Farbe bleibt dauerhaft. Nach dem Ein- oder Ausschalten und nach Änderungen an Name oder Preis die Rewards abgleichen. Platzhalter der Texte: ${code('user')} ${code('color')}.`, items: [

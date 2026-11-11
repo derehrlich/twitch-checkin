@@ -7,81 +7,109 @@
 <title>Stadtwache Chat</title>
 <link rel="stylesheet" href="/theme.css">
 <style>
-  /* Waagerechter Chat als OBS-Browserquelle (z. B. 1920×90, Hintergrund bleibt durchsichtig).
-     Neue Nachrichten kommen rechts herein, ältere rutschen nach links und verschwinden.
-     ?demo  Beispielnachrichten   ?pos=top  Leiste oben   ?scale=1.3  Größe */
+  /* Waagerechter Chat als OBS-Browserquelle (z. B. 1920×120, Hintergrund durchsichtig).
+     Neueste Nachricht links, ältere rutschen nach rechts.   ?demo  Beispielnachrichten   ?scale=1.3  Größe */
+  :root { --s: 1; --alpaka: calc(50px * var(--s)); --name: calc(1.25rem * var(--s)); --text: calc(1.15rem * var(--s)); --width: 28ch; --gap: calc(40px * var(--s)); --fade: 8%; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
-  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: calc(64px * var(--s, 1)); display: flex; align-items: center; justify-content: flex-end; gap: calc(14px * var(--s, 1)); padding: 0 calc(16px * var(--s, 1)); overflow: hidden; }
-  body.top #bar { bottom: auto; top: 0; }
-  .msg { flex: none; display: flex; align-items: center; gap: calc(8px * var(--s, 1)); max-width: 60vw; padding: calc(8px * var(--s, 1)) calc(18px * var(--s, 1)); box-sizing: border-box; border-radius: 999px; background: rgba(20, 10, 4, .72); box-shadow: inset 0 1px 0 rgba(255, 214, 160, .18), 0 2px 8px rgba(0, 0, 0, .35); font-size: calc(26px * var(--s, 1)); font-weight: 500; line-height: 1.2; color: #fff3da; white-space: nowrap; animation: in .45s cubic-bezier(.2, .9, .3, 1); transition: opacity .6s; }
-  .msg.out { opacity: 0; }
-  .msg b { font-weight: 700; text-shadow: 1px 1px 0 rgba(43, 24, 12, .75); }
-  .msg .t { overflow: hidden; text-overflow: ellipsis; }
-  .msg img { height: 1.25em; width: auto; vertical-align: middle; }
-  @keyframes in { from { opacity: 0; transform: translateX(60px) scale(.9); } to { opacity: 1; transform: none; } }
+  #chat { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; height: 100vh; padding: 0 40px; box-sizing: border-box; gap: var(--gap);
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+  .bubble { display: flex; align-items: center; gap: 12px; flex-shrink: 0; animation: in .6s cubic-bezier(.23, 1, .32, 1) forwards; }
+  @keyframes in { from { opacity: 0; transform: translateX(-100px); } to { opacity: 1; transform: none; } }
+  .alpaka { width: var(--alpaka); height: var(--alpaka); object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .3)); }
+  .wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .name { font-weight: 700; font-size: var(--name); white-space: nowrap; text-shadow: 0 2px 4px rgba(0, 0, 0, .8); }
+  .text { color: #fff; font-weight: 500; font-size: var(--text); text-shadow: 0 2px 4px rgba(0, 0, 0, .8); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: var(--width); white-space: normal; overflow-wrap: anywhere; }
+  .text img { height: 1.3em; width: auto; vertical-align: middle; }
+  /* Extras (nur Abos und VIPs): Verlauf, und Glitzer als Lichtschein. Der Schein läuft nur bei den jeweils sichtbaren Nachrichten. */
+  .fx-gradient .name, .fx-gradient .text, .fx-glitter .name, .fx-glitter .text { -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .8)); }
+  .fx-gradient .name, .fx-gradient .text { background-image: linear-gradient(90deg, var(--c1), var(--c2)); }
+  .fx-glitter .name, .fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c1) 35%, #fff 48%, #fff 52%, var(--c1) 65%, var(--c1) 100%); background-size: 250% 100%; animation: sweep 2.4s linear infinite; }
+  .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c2) 30%, #fff 48%, #fff 52%, var(--c2) 70%, var(--c1) 100%); }
+  @keyframes sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 </style>
 </head>
 <body>
-<div id="bar" aria-live="off"></div>
+<div id="chat" aria-live="off"></div>
 <script>
 const params = new URLSearchParams(location.search);
-if (params.get('pos') === 'top') document.body.classList.add('top');
 const scale = Number(params.get('scale'));
 if (scale > 0.3 && scale < 5) document.documentElement.style.setProperty('--s', scale);
-const bar = document.getElementById('bar');
-const SHOWN = new Map(); // Nachrichten-ID -> Element (bleibt klein: wird beim Entfernen mit aufgeräumt)
-const COLORS = ['#ff8fc0', '#27c9c0', '#ffd93d', '#a14ee8', '#7fc4ff', '#ff8a1f', '#8be26a', '#ff6b6b'];
-const colorOf = (m) => m.c || COLORS[[...m.n].reduce((s, ch) => s + ch.charCodeAt(0), 0) % COLORS.length];
-let seconds = 60;
+const chat = document.getElementById('chat');
+
+// Deine Alpaka-Bilder, je Nachricht eins (nach der Nachrichten-Kennung, so bleibt es nach einem Neuladen gleich)
+const ALPAKAS = [
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_mhyq6kt35g912r7w',
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_y4kngmsfnywe8vt7',
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_flchcoran15t0ic1',
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_atpytgfw5o4colo8',
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_i9vmvbmpumttu97g',
+  'https://user-assets.meldstudio.co/99e838bc23a44b1c9f392c53f2d7a95c/ua/ast_67opte92pph2vvdf',
+];
+const hash = (str) => [...str].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const x = (v) => Math.round(255 * v).toString(16).padStart(2, '0');
+  return '#' + x(f(0)) + x(f(8)) + x(f(4));
+}
+function shiftHex(hex, deg) { // zweite Farbe für Verlauf und Glitzer: Farbton gedreht
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    h = max === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6 : max === g ? ((b - r) / d + 2) / 6 : ((r - g) / d + 4) / 6;
+  }
+  return hslToHex((h * 360 + deg + 360) % 360, s * 100, l * 100);
+}
+
+const SHOWN = new Map(); // Nachrichten-Kennung -> Element
+let limit = 10;
 
 function build(m) {
+  const base = m.c || hslToHex(hash(m.n.toLowerCase()) % 360, 100, 75); // ohne eigene Farbe: pro Person immer dieselbe
   const el = document.createElement('div');
-  el.className = 'msg';
-  const name = document.createElement('b');
-  name.textContent = m.n;
-  name.style.color = colorOf(m);
-  const text = document.createElement('span');
-  text.className = 't';
+  el.className = 'bubble' + (m.g ? ' fx-gradient' : '') + (m.s ? ' fx-glitter' : '');
+  el.style.setProperty('--c1', base); el.style.setProperty('--c2', shiftHex(base, 40));
+  const img = document.createElement('img');
+  img.className = 'alpaka'; img.alt = ''; img.src = ALPAKAS[hash(String(m.id)) % ALPAKAS.length];
+  const wrap = document.createElement('div'); wrap.className = 'wrap';
+  const name = document.createElement('span'); name.className = 'name'; name.textContent = m.n + ':';
+  if (!m.g && !m.s) name.style.color = base;
+  const text = document.createElement('span'); text.className = 'text';
   for (const p of m.m) {
-    if (p.e) {
-      const img = document.createElement('img');
-      img.alt = '';
-      img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(p.e)}/default/dark/2.0`;
-      text.append(img);
-    } else text.append(document.createTextNode(p.x));
+    if (p.e) { const e = document.createElement('img'); e.alt = ''; e.src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(p.e)}/default/dark/2.0`; text.append(e); }
+    else text.append(document.createTextNode(p.x));
   }
-  el.append(name, text);
-  el.dataset.t = m.t;
+  wrap.append(name, text); el.append(img, wrap);
   return el;
 }
 
-function drop(id) {
-  const el = SHOWN.get(id);
-  SHOWN.delete(id);
-  if (!el) return;
-  el.classList.add('out');
-  setTimeout(() => el.remove(), 700);
+function add(m) { const el = build(m); SHOWN.set(m.id, el); chat.prepend(el); }
+function drop(id) { SHOWN.get(id)?.remove(); SHOWN.delete(id); }
+function trim() { // älteste (ganz rechts) entfernen, so wächst nichts an
+  while (chat.children.length > limit) { for (const [id, el] of SHOWN) if (el === chat.lastElementChild) { drop(id); break; } }
 }
 
 function render(d) {
-  seconds = d.seconds || 60;
   const ids = new Set(d.messages.map((m) => m.id));
-  for (const m of d.messages) if (!SHOWN.has(m.id)) { const el = build(m); SHOWN.set(m.id, el); bar.append(el); }
-  for (const id of [...SHOWN.keys()]) if (!ids.has(id)) drop(id); // abgelaufen oder aus der Liste gefallen
-  // Was links über den Rand hinausragt, fliegt raus (so wächst nichts an)
-  for (const [id, el] of SHOWN) if (el.offsetLeft + el.offsetWidth < 0 || el.offsetLeft < -el.offsetWidth / 2) drop(id);
+  for (const m of d.messages) if (!SHOWN.has(m.id)) add(m); // Reihenfolge alt → neu, jede kommt links davor
+  for (const id of [...SHOWN.keys()]) if (!ids.has(id)) drop(id); // abgelaufen oder herausgefallen
+  trim();
 }
 
 const DEMO = [
-  ['Anna', '#ff8fc0', 'Guten Abend zusammen!'], ['Ben', '#27c9c0', 'Das Alpaka-Overlay ist so süß 🦙'],
-  ['Cleo', '', 'Wie lang geht der Stream heute?'], ['Dennis', '#a14ee8', 'GG, das war knapp'], ['Fiona', '#e03a3a', 'Hallo aus Hamburg!'],
+  ['Anna', '#ff8fc0', 'Guten Abend zusammen!'], ['Ben', '', 'Das Alpaka-Overlay ist so süß 🦙'],
+  ['Cleo', '', 'Wie lang geht der Stream heute?'], ['Dennis', '#a14ee8', 'GG, das war knapp', 1, 1], ['Fiona', '', 'Hallo aus Hamburg!'],
 ];
 let demoN = 0;
 function demo() {
-  const [n, c, text] = DEMO[demoN % DEMO.length];
-  const m = { id: 'd' + demoN++, t: Date.now(), n, c, m: [{ x: text }] };
-  const el = build(m); el._m = m; SHOWN.set(m.id, el); bar.append(el);
-  for (const id of [...SHOWN.keys()]) if (SHOWN.size > 5) drop(id);
+  const [n, c, text, g, s] = DEMO[demoN % DEMO.length];
+  add({ id: 'demo' + demoN++, t: Date.now(), n, c, g: Boolean(g), s: Boolean(s), m: [{ x: text }] });
+  trim();
 }
 
 async function poll() {
@@ -89,17 +117,15 @@ async function poll() {
   const timer = setTimeout(() => ctl.abort(), 8000); // hängende Anfrage nicht ewig offen lassen
   try {
     const res = await fetch('/api/chatlog', { cache: 'no-store', signal: ctl.signal });
-    if (res.ok) render(await res.json());
+    if (res.ok) { const d = await res.json(); limit = d.max || limit; render(d); }
   } catch { /* beim nächsten Mal wieder */ }
   finally { clearTimeout(timer); }
 }
 
 if (params.has('demo')) { demo(); setInterval(demo, 2500); }
 else {
-  poll();
-  setInterval(poll, 2000);
-  // Sicherheitsnetz für lange Streams: alle 6 Stunden sauber neu laden (die Leiste füllt sich danach sofort wieder)
-  setTimeout(() => location.reload(), 6 * 3600 * 1000);
+  poll(); setInterval(poll, 2000);
+  setTimeout(() => location.reload(), 6 * 3600 * 1000); // Sicherheitsnetz für lange Streams: alle 6 Stunden sauber neu laden
 }
 </script>
 </body>

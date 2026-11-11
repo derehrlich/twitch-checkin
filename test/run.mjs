@@ -1910,12 +1910,13 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
   const ev = (name, message, extra = {}) => ({ broadcaster_user_id: '999', chatter_user_id: 'u-' + name, chatter_user_name: name, message_id: crypto.randomUUID(), message, ...extra });
   const send = (e) => webhook(signed('notification', { subscription: { type: 'channel.chat.message' }, event: e }, { id: 'cl-' + e.message_id }));
 
-  assert.deepEqual(await pub(), { enabled: false, seconds: 60, messages: [] }, 'standardmäßig aus');
+  assert.deepEqual(await pub(), { enabled: false, seconds: 0, max: 10, messages: [] }, 'standardmäßig aus');
   await send(ev('Anna', { text: 'unsichtbar' }));
   assert.deepEqual((await pub()).messages, [], 'ausgeschaltet merkt sich niemand etwas');
 
-  assert.equal((await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: true, chatOverlayMax: 2, creditsIgnore: 'Nightbot' }, cookie))).status, 200);
-  await send(ev('Anna', { text: 'Hallo Kappa', fragments: [{ type: 'text', text: 'Hallo ' }, { type: 'emote', text: 'Kappa', emote: { id: '25' } }] }, { color: '#ff0000' }));
+  assert.equal((await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: true, chatOverlayMax: 2, chatOverlaySeconds: 60, creditsIgnore: 'Nightbot' }, cookie))).status, 200);
+  await send(ev('Anna', { text: '!farbe #ff0000' }));
+  await send(ev('Anna', { text: 'Hallo Kappa', fragments: [{ type: 'text', text: 'Hallo ' }, { type: 'emote', text: 'Kappa', emote: { id: '25' } }] }));
   await send(ev('Ben', { text: '!streak' }));
   await send(ev('Nightbot', { text: 'Folgt bitte' }));
   let v = await pub();
@@ -1923,6 +1924,19 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
   assert.deepEqual(v.messages.map((m) => m.n), ['Anna'], 'Befehle und Bots erscheinen nicht');
   assert.deepEqual(v.messages[0].m, [{ x: 'Hallo ' }, { e: '25' }]);
   assert.equal(v.messages[0].c, '#ff0000');
+
+  assert.deepEqual([v.messages[0].g, v.messages[0].s], [false, false]);
+  await send(ev('Anna', { text: '!glitter' }));
+  await send(ev('Anna', { text: 'ohne Abo' }));
+  assert.equal((await pub()).messages.at(-1).s, false, 'Glitzer nur mit Abo, VIP oder Mod');
+  await send(ev('Zoe', { text: '!verlauf' }, { badges: [{ set_id: 'subscriber', id: '1', info: '3' }] }));
+  await send(ev('Zoe', { text: 'mit Abo' }, { badges: [{ set_id: 'subscriber', id: '1', info: '3' }] }));
+  assert.equal((await pub()).messages.at(-1).g, true, 'Abo darf Verlauf');
+  await send(ev('Zoe', { text: '!reset' }));
+  await send(ev('Zoe', { text: 'zurückgesetzt' }));
+  assert.equal((await pub()).messages.at(-1).g, false, '!reset setzt zurück');
+  await send(ev('Ehrlich', { text: '!glitter' }, {}));
+  await db.delete('chatlog');
 
   const dup = ev('Cleo', { text: 'doppelt' });
   await send(dup); await send(dup);
@@ -1935,6 +1949,7 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
   assert.deepEqual((await cl.publicView(settings, Date.now() + 61_000)).messages, [], 'nach Ablauf der Zeit weg');
   assert.equal((await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: false }, cookie))).status, 200);
   await db.delete('chatlog');
+  for (const id of ['u-Anna', 'u-Zoe', 'u-Ehrlich']) await db.delete(`chatstyle/${id}`);
 });
 
 // ---- Alpakas im Overlay
