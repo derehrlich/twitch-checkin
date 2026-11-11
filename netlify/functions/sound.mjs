@@ -1,7 +1,7 @@
 // Liefert einen im Admin hochgeladenen Ton aus (?slot=follow, ohne Angabe der Check-in-Ton). Die Adresse enthält ?v=<Version>,
 // dadurch darf der Browser (und OBS) die Datei dauerhaft zwischenspeichern und lädt sie nur bei Änderung neu.
-import { db } from '../lib/store.mjs';
-import { SLOTS, slotKey } from '../lib/sounds.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { SLOTS, slotKey } from '../lib/medien/sounds.mjs';
 
 export const config = { path: '/api/sound' };
 

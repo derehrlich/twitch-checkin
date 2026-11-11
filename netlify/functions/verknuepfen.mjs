@@ -1,8 +1,8 @@
 // Verknüpfungsseite (/verknuepfen): Die Person kommt mit einem Link vom VerwirrBot (/verknuepfen im Discord), meldet sich mit
 // Twitch an und stimmt ausdrücklich zu. Erst dann wird verknüpft. Löschen ist hier jederzeit möglich.
-import { getSettings } from '../lib/settings.mjs';
-import { cookie, json, parseCookies, viewerFrom } from '../lib/http.mjs';
-import { linkByTwitch, monthBoard, removeLink, saveLink, secretSet, verifyLinkToken } from '../lib/community.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { cookie, json, parseCookies, viewerFrom } from '../lib/kern/http.mjs';
+import { linkByTwitch, monthBoard, removeLink, saveLink, secretSet, verifyLinkToken } from '../lib/belohnungen/community.mjs';
 
 export const config = { path: ['/api/verknuepfen', '/api/verknuepfen/*'] };
 

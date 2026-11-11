@@ -1,6 +1,6 @@
-import { db } from './store.mjs';
-import { fill, pushOverlay, signText } from './checkin.mjs';
-import { channelInfo, pickClip, sendChat, shoutout } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { fill, pushOverlay, signText } from '../zuschauer/checkin.mjs';
+import { channelInfo, pickClip, sendChat, shoutout } from '../kern/twitch.mjs';
 
 // Sammelt alles, was zu einem Raider angezeigt wird. Jeder Teil ist optional: fällt einer aus, läuft der Rest weiter.
 export async function raiderPackage(raiderId, fallbackName, settings) {

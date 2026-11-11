@@ -2,8 +2,8 @@
 // (public/admin/js/schema.js). Dort steht je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen.
 // Eine neue Einstellung braucht also nur diese eine Zeile, hier ist nichts mehr einzutragen.
 import { db } from './store.mjs';
-import { parseLevels } from './streak.mjs';
-import { SCHEMA } from '../../public/admin/js/schema.js';
+import { parseLevels } from '../zuschauer/streak.mjs';
+import { SCHEMA } from '../../../public/admin/js/schema.js';
 
 const ITEMS = Object.values(SCHEMA).flat().flatMap((g) => g.items);
 const RULES = Object.fromEntries(ITEMS.map((i) => [i.id, i]));

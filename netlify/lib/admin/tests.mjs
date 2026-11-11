@@ -1,12 +1,12 @@
 // POST /api/admin/test: schickt Beispiel-Ereignisse ans Overlay oder in den Chat. Verändert keine Zähler.
-import { db } from '../store.mjs';
-import { getSettings } from '../settings.mjs';
-import { fill, fmtDuration, pushOverlay, signText } from '../checkin.mjs';
-import { raiderPackage, raidVars, raidCard } from '../raid.mjs';
-import { buildAlert } from '../alerts.mjs';
-import { getBoard } from '../soundboard.mjs';
-import { json } from '../http.mjs';
-import { sendChat, userByLogin } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { fill, fmtDuration, pushOverlay, signText } from '../zuschauer/checkin.mjs';
+import { raiderPackage, raidVars, raidCard } from '../ereignisse/raid.mjs';
+import { buildAlert } from '../ereignisse/alerts.mjs';
+import { getBoard } from '../belohnungen/soundboard.mjs';
+import { json } from '../kern/http.mjs';
+import { sendChat, userByLogin } from '../kern/twitch.mjs';
 
 // Beispieldaten je Alert (EventSub-Typ und Ereignis)
 const alertSamples = (user, count) => ({

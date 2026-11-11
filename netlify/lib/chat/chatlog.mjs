@@ -4,8 +4,8 @@
 // Speicher:
 //   chatlog           [ { id, t, n: Name, c: Farbe|'', g: Verlauf, s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
 //   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, glitter }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
-import { db } from './store.mjs';
-import { parseColor } from './alpaca.mjs';
+import { db } from '../kern/store.mjs';
+import { parseColor } from '../belohnungen/alpaca.mjs';
 
 export const LOG_KEY = 'chatlog';
 const KEEP = 40; // so viele Nachrichten hält die Liste höchstens

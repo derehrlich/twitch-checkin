@@ -9,8 +9,8 @@
 //   entrysound-file/<twitchId>     freigegebene Datei { type, data }
 //   entrysound-pending/<twitchId>  Datei, die auf die Freigabe wartet
 //   entrysound-lock/<twitchId>     kurze Sperre gegen gleichzeitige Einlösungen
-import { db } from './store.mjs';
-import { sendChat, setRedemptionStatus, siteUrl } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { sendChat, setRedemptionStatus, siteUrl } from '../kern/twitch.mjs';
 
 const DAY = 86_400_000;
 const MONTH_DAYS = 30.4375;

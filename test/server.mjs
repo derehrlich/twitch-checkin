@@ -154,7 +154,7 @@ const ok = (name) => { n++; console.log('  ok', name); };
 
 // ---- Dateispeicher: Hilfsdateien tauchen nicht auf, Schreiben ist ersetzend
 {
-  const { db } = await import('../netlify/lib/store.mjs');
+  const { db } = await import('../netlify/lib/kern/store.mjs');
   await db.set('test/a', { v: 1 });
   await db.set('test/a', { v: 2 });
   assert.deepEqual(await db.get('test/a'), { v: 2 });

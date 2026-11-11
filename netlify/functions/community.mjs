@@ -8,10 +8,10 @@
 //   POST /api/community/sync     Discord-Zahlen des Monats melden { month, rows: [{ discordId, msgs, days }] }
 //   POST /api/community/unlink   Verknüpfung löschen { discordId }
 // Öffentlich zugänglich ist nur die Rangliste in /api/leaderboard.
-import { getSettings } from '../lib/settings.mjs';
-import { announceAgain, awardForBot } from '../lib/award.mjs';
-import { json } from '../lib/http.mjs';
-import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/community.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { announceAgain, awardForBot } from '../lib/belohnungen/award.mjs';
+import { json } from '../lib/kern/http.mjs';
+import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
 export const config = { path: ['/api/community/*'] };
 

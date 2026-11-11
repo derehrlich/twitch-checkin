@@ -1,7 +1,7 @@
 // Gemeinsame Helfer der Admin-API: Uploads prüfen, Nutzer laden.
-import { db } from '../store.mjs';
-import { json } from '../http.mjs';
-import { IMAGE_MAX, sniffImage } from '../images.mjs';
+import { db } from '../kern/store.mjs';
+import { json } from '../kern/http.mjs';
+import { IMAGE_MAX, sniffImage } from '../medien/images.mjs';
 
 // Dateityp an den ersten Bytes erkennen, statt dem Browser zu glauben
 export function sniffAudio(buf) {

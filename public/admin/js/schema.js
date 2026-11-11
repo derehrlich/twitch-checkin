@@ -1,5 +1,5 @@
 // Alle Einstellungen an EINER Stelle. Daraus entstehen die Formulare, die Standardwerte und die Prüfung auf dem Server
-// (netlify/lib/settings.mjs liest diese Datei). Eine neue Einstellung braucht nur eine Zeile:
+// (netlify/lib/kern/settings.mjs liest diese Datei). Eine neue Einstellung braucht nur eine Zeile:
 //   t('name', 'Standardwert', 'Beschriftung', { maxlength: 60 })     Text (maxlength = längste Eingabe)
 //   a('name', 'Standardwert', 'Beschriftung', { Beispielwerte })    Textvorlage mit Vorschau (höchstens 400 Zeichen)
 //   n('name', 5, 'Beschriftung', { min: 0, max: 10 })               Zahl (immer min und max angeben)

@@ -1,12 +1,12 @@
 // Öffentliche Seite für den persönlichen Einlaufsound (/einlaufsound): Anmeldung mit Twitch, Status, Upload.
 // Die Anmeldung vergibt keine Berechtigungen, Twitch bestätigt nur, wer die Person ist.
 // /api/einlaufsound/audio?id=<twitchId>&v=<Version> liefert freigegebene Sounds ans Overlay aus.
-import { db } from '../lib/store.mjs';
-import { getSettings } from '../lib/settings.mjs';
-import { json, cookie, viewerFrom } from '../lib/http.mjs';
-import { USER_ID, UPLOAD_MAX, fileKey, submitUpload, viewFor } from '../lib/entrysound.mjs';
+import { db } from '../lib/kern/store.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { json, cookie, viewerFrom } from '../lib/kern/http.mjs';
+import { USER_ID, UPLOAD_MAX, fileKey, submitUpload, viewFor } from '../lib/belohnungen/entrysound.mjs';
 import { audioUploadMax, cleanName } from '../lib/admin/common.mjs';
-import { CATALOG_ID, awardView, catalogKey, choose, ensureAward } from '../lib/award.mjs';
+import { CATALOG_ID, awardView, catalogKey, choose, ensureAward } from '../lib/belohnungen/award.mjs';
 
 export const config = { path: ['/api/einlaufsound', '/api/einlaufsound/*'] };
 

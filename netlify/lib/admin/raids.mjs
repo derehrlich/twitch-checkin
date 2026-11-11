@@ -1,7 +1,7 @@
 // /api/admin/raids: Raid-Verlauf lesen und früher erhaltene Raids nachtragen (Twitch liefert keinen Verlauf).
-import { db } from '../store.mjs';
-import { json } from '../http.mjs';
-import { userByLogin } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { json } from '../kern/http.mjs';
+import { userByLogin } from '../kern/twitch.mjs';
 
 export async function raids({ method, body }) {
   if (method === 'GET') {

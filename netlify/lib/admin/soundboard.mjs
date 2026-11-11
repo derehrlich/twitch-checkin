@@ -1,8 +1,8 @@
 // /api/admin/soundboard: Einträge des Kanalpunkte-Soundboards (ein Reward mit Sounddatei je Eintrag).
-import { db } from '../store.mjs';
-import { MAX_ENTRIES, ID, getBoard, newId, sanitizeEntry, saveBoard, soundKey } from '../soundboard.mjs';
-import { json } from '../http.mjs';
-import { deleteReward } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { MAX_ENTRIES, ID, getBoard, newId, sanitizeEntry, saveBoard, soundKey } from '../belohnungen/soundboard.mjs';
+import { json } from '../kern/http.mjs';
+import { deleteReward } from '../kern/twitch.mjs';
 import { audioUpload, cleanName, storeFile } from './common.mjs';
 
 const duplicate = (board, title, exceptId) => board.some((e) => e.id !== exceptId && e.title === title);

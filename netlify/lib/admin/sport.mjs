@@ -1,7 +1,7 @@
 // /api/admin/sport: Einheiten eintragen und löschen, Scoreboard ein- und ausblenden.
-import { db } from '../store.mjs';
-import { LOG_ID, LOG_PREFIX, addSession, getConfig, publicView, sessions, totals, updateConfig } from '../sport.mjs';
-import { json } from '../http.mjs';
+import { db } from '../kern/store.mjs';
+import { LOG_ID, LOG_PREFIX, addSession, getConfig, publicView, sessions, totals, updateConfig } from '../overlays/sport.mjs';
+import { json } from '../kern/http.mjs';
 
 const state = async () => { const log = await sessions(); return { config: await getConfig(), log, totals: totals(log), view: await publicView() }; };
 

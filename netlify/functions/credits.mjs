@@ -1,8 +1,8 @@
 // Daten für die Abspann-Seite (/abspann): Chatter, Follows, Subs, Bits und Raids des Stream-Tags. Öffentlich wie das Overlay.
-import { getSettings } from '../lib/settings.mjs';
-import { streamDay } from '../lib/checkin.mjs';
-import { creditsFor } from '../lib/credits.mjs';
-import { json } from '../lib/http.mjs';
+import { getSettings } from '../lib/kern/settings.mjs';
+import { streamDay } from '../lib/zuschauer/checkin.mjs';
+import { creditsFor } from '../lib/overlays/credits.mjs';
+import { json } from '../lib/kern/http.mjs';
 
 export const config = { path: '/api/credits' };
 

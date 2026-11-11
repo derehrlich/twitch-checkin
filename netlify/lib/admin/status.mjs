@@ -1,10 +1,10 @@
 // GET /api/admin/state: Zustand von Umgebungsvariablen, Twitch-Verbindung, Rewards und Webhooks.
-import { db } from '../store.mjs';
-import { getSettings, needsChat } from '../settings.mjs';
-import { streamDay } from '../checkin.mjs';
-import { getBoard, isActive } from '../soundboard.mjs';
-import { json } from '../http.mjs';
-import { listSubscriptions, SCOPES, siteUrl } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings, needsChat } from '../kern/settings.mjs';
+import { streamDay } from '../zuschauer/checkin.mjs';
+import { getBoard, isActive } from '../belohnungen/soundboard.mjs';
+import { json } from '../kern/http.mjs';
+import { listSubscriptions, SCOPES, siteUrl } from '../kern/twitch.mjs';
 import { allUsers } from './common.mjs';
 
 export async function status({ req, route, method }) {

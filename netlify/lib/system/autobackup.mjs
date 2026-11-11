@@ -4,9 +4,9 @@
 // Dateinamen: stadtwache-JJJJ-MM-TT.json (pro Tag eine, die jüngsten backupKeep bleiben).
 import fs from 'node:fs';
 import path from 'node:path';
-import { db } from './store.mjs';
-import { getSettings } from './settings.mjs';
-import { buildBackup } from './admin/backup.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings } from '../kern/settings.mjs';
+import { buildBackup } from '../admin/backup.mjs';
 
 const NAME = /^stadtwache-(\d{4}-\d{2}-\d{2})\.json$/;
 const STATE_KEY = 'config/backup-state'; // { lastOk, lastError } (gehört nicht in die Sicherung selbst)

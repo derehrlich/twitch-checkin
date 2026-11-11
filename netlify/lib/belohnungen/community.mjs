@@ -11,9 +11,9 @@
 //   dmonth/<YYYY-MM>/<discordId>  Discord im Monat, vom Bot gemeldet { msgs, days }
 //   linktip/<YYYY-MM>/<twitchId>  Tipp wurde schon gezeigt
 import crypto from 'node:crypto';
-import { db } from './store.mjs';
-import { safeEqual } from './http.mjs';
-import { siteUrl } from './twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { safeEqual } from '../kern/http.mjs';
+import { siteUrl } from '../kern/twitch.mjs';
 
 const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
 export const DISCORD_ID = /^\d{5,25}$/;

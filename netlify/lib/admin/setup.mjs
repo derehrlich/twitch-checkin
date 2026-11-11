@@ -1,10 +1,10 @@
 // POST /api/admin/setup: legt alle Rewards in Twitch an oder passt sie an und abonniert die Webhooks.
-import { db } from '../store.mjs';
-import { getSettings, needsChat } from '../settings.mjs';
-import { getBoard, isActive, saveBoard } from '../soundboard.mjs';
-import { json } from '../http.mjs';
-import { rewardPrompts, rewardTitles } from '../entrysound.mjs';
-import { ensureRewards, siteUrl, subscribe, syncSoundboardRewards } from '../twitch.mjs';
+import { db } from '../kern/store.mjs';
+import { getSettings, needsChat } from '../kern/settings.mjs';
+import { getBoard, isActive, saveBoard } from '../belohnungen/soundboard.mjs';
+import { json } from '../kern/http.mjs';
+import { rewardPrompts, rewardTitles } from '../belohnungen/entrysound.mjs';
+import { ensureRewards, siteUrl, subscribe, syncSoundboardRewards } from '../kern/twitch.mjs';
 
 export async function setup({ req, method }) {
   if (method !== 'POST') return;

@@ -33,7 +33,7 @@ globalThis.fetch = async (url, init = {}) => {
   return ok({ data: [] });
 };
 
-const { db } = await import(root + '/netlify/lib/store.mjs');
+const { db } = await import(root + '/netlify/lib/kern/store.mjs');
 const fn = {
   admin: (await import(root + '/netlify/functions/admin.mjs')).default, overlay: (await import(root + '/netlify/functions/overlay.mjs')).default,
   sound: (await import(root + '/netlify/functions/sound.mjs')).default, image: (await import(root + '/netlify/functions/image.mjs')).default,

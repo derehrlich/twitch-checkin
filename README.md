@@ -198,7 +198,15 @@ Alles im Admin unter *Chat & Abspann*. **Nach dem Update:** einmal **Mit Twitch 
 
 ```
 netlify/functions/   Eingänge (je Datei eine URL): admin, auth, overlay, sound, image, soundboard, einlaufsound, verknuepfen, community, credits, leaderboard, twitch-webhook
-netlify/lib/         Logik: checkin, streak, raid, alerts, chat, credits, soundboard, entrysound, award, community, settings, twitch, store, http …
+netlify/lib/         Logik, sortiert wie die Reiter im Admin:
+  kern/                Grundlagen: store (Speicher), http, settings, twitch
+  zuschauer/           checkin, streak
+  ereignisse/          alerts, raid
+  chat/                chat (Webhook), befehle (feste Chat-Befehle als Liste), commands (eigene Commands), extras (Shoutout, Zitate), chatlog (Chat-Leiste)
+  belohnungen/         soundboard, playlock, entrysound, award (Top des Monats), community, alpaca
+  overlays/            credits (Abspann), sport
+  medien/              images, sounds
+  system/              autobackup
 netlify/lib/admin/   Bereiche der Admin-API: status, config, setup, tests, raids, media, soundboard, entrysound, users, backup
 public/overlay.html  OBS-Overlay (Karten, Schilder, Soundboard, Selbst-Update)
 public/abspann.html  Abspann-Szene, public/rangliste.html öffentliche Rangliste, public/einlaufsound.html Upload-Seite, public/verknuepfen.html Verknüpfung
@@ -208,7 +216,8 @@ test/run.mjs         Tests der Functions mit simuliertem Twitch (npm test)
 test/e2e/admin.mjs   Ende-zu-Ende-Test der Admin-Oberfläche im Browser (optional, braucht Playwright)
 ```
 
-- **Neues Einstellungsfeld:** Standardwert und Prüfung in `netlify/lib/settings.mjs`, Formularfeld in `public/admin/js/schema.js`. Mehr nicht, Formular, Speichern und Vorschau entstehen daraus.
+- **Neues Einstellungsfeld:** eine Zeile in `public/admin/js/schema.js` (Name, Standardwert, Beschriftung, Grenzen). Formular, Standardwert, Prüfung und Vorschau entstehen daraus.
+- **Neuer fester Chat-Befehl:** eine Zeile in `BEFEHLE` in `netlify/lib/chat/befehle.mjs` (Wort aus den Einstellungen, optional Rolle, Antworttext). Abklingzeit, Rollenprüfung und Senden übernimmt der Rahmen.
 - **Neue Admin-Route:** Datei in `netlify/lib/admin/` anlegen und in `netlify/functions/admin.mjs` in die Tabelle `ROUTES` eintragen.
 - **Ende-zu-Ende-Test:** `NODE_PATH=$(npm root -g) node test/e2e/admin.mjs` (Playwright muss installiert sein). Er startet die echten Functions lokal mit simuliertem Twitch und klickt die Oberfläche durch.
 
