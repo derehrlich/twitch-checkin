@@ -16,7 +16,7 @@ Es wird nichts im Router freigegeben. Der Tunnel baut die Verbindung von innen n
 
 - Domain bei Cloudflare mit Status „Aktiv" (z. B. `ehrlichverwirrt.de`), darunter die Adresse `wache.ehrlichverwirrt.de`.
 - Cloudflare Tunnel (`cloudflared`) auf dem NAS.
-- Backup der Netlify-Version: Admin → *Allgemein → Backup & Wiederherstellen* → „Backup herunterladen" (am besten **mit Tönen & Bildern**). **Das zuerst machen, solange Netlify noch läuft.**
+- Backup der Netlify-Version: Admin → *System → Backup & Wiederherstellen* → „Backup herunterladen" (am besten **mit Tönen & Bildern**). **Das zuerst machen, solange Netlify noch läuft.**
 - Deine Werte: `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `EVENTSUB_SECRET`, `ADMIN_PASSWORD`, `LINK_SECRET`. Netlify zeigt als „secret" gespeicherte Werte nicht mehr an, du holst sie so:
   - `TWITCH_CLIENT_ID`: Twitch-Entwicklerkonsole (nicht geheim). `TWITCH_CLIENT_SECRET`: dort „Neues Geheimnis" erzeugen (das alte wird dann ungültig, also das neue auch in Netlify eintragen, solange Netlify noch läuft).
   - `EVENTSUB_SECRET`: frei ausdenken (10 bis 100 Zeichen, nur Buchstaben und Zahlen). Er muss nicht gleich bleiben, denn die Webhooks werden für die neue Adresse ohnehin neu angelegt (Admin → *Rewards & Webhooks abgleichen*).
@@ -37,7 +37,7 @@ Es wird nichts im Router freigegeben. Der Tunnel baut die Verbindung von innen n
 
 ## Schritt 3: Daten übernehmen
 
-1. Im neuen Admin: *Allgemein → Backup & Wiederherstellen → Wiederherstellen* (die Datei von Netlify).
+1. Im neuen Admin: *System → Backup & Wiederherstellen → Wiederherstellen* (die Datei von Netlify).
 2. **Mit Twitch verbinden.** Tokens sind nie im Backup. Das geht erst, wenn die Redirect-URL aus Schritt 4 in der Twitch-App steht.
 
 ## Schritt 4: Tunnel und Twitch
@@ -60,13 +60,13 @@ Cloudflare → Zero Trust → Access → Anwendungen → *Selbst gehostet*: Anwe
 
 ## Betrieb
 
-- **Update per Knopf:** Im Admin unter *Allgemein → Updates* steht die laufende Version und der Knopf **„Auf Updates prüfen“**. Er bittet Watchtower, nachzusehen, ob nach einem Merge in `main` ein neues Image da ist. Wenn ja, lädt Watchtower es und startet die Stadtwache neu (die Seite ist etwa eine halbe Minute weg, die Daten bleiben). Wenn nein, steht dort „Bereits aktuell“.
+- **Update per Knopf:** Im Admin unter *System → Updates* steht die laufende Version und der Knopf **„Auf Updates prüfen“**. Er bittet Watchtower, nachzusehen, ob nach einem Merge in `main` ein neues Image da ist. Wenn ja, lädt Watchtower es und startet die Stadtwache neu (die Seite ist etwa eine halbe Minute weg, die Daten bleiben). Wenn nein, steht dort „Bereits aktuell“.
   - **Einmalig einrichten:** 1. Ein langes Geheimwort ausdenken (Buchstaben und Zahlen). 2. In CasaOS die App aus `docker-compose.watchtower.yml` installieren, `HIER_UPDATE_SCHLUESSEL` durch das Geheimwort ersetzen. 3. In der Stadtwache-App `WATCHTOWER_TOKEN` auf dasselbe Geheimwort setzen und `WATCHTOWER_URL` auf `http://<NAS-Adresse>:8081`. 4. Watchtower findet die Stadtwache über ihren Namen (`stadtwache`, siehe `command` in `docker-compose.watchtower.yml`). Heißt deine App anders, den Namen dort anpassen. Steht im Protokoll (`docker logs watchtower`) `scanned=0`, hat es keinen Container gefunden.
   - Die Version kommt aus dem Bau des Images (`BUILD_SHA`, gesetzt von der GitHub Action). Nach einem Merge dauert der Bau etwa eine Minute, erst danach findet der Knopf etwas Neues.
 - **Update von Hand** (falls der Knopf nicht geht): per SSH `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/nicholas-fedor/watchtower:latest --run-once --cleanup stadtwache`.
 - **Server war aus:** Nach einem längeren Ausfall kann Twitch die Webhooks abgeschaltet haben. Admin → **Rewards & Webhooks abgleichen**.
 - **Gesundheit:** `/healthz` antwortet mit `ok`; Docker prüft das selbst.
-- **Automatische Sicherung:** Jede Nacht ab 3 Uhr (einstellbar im Admin unter *Allgemein → Automatische Sicherung*) legt die Stadtwache eine Datei `stadtwache-JJJJ-MM-TT.json` im Backup-Ordner ab, mit Tönen und Bildern, und hebt die letzten 7 auf. Im Admin unter *Allgemein → Backup & Wiederherstellen* siehst du die letzte Sicherung und kannst mit „Jetzt sichern“ eine auslösen. **Der Ordner sollte auf einem anderen Gerät liegen**, zum Beispiel einer Freigabe deines NAS: In CasaOS unter *Dateien → Netzwerk → Freigabe hinzufügen* verbinden (sie erscheint dann unter `/media/<Name>`), dann in der Stadtwache-App beim Speicher `/DATA/AppData/stadtwache/backups` durch den Ordner auf der Freigabe ersetzen (rechts steht weiter `:/backups`). Zurückspielen: Datei im Admin bei *Wiederherstellen* auswählen.
+- **Automatische Sicherung:** Jede Nacht ab 3 Uhr (einstellbar im Admin unter *System → Automatische Sicherung*) legt die Stadtwache eine Datei `stadtwache-JJJJ-MM-TT.json` im Backup-Ordner ab, mit Tönen und Bildern, und hebt die letzten 7 auf. Im Admin unter *System → Backup & Wiederherstellen* siehst du die letzte Sicherung und kannst mit „Jetzt sichern“ eine auslösen. **Der Ordner sollte auf einem anderen Gerät liegen**, zum Beispiel einer Freigabe deines NAS: In CasaOS unter *Dateien → Netzwerk → Freigabe hinzufügen* verbinden (sie erscheint dann unter `/media/<Name>`), dann in der Stadtwache-App beim Speicher `/DATA/AppData/stadtwache/backups` durch den Ordner auf der Freigabe ersetzen (rechts steht weiter `:/backups`). Zurückspielen: Datei im Admin bei *Wiederherstellen* auswählen.
 - **Sicherung:** Der Ordner `/DATA/AppData/stadtwache/data` enthält auch die Twitch-Tokens (Dateirechte nur für den Besitzer). Nicht öffentlich teilen. Das Admin-Backup enthält sie nicht.
 
 ## Lokal ausprobieren (Entwickler)

@@ -15,9 +15,12 @@ import { initBackup, loadAutoBackup } from './backup.js';
 import { initUpdate, loadUpdate } from './update.js';
 import { initSport, loadSport } from './sport.js';
 
-const TABS = ['start', 'checkin', 'alerts', 'raids', 'abspann', 'sport', 'alpakas', 'soundboard', 'commands', 'einlaufsound', 'community', 'medien', 'besucher', 'tests', 'allgemein'];
+const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'overlays', 'medien', 'system'];
+// Alte Adressen (#abspann, #besucher …) führen weiter an die richtige Stelle
+const OLD_TABS = { checkin: 'zuschauer', besucher: 'zuschauer', alerts: 'ereignisse', raids: 'ereignisse', abspann: 'chat', commands: 'chat', alpakas: 'belohnungen', soundboard: 'belohnungen', einlaufsound: 'belohnungen', community: 'belohnungen', sport: 'overlays', tests: 'system', allgemein: 'system' };
 
 function showTab(name) {
+  name = OLD_TABS[name] ?? name;
   if (!TABS.includes(name)) name = 'start';
   for (const p of document.querySelectorAll('.tab-panel')) p.classList.toggle('hidden', p.dataset.panel !== name);
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
