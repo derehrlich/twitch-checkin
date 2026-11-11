@@ -22,9 +22,9 @@
   .text img { height: 1.3em; width: auto; vertical-align: middle; }
   /* Extras (nur Abos und VIPs): Verlauf, und Glitzer als Lichtschein. Der Schein läuft nur bei den jeweils sichtbaren Nachrichten. */
   .fx-gradient .name, .fx-gradient .text, .fx-glitter .name, .fx-glitter .text { -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .8)); }
-  .fx-gradient .name, .fx-gradient .text { background-image: linear-gradient(90deg, var(--c1), var(--c2)); }
+  .fx-gradient .name, .fx-gradient .text { background-image: linear-gradient(90deg, var(--c1), var(--c2) 55%, var(--c3)); }
   .fx-glitter .name, .fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c1) 35%, #fff 48%, #fff 52%, var(--c1) 65%, var(--c1) 100%); background-size: 250% 100%; animation: sweep 2.4s linear infinite; }
-  .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c2) 30%, #fff 48%, #fff 52%, var(--c2) 70%, var(--c1) 100%); }
+  .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c2) 22%, #fff 48%, #fff 52%, var(--c2) 78%, var(--c3) 100%); }
   @keyframes sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 </style>
 </head>
@@ -54,7 +54,7 @@ function hslToHex(h, s, l) {
   const x = (v) => Math.round(255 * v).toString(16).padStart(2, '0');
   return '#' + x(f(0)) + x(f(8)) + x(f(4));
 }
-function shiftHex(hex, deg) { // zweite Farbe für Verlauf und Glitzer: Farbton gedreht
+function shiftHex(hex, deg) { // weitere Farben für Verlauf und Glitzer: Farbton gedreht
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
   let h = 0, s = 0;
@@ -63,7 +63,8 @@ function shiftHex(hex, deg) { // zweite Farbe für Verlauf und Glitzer: Farbton 
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     h = max === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6 : max === g ? ((b - r) / d + 2) / 6 : ((r - g) / d + 4) / 6;
   }
-  return hslToHex((h * 360 + deg + 360) % 360, s * 100, l * 100);
+  // Mindestens kräftige Farbe, sonst sieht man bei Grau, Weiß oder Schwarz keinen Verlauf
+  return hslToHex((h * 360 + deg + 360) % 360, Math.max(s, 0.75) * 100, Math.min(0.72, Math.max(0.5, l)) * 100);
 }
 
 const SHOWN = new Map(); // Nachrichten-Kennung -> Element
@@ -73,7 +74,7 @@ function build(m) {
   const base = m.c || hslToHex(hash(m.n.toLowerCase()) % 360, 100, 75); // ohne eigene Farbe: pro Person immer dieselbe
   const el = document.createElement('div');
   el.className = 'bubble' + (m.g ? ' fx-gradient' : '') + (m.s ? ' fx-glitter' : '');
-  el.style.setProperty('--c1', base); el.style.setProperty('--c2', shiftHex(base, 40));
+  el.style.setProperty('--c1', base); el.style.setProperty('--c2', shiftHex(base, 70)); el.style.setProperty('--c3', shiftHex(base, 140));
   const img = document.createElement('img');
   img.className = 'alpaka'; img.alt = ''; img.src = ALPAKAS[hash(String(m.id)) % ALPAKAS.length];
   const wrap = document.createElement('div'); wrap.className = 'wrap';

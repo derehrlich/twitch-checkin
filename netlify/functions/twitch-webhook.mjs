@@ -9,7 +9,7 @@ import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
 import { handleAlpaca } from '../lib/belohnungen/alpaca.mjs';
 import { handleChat } from '../lib/chat/chat.mjs';
-import { handleGlitter } from '../lib/chat/chatlog.mjs';
+import { handleGlitter, handleGradient } from '../lib/chat/chatlog.mjs';
 import { logEvent } from '../lib/overlays/credits.mjs';
 import { ALERT_TYPES, CHAT_TYPE } from '../lib/kern/twitch.mjs';
 import { safeEqual, text } from '../lib/kern/http.mjs';
@@ -72,8 +72,9 @@ export default async (req) => {
     const isEntryExtend = Boolean(state.entryExtendRewardId) && e.reward.id === state.entryExtendRewardId;
     const isAlpaca = Boolean(state.alpacaRewardId) && e.reward.id === state.alpacaRewardId;
     const isGlitter = Boolean(state.glitterRewardId) && e.reward.id === state.glitterRewardId;
-    const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
-    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !board) return new Response(null, { status: 204 });
+    const isGradient = Boolean(state.gradientRewardId) && e.reward.id === state.gradientRewardId;
+    const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
+    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !isGradient && !board) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
@@ -83,6 +84,7 @@ export default async (req) => {
       if (board) await handleSoundboard(redemption, board, settings);
       else if (isAlpaca) await handleAlpaca(redemption, settings);
       else if (isGlitter) await handleGlitter(redemption, settings);
+      else if (isGradient) await handleGradient(redemption, settings);
       else if (isEntryBuy) await handleEntryBuy(redemption, settings);
       else if (isEntryExtend) await handleEntryExtend(redemption, settings);
       else await (isRescue ? handleRescue : isCheckout ? handleCheckout : handleRedemption)(redemption, settings);

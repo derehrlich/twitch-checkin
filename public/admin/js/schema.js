@@ -140,7 +140,7 @@ export const SCHEMA = {
   ],
 
   chatleiste: [
-    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Overlays, Abschnitt Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. Den Glitzer können sich Zuschauer auch mit Kanalpunkten kaufen (nächster Abschnitt). <b>!reset</b> setzt alles zurück.', items: [
+    { title: 'Chat-Leiste', hint: 'Zeigt die Chatnachrichten in einer Zeile am Bildrand, neueste links. Bots aus der Liste „Bots, die weder im Abspann noch in der Chatter-Rangliste auftauchen“ (Reiter Overlays, Abschnitt Abspann) erscheinen nicht. Im Chat gilt: <b>!farbe #ff8800</b> (oder ein Farbname wie rot, türkis) setzt die eigene Farbe, jede Person darf das. <b>!glitter</b> und <b>!verlauf</b> schalten Extras ein und aus, das dürfen Abos, VIPs, Mods und die Namen unten. Glitzer und Verlauf können sich Zuschauer auch mit Kanalpunkten kaufen (nächste Abschnitte). <b>!reset</b> setzt alles zurück.', items: [
       c('chatOverlayEnabled', false, 'Chat-Leiste aktivieren (braucht den Chat-Webhook)'),
       n('chatOverlayMax', 10, 'Höchstens so viele Nachrichten gleichzeitig', { min: 1, max: 30 }),
       n('chatOverlaySeconds', 0, 'Eine Nachricht verschwindet nach so vielen Sekunden (0 = sie bleibt, bis neue sie wegschieben)', { min: 0, max: 3600 }),
@@ -152,6 +152,12 @@ export const SCHEMA = {
       t('glitterRewardTitle', 'Glitzer-Chat', 'Reward-Name', { maxlength: 45 }), n('glitterRewardCost', 5000, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       n('glitterDays', 30, 'Der Glitzer gilt so viele Tage (0 = für immer). Erneutes Einlösen verlängert', { min: 0, max: 3650 }),
       a('glitterTemplate', '✨ {user} glitzert jetzt bis {until}! Mit !glitter geht der Glitzer an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
+    ] },
+    { title: 'Verlauf als Kanalpunkte-Belohnung', hint: `Wie beim Glitzer, nur mit einem <b>Farbverlauf</b> durch mehrere Farben in Name und Nachrichten. Mit <b>!verlauf</b> schalten die Käufer ihn an und aus. Wer beides kauft, hat einen Verlauf mit Glitzer. Braucht die eingeschaltete Chat-Leiste. Nach dem Einschalten oder Ändern von Name, Preis oder Tagen die Rewards abgleichen. Platzhalter: ${code('user', 'until')}.`, items: [
+      c('gradientEnabled', false, 'Reward „Verlauf“ anbieten'),
+      t('gradientRewardTitle', 'Verlauf-Chat', 'Reward-Name', { maxlength: 45 }), n('gradientRewardCost', 5000, 'Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      n('gradientDays', 30, 'Der Verlauf gilt so viele Tage (0 = für immer). Erneutes Einlösen verlängert', { min: 0, max: 3650 }),
+      a('gradientTemplate', '🌈 {user} hat jetzt einen Farbverlauf bis {until}! Mit !verlauf geht er an und aus.', 'Chat-Nachricht nach dem Kauf', { user: 'Max', until: '10.12.2026' }),
     ] },
   ],
 
@@ -242,4 +248,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'gradientEnabled', 'gradientRewardTitle', 'gradientRewardCost', 'gradientDays', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];

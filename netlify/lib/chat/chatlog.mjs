@@ -4,7 +4,7 @@
 // Speicher:
 //   chatlog           [ { id, t, n: Name, c: Farbe|'', g: Verlauf, s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
 //   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, glitter, glitterUntil }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
-//                     glitterUntil: bis wann der Glitzer gekauft ist (Kanalpunkte-Reward, FOREVER = unbegrenzt); darf dann auch ohne Abo an- und ausgeschaltet werden
+//                     glitterUntil / gradientUntil: bis wann Glitzer bzw. Verlauf gekauft sind (Kanalpunkte-Reward, FOREVER = unbegrenzt); darf dann auch ohne Abo an- und ausgeschaltet werden
 import { db } from '../kern/store.mjs';
 import { parseColor } from '../belohnungen/alpaca.mjs';
 import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
@@ -39,37 +39,50 @@ const privileged = (e, settings) => {
 };
 
 // Eigene Farbe und Extras per Chatbefehl. Farbe darf jede Person. Glitzer und Verlauf nur Abos, VIPs, Mods, der Kanalinhaber und die Namen
-// aus der Einstellung. Glitzer darf außerdem, wer ihn per Kanalpunkte-Reward gekauft hat (solange er gilt).
+// aus der Einstellung. Glitzer und Verlauf darf außerdem, wer sie per Kanalpunkte-Reward gekauft hat (solange sie gelten).
 async function styleCommand(e, settings, cmd, arg, now = Date.now()) {
   const id = e.chatter_user_id;
   const allowed = privileged(e, settings);
   const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
   if (cmd === 'farbe') { const c = parseColor(arg); if (!c) return; st.hex = c; }
   else if (cmd === 'glitter') { if (!allowed && !(st.glitterUntil > now)) return; st.glitter = !st.glitter; }
-  else if (cmd === 'verlauf') { if (!allowed) return; st.gradient = !st.gradient; }
-  else { st.hex = null; st.gradient = false; st.glitter = false; } // gekaufter Glitzer bleibt gekauft (glitterUntil)
+  else if (cmd === 'verlauf') { if (!allowed && !(st.gradientUntil > now)) return; st.gradient = !st.gradient; }
+  else { st.hex = null; st.gradient = false; st.glitter = false; } // Gekauftes bleibt gekauft (glitterUntil, gradientUntil)
   await db.set(`chatstyle/${id}`, st);
 }
 
+// Ein Extra wird gezeigt, wenn es an ist und (falls gekauft) noch gilt oder die Person es ohnehin darf (Abo, VIP, Mod …)
+const valid = (on, until, e, settings, now = Date.now()) => Boolean(on) && (!until || until > now || privileged(e, settings));
+
 const untilText = (until, settings) => (until >= FOREVER ? 'unbegrenzt' : new Date(until).toLocaleDateString('de-DE', { timeZone: settings.timezone }));
 
-/** Reward „Glitzer-Chat“: schaltet den Glitzer für glitterDays Tage frei (0 = unbegrenzt) und macht ihn gleich an. Erneutes Einlösen verlängert. */
-export async function handleGlitter(redemption, settings, now = Date.now()) {
+// Die beiden kaufbaren Extras: Glitzer und Verlauf. flag = Schalter in chatstyle, until = bis wann gekauft, Einstellungen heißen <prefix>Days und <prefix>Template.
+const EXTRAS = {
+  glitter: { flag: 'glitter', until: 'glitterUntil', prefix: 'glitter', off: 'der Glitzer' },
+  gradient: { flag: 'gradient', until: 'gradientUntil', prefix: 'gradient', off: 'der Farbverlauf' },
+};
+
+/** Reward „Glitzer-Chat“ oder „Verlauf-Chat“: schaltet das Extra für <prefix>Days Tage frei (0 = unbegrenzt) und macht es gleich an. Erneutes Einlösen verlängert. */
+export async function handleStyleReward(kind, redemption, settings, now = Date.now()) {
+  const x = EXTRAS[kind];
   const { id: rid, user_id: id, user_name: name, reward } = redemption;
-  if (!settings.chatOverlayEnabled) { // ohne Chat-Leiste gibt es nichts zu glitzern
-    if (settings.chatEnabled) await sendChat(`${name}, die Chat-Leiste ist gerade aus, der Glitzer hätte nichts bewirkt. Deine Punkte bekommst du zurück.`).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+  if (!settings.chatOverlayEnabled) { // ohne Chat-Leiste gibt es nichts zu sehen
+    if (settings.chatEnabled) await sendChat(`${name}, die Chat-Leiste ist gerade aus, ${x.off} hätte nichts bewirkt. Deine Punkte bekommst du zurück.`).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
     await setRedemptionStatus(rid, reward.id, 'CANCELED');
     return { ok: false };
   }
   const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
-  const base = Math.max(now, st.glitterUntil ?? 0);
-  st.glitterUntil = settings.glitterDays > 0 && base < FOREVER ? base + settings.glitterDays * DAY : FOREVER;
-  st.glitter = true;
+  const days = settings[`${x.prefix}Days`];
+  const base = Math.max(now, st[x.until] ?? 0);
+  st[x.until] = days > 0 && base < FOREVER ? base + days * DAY : FOREVER;
+  st[x.flag] = true;
   await db.set(`chatstyle/${id}`, st);
-  if (settings.chatEnabled) await sendChat(fill(settings.glitterTemplate, { user: name, until: untilText(st.glitterUntil, settings) })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+  if (settings.chatEnabled) await sendChat(fill(settings[`${x.prefix}Template`], { user: name, until: untilText(st[x.until], settings) })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
   await setRedemptionStatus(rid, reward.id, 'FULFILLED');
-  return { ok: true, until: st.glitterUntil };
+  return { ok: true, until: st[x.until] };
 }
+export const handleGlitter = (redemption, settings, now) => handleStyleReward('glitter', redemption, settings, now);
+export const handleGradient = (redemption, settings, now) => handleStyleReward('gradient', redemption, settings, now);
 
 /** Nachricht merken, wenn das Overlay an ist. Befehle (!…) und ignorierte Namen (Bots) bleiben draußen. */
 export async function recordChatMessage(e, settings) {
@@ -85,7 +98,7 @@ export async function recordChatMessage(e, settings) {
   const id = String(e.message_id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const st = (await db.get(`chatstyle/${e.chatter_user_id}`)) ?? {};
   const list = ((await db.get(LOG_KEY)) ?? []).filter((x) => x.id !== id); // Twitch kann doppelt zustellen
-  list.push({ id, t: Date.now(), n: name, c: st.hex ?? '', g: Boolean(st.gradient), s: Boolean(st.glitter) && (!st.glitterUntil || st.glitterUntil > Date.now() || privileged(e, settings)), m: pieces(e.message) });
+  list.push({ id, t: Date.now(), n: name, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, e, settings), s: valid(st.glitter, st.glitterUntil, e, settings), m: pieces(e.message) });
   await db.set(LOG_KEY, list.slice(-KEEP));
   return true;
 }
