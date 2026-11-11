@@ -2369,6 +2369,14 @@ await test('Glitzer-Reward: Kauf schaltet Glitzer frei (befristet, verlängerbar
   const state = await db.get('config/state');
   const reward = rewards.find((r) => r.id === state.glitterRewardId);
   assert.equal(reward.cost, 5000); assert.ok(subs.some((x) => x.condition.reward_id === state.glitterRewardId), 'Webhook für den Reward');
+  // Beschreibung in Twitch: Anleitung mit Dauer, höchstens 200 Zeichen, folgt der Einstellung
+  const { glitterPrompt } = await import('../netlify/lib/kern/twitch.mjs');
+  const createdGlitter = calls.filter((c) => c.path.endsWith('/custom_rewards') && c.method === 'POST').find((c) => c.body.title === 'Glitzer-Chat');
+  assert.equal(createdGlitter.body.prompt, glitterPrompt(await getSettings()));
+  assert.match(createdGlitter.body.prompt, /30 Tage lang.*!glitter.*an\/aus.*verlängert/);
+  assert.ok(createdGlitter.body.prompt.length <= 200 && createdGlitter.body.prompt.length > 60, `Länge ${createdGlitter.body.prompt.length}`);
+  assert.match(glitterPrompt({ glitterDays: 0 }), /für immer/);
+  assert.ok(glitterPrompt({ glitterDays: 3650 }).length <= 200);
 
   const msg = (text, id = 'gv1', name = 'Glitzi', badges = []) => ({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges: badges.map((set_id) => ({ set_id })), message_id: crypto.randomUUID(), message: { text, fragments: [{ type: 'text', text }] } });
   const say = async (text, o = []) => { await handleChat(msg(text, ...o), await getSettings()); };

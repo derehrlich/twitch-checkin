@@ -89,6 +89,10 @@ export async function setRedemptionStatus(redemptionId, rewardId, status) {
   }
 }
 
+// Beschreibung des Glitzer-Rewards in Twitch (höchstens 200 Zeichen): kurze Anleitung mit der eingestellten Dauer
+export const glitterPrompt = (settings) =>
+  `✨ Dein Name und deine Chat-Nachrichten glitzern in der Chat-Leiste im Stream, ${settings.glitterDays > 0 ? `${settings.glitterDays} Tage lang` : 'für immer'}. Mit !glitter im Chat schaltest du es an/aus. Nochmal einlösen verlängert.`.slice(0, 200);
+
 // Legt die Rewards an (oder passt Preis/Namen an) und merkt sich die IDs.
 // Check-out nur, wenn aktiviert; ein früher angelegter Check-out-Reward wird dann in Twitch deaktiviert.
 export async function ensureRewards(settings, entry = null) {
@@ -152,7 +156,7 @@ export async function ensureRewards(settings, entry = null) {
   // Glitzer-Chat: schaltet den Glitzer in der Chat-Leiste frei
   let glitter = null;
   if (settings.glitterEnabled) {
-    glitter = await make({ stateKey: 'glitterRewardId', title: settings.glitterRewardTitle, cost: settings.glitterRewardCost, prompt: 'Dein Name und deine Nachrichten glitzern in der Chat-Leiste im Stream! Mit !glitter schaltest du den Glitzer an und aus.', color: '#F5C230', syncPrompt: true });
+    glitter = await make({ stateKey: 'glitterRewardId', title: settings.glitterRewardTitle, cost: settings.glitterRewardCost, prompt: glitterPrompt(settings), color: '#F5C230', syncPrompt: true });
   } else if (state.glitterRewardId) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.glitterRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.glitterRewardId;
