@@ -20,7 +20,7 @@ Zeigt im Chat die Restzeit bis zur Zielzeit des Countdowns und den Wochenplan. S
 
 ## Adventure-Einreichung (Community-Tage)
 - Admin → Geburtstagswoche → „Adventure-Einreichungen“. Einschalten und Texte: Karte darunter (standardmäßig **aus**).
-- Zuschauer reichen im Twitch-Chat mit `!adventure Name oder Link` ein, im Discord über den VerwirrBot (Schnittstelle `POST /api/community/adventure`, **die Discord-Seite im VerwirrBot ist noch nicht gebaut**). Alles landet in einer Liste. Höchstens 2 je Person (Twitch und Discord zusammen, wenn das Konto verknüpft ist), gleiche Namen nur einmal.
+- Zuschauer reichen im Twitch-Chat mit `!adventure Name oder Link` ein, im Discord über den VerwirrBot (Schnittstelle `POST /api/community/adventure`, im Discord mit `/adventure einreichen` und `/adventure liste` (VerwirrBot, Phase 7l)). Alles landet in einer Liste. Höchstens 2 je Person (Twitch und Discord zusammen, wenn das Konto verknüpft ist), gleiche Namen nur einmal.
 - „Offene aufs Glücksrad übertragen“ macht daraus ein Rad (oder ersetzt die Felder eines vorhandenen). Jedes Feld kommt nur einmal dran, im Ergebnis steht „eingereicht von …“. Ein gedrehtes Adventure steht in der Liste als „vom Rad gewählt“.
 - Von Hand ergänzen geht auch, falls jemand es woanders postet.
 
