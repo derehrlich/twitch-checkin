@@ -23,7 +23,7 @@
   /* Extras (nur Abos und VIPs): Verlauf, und Glitzer als Lichtschein. Der Schein läuft nur bei den jeweils sichtbaren Nachrichten. */
   .fx-gradient .name, .fx-gradient .text, .fx-glitter .name, .fx-glitter .text { -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .8)); }
   .fx-gradient .name, .fx-gradient .text { background-image: var(--grad); }
-  .fx-glitter .name, .fx-glitter .text { background-image: linear-gradient(100deg, var(--c1) 0%, var(--c1) 35%, #fff 48%, #fff 52%, var(--c1) 65%, var(--c1) 100%); background-size: 250% 100%; animation: sweep 2.4s linear infinite; }
+  .fx-glitter .name, .fx-glitter .text { background-image: linear-gradient(100deg, var(--cg) 0%, var(--cg) 35%, #fff 48%, #fff 52%, var(--cg) 65%, var(--cg) 100%); background-size: 250% 100%; animation: sweep 2.4s linear infinite; }
   .fx-gradient.fx-glitter .name, .fx-gradient.fx-glitter .text { background-image: var(--gradglit); }
   @keyframes sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 </style>
@@ -70,13 +70,14 @@ function shiftHex(hex, deg) { // weitere Farben für Verlauf und Glitzer: Farbto
 const SHOWN = new Map(); // Nachrichten-Kennung -> Element
 let limit = 10;
 
-const sig = (m) => JSON.stringify([m.c, m.g, m.s, m.gc]);
+const sig = (m) => JSON.stringify([m.c, m.g, m.s, m.gc, m.gl]);
 function style(el, m) { // Farbe und Extras setzen, auch später, wenn sich der Stil der Person ändert
   const base = m.c || hslToHex(hash(m.n.toLowerCase()) % 360, 100, 75); // ohne eigene Farbe: pro Person immer dieselbe
   el.classList.toggle('fx-gradient', Boolean(m.g)); el.classList.toggle('fx-glitter', Boolean(m.s));
   el.dataset.sig = sig(m);
   el.querySelector('.name').style.color = m.g || m.s ? '' : base;
   el.style.setProperty('--c1', base);
+  el.style.setProperty('--cg', /^#[0-9a-f]{6}$/i.test(m.gl ?? '') ? m.gl : base); // Glitzerfarbe: eigene, sonst die Namensfarbe
   // Verlauffarben: eigene (2 oder 3) oder automatisch aus der Namensfarbe (Farbton +70° und +140°)
   const own = (m.gc ?? []).filter((c) => /^#[0-9a-f]{6}$/i.test(c));
   const cols = own.length >= 2 ? own : [own[0] ?? base, shiftHex(own[0] ?? base, 70), shiftHex(own[0] ?? base, 140)];

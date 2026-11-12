@@ -1954,6 +1954,31 @@ await test('Auto-Sicherung: einmal pro Tag ab der Uhrzeit, alte werden gelöscht
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// ---- Glitzerfarbe
+await test('Chat-Leiste: !glitter <Farbe> stellt die Glitzerfarbe ein, auto und !reset nehmen sie weg, unbekannte Farben ändern nichts', async () => {
+  const { getSettings } = await import('../netlify/lib/kern/settings.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: true, chatOverlaySeconds: 0, chatOverlayMax: 10 }, cookie));
+  await db.delete('chatlog');
+  const say = async (text) => handleChat({ broadcaster_user_id: '999', chatter_user_id: 'gc1', chatter_user_name: 'Gold', badges: [{ set_id: 'vip' }], message_id: crypto.randomUUID(), message: { text, fragments: [{ type: 'text', text }] } }, await getSettings());
+  const pub = async () => (await (await import('../netlify/functions/chatlog.mjs')).default(new Request(BASE + '/api/chatlog'))).json();
+  const last = async () => (await pub()).messages.at(-1);
+  await say('!glitter gold'); await say('hallo');
+  assert.deepEqual([(await last()).s, (await last()).gl], [true, '#f2b705'], 'Farbe gesetzt und Glitzer an');
+  await say('!glitter'); await say('aus');
+  assert.equal((await last()).s, false, 'ohne Farbe schaltet es um');
+  assert.equal((await last()).gl, '#f2b705', 'die Farbe bleibt gemerkt');
+  await say('!glitter blabla'); assert.equal((await db.get('chatstyle/gc1')).glitter, false, 'unbekannte Farbe: nichts passiert');
+  await say('!glitter #ff0000'); assert.equal((await db.get('chatstyle/gc1')).glitterColor, '#ff0000');
+  await say('hallo'); assert.equal((await pub()).messages.every((m) => m.gl === '#ff0000'), true, 'auch schon sichtbare Nachrichten übernehmen die neue Farbe');
+  await say('!glitter auto'); assert.equal((await db.get('chatstyle/gc1')).glitterColor, null);
+  await say('x'); assert.equal('gl' in (await last()), false);
+  await say('!glitter rot'); await say('!reset');
+  assert.deepEqual([(await db.get('chatstyle/gc1')).glitter, (await db.get('chatstyle/gc1')).glitterColor], [false, null], '!reset setzt auch die Glitzerfarbe zurück');
+  await db.delete('chatlog'); await db.delete('chatstyle/gc1');
+  await admin(adminReq('PUT', 'settings', { chatOverlayEnabled: false }, cookie));
+});
+
 // ---- Update-Knopf
 await test('Updates: Version anzeigen, ohne Einrichtung gesperrt, Watchtower anstoßen (fertig, läuft, Fehler)', async () => {
   const upd = (m) => admin(adminReq(m, 'update', m === 'GET' ? null : {}, cookie));

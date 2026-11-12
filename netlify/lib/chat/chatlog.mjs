@@ -2,8 +2,8 @@
 // das Overlay holt sie ab (siehe netlify/functions/chatlog.mjs).
 //
 // Speicher:
-//   chatlog           [ { id, t, u: Twitch-ID, p: darf Extras ohne Kauf, n: Name, c: Farbe|'', g: Verlauf, gc: [Verlauffarben] (optional), s: Glitzer, m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
-//   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, gradientColors: ['#rrggbb', …]|null, glitter, glitterUntil, gradientUntil }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
+//   chatlog           [ { id, t, u: Twitch-ID, p: darf Extras ohne Kauf, n: Name, c: Farbe|'', g: Verlauf, gc: [Verlauffarben] (optional), s: Glitzer, gl: Glitzerfarbe (optional), m: [ { e: Emote-Kennung } | { x: Text } ] } ]   die letzten Nachrichten, neueste zuletzt
+//   chatstyle/<id>    { hex: '#rrggbb'|null, gradient, gradientColors: ['#rrggbb', …]|null, glitter, glitterColor: '#rrggbb'|null, glitterUntil, gradientUntil }   eigene Farbe und Extras einer Person (per !farbe, !verlauf, !glitter, !reset)
 //                     glitterUntil / gradientUntil: bis wann Glitzer bzw. Verlauf gekauft sind (Kanalpunkte-Reward, FOREVER = unbegrenzt); darf dann auch ohne Abo an- und ausgeschaltet werden
 import { db } from '../kern/store.mjs';
 import { parseColor, parseColors } from '../belohnungen/alpaca.mjs';
@@ -45,7 +45,13 @@ async function styleCommand(e, settings, cmd, arg, now = Date.now()) {
   const allowed = privileged(e, settings);
   const st = { hex: null, gradient: false, glitter: false, ...((await db.get(`chatstyle/${id}`)) ?? {}) };
   if (cmd === 'farbe') { const c = parseColor(arg); if (!c) return; st.hex = c; }
-  else if (cmd === 'glitter') { if (!allowed && !(st.glitterUntil > now)) return; st.glitter = !st.glitter; }
+  else if (cmd === 'glitter') {
+    if (!allowed && !(st.glitterUntil > now)) return;
+    const wish = String(arg ?? '').trim();
+    if (!wish) st.glitter = !st.glitter; // ohne Farbe: an/aus
+    else if (/^(auto|automatisch)$/i.test(wish)) { st.glitterColor = null; st.glitter = true; } // zurück zur Namensfarbe
+    else { const c = parseColor(wish); if (!c) return; st.glitterColor = c; st.glitter = true; } // eigene Glitzerfarbe
+  }
   else if (cmd === 'verlauf') {
     if (!allowed && !(st.gradientUntil > now)) return;
     const wish = String(arg ?? '').trim();
@@ -53,7 +59,7 @@ async function styleCommand(e, settings, cmd, arg, now = Date.now()) {
     else if (/^(auto|automatisch)$/i.test(wish)) { st.gradientColors = null; st.gradient = true; } // zurück zum automatischen Verlauf
     else { const cols = parseColors(wish); if (!cols.length) return; st.gradientColors = cols; st.gradient = true; } // eigene Farben
   }
-  else { st.hex = null; st.gradient = false; st.glitter = false; st.gradientColors = null; } // Gekauftes bleibt gekauft (glitterUntil, gradientUntil)
+  else { st.hex = null; st.gradient = false; st.glitter = false; st.gradientColors = null; st.glitterColor = null; } // Gekauftes bleibt gekauft (glitterUntil, gradientUntil)
   await db.set(`chatstyle/${id}`, st);
 }
 
@@ -118,7 +124,7 @@ export async function recordChatMessage(e, settings) {
   const st = (await db.get(`chatstyle/${e.chatter_user_id}`)) ?? {};
   const list = ((await db.get(LOG_KEY)) ?? []).filter((x) => x.id !== id); // Twitch kann doppelt zustellen
   const priv = privileged(e, settings);
-  list.push({ id, t: Date.now(), u: String(e.chatter_user_id ?? ''), p: priv, n: name, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, priv), ...(st.gradientColors?.length ? { gc: st.gradientColors } : {}), s: valid(st.glitter, st.glitterUntil, priv), m: pieces(e.message) });
+  list.push({ id, t: Date.now(), u: String(e.chatter_user_id ?? ''), p: priv, n: name, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, priv), ...(st.gradientColors?.length ? { gc: st.gradientColors } : {}), s: valid(st.glitter, st.glitterUntil, priv), ...(st.glitterColor ? { gl: st.glitterColor } : {}), m: pieces(e.message) });
   await db.set(LOG_KEY, list.slice(-KEEP));
   return true;
 }
@@ -131,10 +137,10 @@ export async function publicView(settings, now = Date.now()) {
   // Es gilt immer der aktuelle Stil der Person, auch für Nachrichten, die schon im Bild stehen (wer !verlauf ausschaltet, sieht es sofort).
   const styles = new Map();
   for (const u of new Set(shown.map((x) => x.u).filter(Boolean))) styles.set(u, (await db.get(`chatstyle/${u}`)) ?? {});
-  const messages = shown.map(({ u, p, gc, ...x }) => {
+  const messages = shown.map(({ u, p, gc, gl, ...x }) => {
     const st = styles.get(u);
-    if (!st) return { ...x, ...(gc ? { gc } : {}) }; // ältere Einträge ohne Person: wie gespeichert
-    return { ...x, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, p), ...(st.gradientColors?.length ? { gc: st.gradientColors } : {}), s: valid(st.glitter, st.glitterUntil, p) };
+    if (!st) return { ...x, ...(gc ? { gc } : {}), ...(gl ? { gl } : {}) }; // ältere Einträge ohne Person: wie gespeichert
+    return { ...x, c: st.hex ?? '', g: valid(st.gradient, st.gradientUntil, p), ...(st.gradientColors?.length ? { gc: st.gradientColors } : {}), s: valid(st.glitter, st.glitterUntil, p), ...(st.glitterColor ? { gl: st.glitterColor } : {}) };
   });
   return { enabled: true, seconds: settings.chatOverlaySeconds, max: settings.chatOverlayMax, messages };
 }
