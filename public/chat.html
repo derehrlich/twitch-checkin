@@ -70,10 +70,12 @@ function shiftHex(hex, deg) { // weitere Farben für Verlauf und Glitzer: Farbto
 const SHOWN = new Map(); // Nachrichten-Kennung -> Element
 let limit = 10;
 
-function build(m) {
+const sig = (m) => JSON.stringify([m.c, m.g, m.s, m.gc]);
+function style(el, m) { // Farbe und Extras setzen, auch später, wenn sich der Stil der Person ändert
   const base = m.c || hslToHex(hash(m.n.toLowerCase()) % 360, 100, 75); // ohne eigene Farbe: pro Person immer dieselbe
-  const el = document.createElement('div');
-  el.className = 'bubble' + (m.g ? ' fx-gradient' : '') + (m.s ? ' fx-glitter' : '');
+  el.classList.toggle('fx-gradient', Boolean(m.g)); el.classList.toggle('fx-glitter', Boolean(m.s));
+  el.dataset.sig = sig(m);
+  el.querySelector('.name').style.color = m.g || m.s ? '' : base;
   el.style.setProperty('--c1', base);
   // Verlauffarben: eigene (2 oder 3) oder automatisch aus der Namensfarbe (Farbton +70° und +140°)
   const own = (m.gc ?? []).filter((c) => /^#[0-9a-f]{6}$/i.test(c));
@@ -82,17 +84,22 @@ function build(m) {
   el.style.setProperty('--grad', `linear-gradient(90deg, ${cols.join(', ')})`);
   el.style.setProperty('--gradglit', `linear-gradient(100deg, ${cols[0]} 0%, ${mid}#fff 48%, #fff 52%${midEnd}, ${cols.at(-1)} 100%)`);
   el.style.setProperty('--c2', cols[1] ?? base);
+}
+
+function build(m) {
+  const el = document.createElement('div');
+  el.className = 'bubble';
   const img = document.createElement('img');
   img.className = 'alpaka'; img.alt = ''; img.src = ALPAKAS[hash(String(m.id)) % ALPAKAS.length];
   const wrap = document.createElement('div'); wrap.className = 'wrap';
   const name = document.createElement('span'); name.className = 'name'; name.textContent = m.n + ':';
-  if (!m.g && !m.s) name.style.color = base;
   const text = document.createElement('span'); text.className = 'text';
   for (const p of m.m) {
     if (p.e) { const e = document.createElement('img'); e.alt = ''; e.src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(p.e)}/default/dark/2.0`; text.append(e); }
     else text.append(document.createTextNode(p.x));
   }
   wrap.append(name, text); el.append(img, wrap);
+  style(el, m);
   return el;
 }
 
@@ -104,7 +111,10 @@ function trim() { // älteste (ganz rechts) entfernen, so wächst nichts an
 
 function render(d) {
   const ids = new Set(d.messages.map((m) => m.id));
-  for (const m of d.messages) if (!SHOWN.has(m.id)) add(m); // Reihenfolge alt → neu, jede kommt links davor
+  for (const m of d.messages) {
+    if (!SHOWN.has(m.id)) add(m); // Reihenfolge alt → neu, jede kommt links davor
+    else if (SHOWN.get(m.id).dataset.sig !== sig(m)) style(SHOWN.get(m.id), m); // Stil der Person hat sich geändert
+  }
   for (const id of [...SHOWN.keys()]) if (!ids.has(id)) drop(id); // abgelaufen oder herausgefallen
   trim();
 }

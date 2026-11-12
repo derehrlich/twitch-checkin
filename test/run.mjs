@@ -2014,6 +2014,8 @@ await test('Chat-Leiste: standardmäßig aus, zeigt Nachrichten mit Emotes, vers
   await send(ev('Zoe', { text: '!reset' }));
   await send(ev('Zoe', { text: 'zurückgesetzt' }));
   assert.equal((await pub()).messages.at(-1).g, false, '!reset setzt zurück');
+  assert.deepEqual((await pub()).messages.filter((m) => m.n === 'Zoe').map((m) => m.g), [false, false], 'auch schon sichtbare Nachrichten übernehmen den aktuellen Stil');
+  assert.ok((await pub()).messages.every((m) => !('u' in m) && !('p' in m)), 'Twitch-ID und Rechte gehen nicht nach außen');
   await send(ev('Ehrlich', { text: '!glitter' }, {}));
   await db.delete('chatlog');
 
