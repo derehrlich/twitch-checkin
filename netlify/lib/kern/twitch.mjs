@@ -187,8 +187,16 @@ export async function ensureRewards(settings, entry = null) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gwRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.gwRewardId;
   }
+  // Mitternachts-Los (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind, nur im kurzen Fenster kaufbar)
+  let gewinnBonus = null;
+  if (settings.gwEnabled && settings.gwBonusEnabled) {
+    gewinnBonus = await make({ stateKey: 'gwBonusRewardId', title: settings.gwBonusRewardTitle, cost: settings.gwBonusRewardCost, prompt: 'Ein Extra-Los für die Geburtstags-Ziehung, nur kurz nach Mitternacht kaufbar. Pro Person eins. Zählt zusammen mit dem Geburtstags-Ticket.', color: '#F6B82E', syncPrompt: true });
+  } else if (state.gwBonusRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gwBonusRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.gwBonusRewardId; delete state.gwBonusPaused;
+  }
   await db.set('config/state', state);
-  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient, gewinn };
+  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient, gewinn, gewinnBonus };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge

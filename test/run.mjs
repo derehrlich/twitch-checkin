@@ -2950,5 +2950,48 @@ await test('Gewinnspiel: Ticket, Wochenpunkte, Lose-Deckel, Sperrliste, Ziehung,
   await admin(adminReq('PUT', 'settings', { gwEnabled: false }, cookie));
 });
 
+await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit Ticket, Reward-Pause)', async () => {
+  const gw = await import('../netlify/lib/belohnungen/gewinn.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  await api('PUT', 'settings', { gwEnabled: true, gwBonusEnabled: true, gwRevealSeconds: 0, chatEnabled: true });
+  const setup = await (await api('POST', 'setup', {})).json();
+  assert.equal(setup.gewinnBonus, 'Mitternachts-Los');
+  assert.equal((await getSettings()).gwBonusRewardCost, 15, 'Preis 15 Kanalpunkte');
+  const state = await db.get('config/state');
+  assert.ok(state.gwBonusRewardId && subs.some((x) => x.condition.reward_id === state.gwBonusRewardId), 'Reward und Webhook');
+  const v = await (await api('POST', 'gewinn/new', {})).json();
+  const id = v.draw.id;
+  assert.equal(v.draw.bonusOpen, '2026-11-29T00:00'); assert.equal(v.draw.bonusClose, '2026-11-29T00:30');
+  const d = await gw.getDraw(id);
+  const tz = (await getSettings()).timezone;
+  const at = (hhmm) => Date.parse(gw.parseLocal(`2026-11-29T${hhmm}`, tz));
+  assert.deepEqual([at('23:59') - 86_400_000, at('00:00'), at('00:29'), at('00:30')].map((t) => gw.bonusState(d, t)), ['vorher', 'offen', 'offen', 'zu']);
+  const bonus = (rid, uid, name) => ({ id: rid, user_id: uid, user_name: name, reward: { id: state.gwBonusRewardId } });
+  const settings = await getSettings();
+  // Außerhalb des Fensters: Hinweis und Punkte zurück
+  const before = chats().length;
+  assert.equal((await gw.handleGewinnBonus(bonus('b0', '301', 'Eva'), settings, at('00:00') - 60_000)).reason, 'closed');
+  assert.equal(chats().length, before + 1);
+  // Im Fenster: eins pro Person, auch bei gleichzeitigen Einlösungen
+  const [r1, r2] = await Promise.all([gw.handleGewinnBonus(bonus('b1', '301', 'Eva'), settings, at('00:05')), gw.handleGewinnBonus(bonus('b2', '301', 'Eva'), settings, at('00:05'))]);
+  assert.deepEqual([r1.ok, r2.ok].sort(), [false, true]);
+  assert.equal((await db.list(`gw/${id}/bonus/`)).length, 1);
+  // Extra-Los zählt nur mit Ticket, obendrauf und nicht gegen den Deckel
+  await api('PUT', 'gewinn/config', { pointsFrom: '2020-01-01T00:00', ticketOpen: '2020-01-01T00:00' });
+  const blank = { checkinDays: [], streakPts: 0, chatCount: 0, chatDay: null, dayMsgs: 0, lastAt: 0 };
+  await db.set(`gw/${id}/pts/301`, { ...blank, name: 'Eva', points: 5000 });
+  await db.set(`gw/${id}/pts/302`, { ...blank, name: 'Finn', points: 0 });
+  await db.set(`gw/${id}/ticket/301`, { name: 'Eva', at: '2026-11-30T00:01:00.000Z', points: 0, redemptionId: 't1' });
+  await db.set(`gw/${id}/ticket/302`, { name: 'Finn', at: '2026-11-30T00:02:00.000Z', points: 0, redemptionId: 't2' });
+  await db.set(`gw/${id}/bonus/999`, { name: 'OhneTicket', at: new Date().toISOString(), redemptionId: 'b9' });
+  const rows = await gw.participants(await gw.getDraw(id));
+  assert.deepEqual(rows.map((r) => [r.name, r.lots, r.extra]), [['Eva', 11, true], ['Finn', 1, false]], 'Eva: 10 (Deckel) + 1 Extra, ohne Ticket zählt nichts');
+  // Reward-Pause folgt dem Fenster
+  const paused = () => calls.filter((c) => c.method === 'PATCH' && c.query.id === state.gwBonusRewardId && 'is_paused' in c.body).at(-1)?.body.is_paused;
+  await gw.gewinnTick(settings, at('00:10')); assert.equal(paused(), false, 'im Fenster aktiv');
+  await gw.gewinnTick(settings, at('00:40')); assert.equal(paused(), true, 'danach pausiert');
+  await api('PUT', 'settings', { gwEnabled: false });
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

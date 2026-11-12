@@ -17,10 +17,10 @@ function render() {
     return;
   }
   const dr = d.draw;
-  $('gwStatus').innerHTML = `<p><b>${esc(dr.name)}</b> · Tickets: <b>${WINDOW[d.window]}</b>${dr.drawnAt ? ` · gezogen am ${fmt(dr.drawnAt)}` : ''}${d.rewardReady ? '' : ' · <span class="bad">Reward fehlt noch (Rewards abgleichen)</span>'}</p><p class="muted">${d.stats.participants} Teilnehmer · ${d.stats.totalLots} Lose</p>`;
+  $('gwStatus').innerHTML = `<p><b>${esc(dr.name)}</b> · Tickets: <b>${WINDOW[d.window]}</b> · Mitternachts-Los: <b>${WINDOW[d.bonusWindow]}</b>${dr.drawnAt ? ` · gezogen am ${fmt(dr.drawnAt)}` : ''}${d.rewardReady ? '' : ' · <span class="bad">Reward fehlt noch (Rewards abgleichen)</span>'}${d.bonusRewardReady || !d.draw.bonusOpen ? '' : ' · <span class="bad">Mitternachts-Los-Reward fehlt noch (Rewards abgleichen)</span>'}</p><p class="muted">${d.stats.participants} Teilnehmer · ${d.stats.totalLots} Lose</p>`;
   $('gwOpen').disabled = $('gwClose').disabled = Boolean(dr.drawnAt);
   const set = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v ?? ''; };
-  set('gwName', dr.name); set('gwFrom', dr.pointsFrom); set('gwOpenAt', dr.ticketOpen); set('gwCloseAt', dr.ticketClose); set('gwPlanned', dr.plannedDraw);
+  set('gwName', dr.name); set('gwFrom', dr.pointsFrom); set('gwOpenAt', dr.ticketOpen); set('gwCloseAt', dr.ticketClose); set('gwPlanned', dr.plannedDraw); set('gwBonusOpen', dr.bonusOpen); set('gwBonusClose', dr.bonusClose); set('gwBonusLots', dr.bonusLots);
   set('gwPer', dr.perPoints); set('gwMax', dr.maxLots); set('gwWCheckin', dr.weights.checkin); set('gwWStreak', dr.weights.streak); set('gwWStreakCap', dr.weights.streakCap);
   set('gwWChat', dr.weights.chat); set('gwWChatCap', dr.weights.chatDayCap); set('gwWChatGap', dr.weights.chatGap); set('gwHours', dr.winnerHours); set('gwAddrDays', dr.addressDays); set('gwKeep', dr.keepDays);
   for (const cb of document.querySelectorAll('.gwCountry')) cb.checked = dr.countries.includes(cb.value);
@@ -30,7 +30,7 @@ function render() {
   renderPrizes();
   $('gwDraw').disabled = Boolean(dr.drawnAt); $('gwTest').disabled = Boolean(dr.drawnAt);
   $('gwStats').innerHTML = d.stats.rows.length ? `<table class="tk"><thead><tr><th>Lose</th><th>Personen</th><th>Anteil an allen Losen</th><th>Chance auf Platz 1 (je Person)</th></tr></thead><tbody>${d.stats.rows.map((r) => `<tr><td>${r.lots}</td><td>${r.persons}</td><td>${pct(r.share)}</td><td>${pct(r.chance)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Noch keine Tickets.</p>';
-  $('gwTickets').innerHTML = d.tickets.length ? `<table class="tk"><thead><tr><th>Name</th><th>Ticket</th><th>Punkte beim Einlösen</th><th>Punkte jetzt</th><th>Lose</th><th></th></tr></thead><tbody>${d.tickets.map((t) => `<tr data-name="${esc(t.name)}"><td>${esc(t.name)}${t.blocked ? ' 🚫' : ''}${t.eligible ? '' : ' <span class="muted">(zählt nicht)</span>'}</td><td>${fmt(t.at)}</td><td>${t.pointsAtTicket}</td><td>${t.points}</td><td>${t.lots}</td><td>${t.blocked ? '' : '<button data-act="block" class="danger">Sperren</button>'}</td></tr>`).join('')}</tbody></table>` : '';
+  $('gwTickets').innerHTML = d.tickets.length ? `<table class="tk"><thead><tr><th>Name</th><th>Ticket</th><th>Punkte beim Einlösen</th><th>Punkte jetzt</th><th>Lose</th><th></th></tr></thead><tbody>${d.tickets.map((t) => `<tr data-name="${esc(t.name)}"><td>${esc(t.name)}${t.blocked ? ' 🚫' : ''}${t.eligible ? '' : ' <span class="muted">(zählt nicht)</span>'}</td><td>${fmt(t.at)}</td><td>${t.pointsAtTicket}</td><td>${t.points}</td><td>${t.lots}${t.extra ? ' 🌙' : ''}</td><td>${t.blocked ? '' : '<button data-act="block" class="danger">Sperren</button>'}</td></tr>`).join('')}</tbody></table>` : '';
   $('gwBlocked').innerHTML = dr.blocked.length ? 'Gesperrt: ' + dr.blocked.map((b) => `${esc(b.name)} <button class="ghost" data-unblock="${esc(b.name)}">frei</button>`).join(' · ') : '';
   const w = d.winners;
   $('gwWinners').innerHTML = w.length ? `<table class="tk"><thead><tr><th>Platz</th><th>Preis</th><th>Gewinner</th><th>Status</th><th>Frist</th><th>Aktionen</th></tr></thead><tbody>${w.map((x) => {
@@ -67,7 +67,7 @@ export async function loadGewinn() { apply(await api('GET', 'gewinn')); }
 function config() {
   const n = (id) => $(id).value;
   return {
-    name: n('gwName'), pointsFrom: n('gwFrom'), ticketOpen: n('gwOpenAt'), ticketClose: n('gwCloseAt'), plannedDraw: n('gwPlanned'), perPoints: n('gwPer'), maxLots: n('gwMax'),
+    name: n('gwName'), pointsFrom: n('gwFrom'), ticketOpen: n('gwOpenAt'), ticketClose: n('gwCloseAt'), plannedDraw: n('gwPlanned'), bonusOpen: n('gwBonusOpen'), bonusClose: n('gwBonusClose'), bonusLots: n('gwBonusLots'), perPoints: n('gwPer'), maxLots: n('gwMax'),
     weights: { checkin: n('gwWCheckin'), streak: n('gwWStreak'), streakCap: n('gwWStreakCap'), chat: n('gwWChat'), chatDayCap: n('gwWChatCap'), chatGap: n('gwWChatGap') },
     winnerHours: n('gwHours'), addressDays: n('gwAddrDays'), keepDays: n('gwKeep'), countries: [...document.querySelectorAll('.gwCountry')].filter((c) => c.checked).map((c) => c.value),
   };
