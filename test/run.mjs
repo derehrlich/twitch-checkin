@@ -3044,9 +3044,17 @@ await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gew
   // !geburtstag: aus, solange nicht eingeschaltet; dann Restzeit und Plan; nach dem Ziel der andere Text
   await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, bdayEnabled: false });
   assert.deepEqual(await chatMsg('!geburtstag', 'g1', 'Gast'), []);
+  (await import('../netlify/lib/chat/befehle.mjs')).SENDE_PAUSE.ms = 0;
+  // Standard: Satz mit der Restzeit zuerst (ohne Plan), dann jeder Planeintrag als eigene Nachricht, in dieser Reihenfolge
   await api('PUT', 'settings', { bdayEnabled: true, bdayPlan: 'Mo 19:00 Slides\nDi 20:30 Bauabend' });
-  const [r] = await chatMsg('!geburtstag', 'g2', 'Gast');
-  assert.match(r, /Noch .* bis Marcels Geburtstag.*Mo 19:00 Slides · Di 20:30 Bauabend/);
+  const msgs = await chatMsg('!geburtstag', 'g2', 'Gast');
+  assert.equal(msgs.length, 3); assert.match(msgs[0], /^🎂 Noch .* bis Marcels Geburtstag! Das Programm:$/);
+  assert.deepEqual(msgs.slice(1), ['Mo 19:00 Slides', 'Di 20:30 Bauabend']);
+  // Ohne den Haken: alles in einer Nachricht, mit · verbunden
+  await api('PUT', 'settings', { bdayEachLine: false });
+  const [one] = await chatMsg('!geburtstag', 'g4', 'Gast');
+  assert.match(one, /Noch .* bis Marcels Geburtstag.*Mo 19:00 Slides · Di 20:30 Bauabend/);
+  await api('PUT', 'settings', { bdayEachLine: true });
   await api('PUT', 'feier/countdown', { target: '2020-01-01T00:00' });
   assert.match((await chatMsg('!geburtstag', 'g3', 'Gast'))[0], /Marcel hat Geburtstag/);
   await api('PUT', 'settings', { bdayEnabled: false });
