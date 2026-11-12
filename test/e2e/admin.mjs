@@ -71,7 +71,7 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button').count(), 8);
+assert.equal(await page.locator('.tabs button').count(), 9);
 const visiblePanels = async () => page.locator('.tab-panel:visible').evaluateAll((els) => els.map((e) => e.dataset.panel));
 assert.deepEqual(await visiblePanels(), ['start']);
 await page.waitForFunction(() => document.querySelectorAll('#checks .check').length >= 5);
@@ -80,7 +80,7 @@ assert.match(await page.inputValue('#overlayUrl'), /\/overlay$/); ok('Start: Sta
 for (const tab of ['zuschauer', 'ereignisse', 'chat', 'belohnungen', 'overlays', 'medien', 'system']) {
   await page.click(`.tabs button[data-tab="${tab}"]`); assert.deepEqual(await visiblePanels(), [tab]); assert.equal(await page.evaluate(() => location.hash), '#' + tab);
 }
-ok('alle 8 Reiter schalten um und setzen die Adresse (#reiter)');
+ok('alle 9 Reiter schalten um und setzen die Adresse (#reiter)');
 await page.goto('http://localhost:8092/admin/#alerts'); await page.waitForSelector('#app:visible');
 assert.deepEqual(await visiblePanels(), ['ereignisse']); ok('Alter Direktlink #alerts öffnet den neuen Reiter Twitch-Ereignisse');
 

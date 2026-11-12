@@ -17,6 +17,7 @@ import { sport } from '../lib/admin/sport.mjs';
 import { update } from '../lib/admin/update.mjs';
 import { moderation } from '../lib/admin/moderation.mjs';
 import { health } from '../lib/admin/gesundheit.mjs';
+import { tickets } from '../lib/admin/tickets.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -41,6 +42,7 @@ const ROUTES = {
   update,
   moderation,
   health,
+  tickets,
 };
 
 export default async (req) => {

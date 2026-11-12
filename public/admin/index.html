@@ -38,6 +38,7 @@
       <button data-tab="ereignisse" role="tab">Twitch-Ereignisse</button>
       <button data-tab="chat" role="tab">Chat</button>
       <button data-tab="belohnungen" role="tab">Belohnungen</button>
+      <button data-tab="tickets" role="tab">Events / Tickets</button>
       <button data-tab="overlays" role="tab">Overlays</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="system" role="tab">System</button>
@@ -257,6 +258,27 @@
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards &amp; Webhooks abgleichen</button></div>
       </section>
       <div data-schema="community" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="tickets">
+      <p class="muted intro">Community-Abende und andere Events mit begrenzten Plätzen: Zuschauer lösen ein Ticket mit Kanalpunkten ein, die Stadtwache führt Übersicht und Warteliste und rückt bei Absagen automatisch nach.</p>
+      <p id="ticketHint" class="card hidden" style="padding:14px 18px">Das Ticket-System ist noch <b>ausgeschaltet</b>. Schalte es unten unter „Ticket-System einschalten“ ein und speichere.</p>
+      <section class="card">
+        <h2>Events</h2>
+        <div id="ticketEvents"></div>
+        <h3 style="margin-top:22px">Neues Event</h3>
+        <div class="grid2">
+          <div><label for="tkName">Name</label><input id="tkName" maxlength="60" placeholder="z. B. Community-Abend Mittwoch"></div>
+          <div><label for="tkWhen">Datum und Uhrzeit</label><input id="tkWhen" type="datetime-local"></div>
+          <div><label for="tkSeats">Plätze</label><input id="tkSeats" type="number" min="1" max="500" value="10"></div>
+          <div><label for="tkCost">Preis (Kanalpunkte)</label><input id="tkCost" type="number" min="1" max="1000000" value="1000"></div>
+          <div><label for="tkStatus">Status</label><select id="tkStatus"><option value="planned">geplant</option><option value="open">Verkauf offen</option><option value="closed">Verkauf geschlossen</option><option value="ended">beendet</option></select></div>
+        </div>
+        <label class="check big"><input id="tkWeek" type="checkbox"> Ein Ticket pro Woche (verhindert, dass dieselben Leute mehrere Abende einer Woche belegen)</label>
+        <div class="row"><button id="ticketAdd">Event anlegen</button></div>
+        <p class="muted">Die Stadtwache legt den Kanalpunkte-Reward „Ticket: Name“ selbst in Twitch an und verwaltet ihn: Er ist nur bei „Verkauf offen“ eingeschaltet und wird pausiert, sobald alle Plätze und die Warteliste voll sind. Plätze und Preis sind nur Vorschläge, ändere sie nach Bedarf. Wer auf der Warteliste steht, hat seine Einlösung noch offen in der Twitch-Queue: Beim Nachrücken wird sie erfüllt, beim Ende des Events ohne Platz storniert (Punkte zurück). Ein Ticket-Reward hat nichts mit dem Gewinnspiel zu tun.</p>
+      </section>
+      <div data-schema="tickets" style="display:grid; gap:22px;"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="overlays">

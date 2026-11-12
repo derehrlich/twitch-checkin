@@ -200,5 +200,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const health = () => healthTick().then((r) => { if (r?.length) console.log('Störungs-Meldung gesendet'); }).catch((e) => console.error('Störungs-Prüfung:', e.message));
   setTimeout(health, 2 * 60_000).unref();
   setInterval(health, 5 * 60_000).unref();
+  // Tickets: abgelaufene Nachrück-Fristen jede Minute prüfen (nur aktiv, wenn das Ticket-System eingeschaltet ist)
+  const { sweepOffers } = await import('./netlify/lib/belohnungen/tickets.mjs');
+  const { getSettings } = await import('./netlify/lib/kern/settings.mjs');
+  setInterval(() => getSettings().then((st) => (st.ticketsEnabled ? sweepOffers(st) : null)).catch((e) => console.error('Ticket-Fristen:', e.message)), 60_000).unref();
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
 }
