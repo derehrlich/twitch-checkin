@@ -228,6 +228,21 @@ export const SCHEMA = {
     ] },
   ],
 
+  gewinn: [
+    { title: 'Geburtstags-Ziehung: Ticket und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du darüber in der Karte „Geburtstags-Ziehung“. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
+      c('gwEnabled', false, 'Geburtstags-Ziehung einschalten (legt den Reward an und zählt die Wochenpunkte, braucht den Chat-Webhook)'),
+      t('gwRewardTitle', 'Geburtstags-Ticket', 'Reward-Name', { maxlength: 45 }), n('gwRewardCost', 500, 'Preis des Tickets (Kanalpunkte, günstig halten)', { min: 1, max: 1000000 }),
+      n('gwRevealSeconds', 8, 'Sekunden je Platz bei der Aufdeckung (Overlay, Chat und Link im Takt, 0 = alles sofort)', { min: 0, max: 60 }),
+      a('gwTicketTemplate', '🎟️ {user}, dein Geburtstags-Ticket ist drin! Du hast aktuell {lots} Los(e). Bonuslose gibt es für Aktivität bis zur Ziehung.', 'Ticket erhalten', { user: 'Max', lots: 3 }),
+      a('gwDuplicateTemplate', '{user}, du hast dein Geburtstags-Ticket schon ✅ Pro Person gibt es eins. Deine Punkte bekommst du zurück.', 'Zweites Ticket (Punkte werden erstattet)', { user: 'Max' }),
+      a('gwClosedTemplate', '{user}, das Geburtstags-Ticket gibt es gerade nicht. Deine Punkte bekommst du zurück.', 'Ticket-Fenster ist zu (Punkte werden erstattet)', { user: 'Max' }),
+      a('gwBlockedTemplate', '{user}, du kannst beim Gewinnspiel leider nicht mitmachen. Deine Punkte bekommst du zurück.', 'Gesperrte Person (Punkte werden erstattet)', { user: 'Max' }),
+      a('gwWinnerTemplate', '🎉 Platz {place}: {user} gewinnt {prize}! Du bekommst gleich eine Flüsternachricht mit deinem persönlichen Link, du hast {hours} Stunden Zeit.', 'Gewinner-Ansage im Chat', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24 }),
+      a('gwRedrawTemplate', '🔁 Nachgezogen: {user} gewinnt {prize} (Platz {place}). {old} hat sich nicht gemeldet. Persönlicher Link per Flüstern, {hours} Stunden Zeit.', 'Nachgezogen', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24, old: 'Anna' }),
+      a('gwWhisperTemplate', 'Glückwunsch {user}! Du hast {prize} gewonnen 🎉 Dein persönlicher Link (nur für dich, {hours} Stunden gültig, bitte nicht weitergeben): {url}', 'Flüsternachricht mit dem Link', { user: 'Max', prize: 'Enshrouded', hours: 24, url: 'https://…' }),
+    ] },
+  ],
+
   tickets: [
     { title: 'Ticket-System', hint: `Die Events (Name, Datum, Plätze, Preis) legst du unten in der Eventliste an. Hier stehen nur Schalter, Chat-Befehle und Texte. Ausgeschaltet nimmt das Ticket-System keine Einlösungen an (die Punkte gehen zurück). Platzhalter in den Texten: ${code('user')} Name, ${code('event')} Eventname, ${code('seat')} Platznummer, ${code('max')} Plätze insgesamt, ${code('free')} freie Plätze, ${code('pos')} Wartelisten-Position, ${code('minutes')} Frist zum Melden.`, items: [
       c('ticketsEnabled', false, 'Ticket-System einschalten'),
@@ -285,4 +300,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'gradientEnabled', 'gradientRewardTitle', 'gradientRewardCost', 'gradientDays', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'gradientEnabled', 'gradientRewardTitle', 'gradientRewardCost', 'gradientDays', 'gwEnabled', 'gwRewardTitle', 'gwRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];

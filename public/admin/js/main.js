@@ -17,8 +17,9 @@ import { initSport, loadSport } from './sport.js';
 import { initModeration, loadModeration } from './moderation.js';
 import { initHealth, loadHealth } from './health.js';
 import { initTickets, loadTickets } from './tickets.js';
+import { initGewinn, loadGewinn } from './gewinn.js';
 
-const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'tickets', 'overlays', 'medien', 'system'];
+const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'tickets', 'gewinn', 'overlays', 'medien', 'system'];
 // Alte Adressen (#abspann, #besucher …) führen weiter an die richtige Stelle
 const OLD_TABS = { checkin: 'zuschauer', besucher: 'zuschauer', alerts: 'ereignisse', raids: 'ereignisse', abspann: 'chat', commands: 'chat', alpakas: 'belohnungen', soundboard: 'belohnungen', einlaufsound: 'belohnungen', community: 'belohnungen', sport: 'overlays', tests: 'system', allgemein: 'system' };
 
@@ -38,7 +39,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadUpdate(), loadAutoBackup()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadGewinn(), loadUpdate(), loadAutoBackup()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -48,7 +49,7 @@ async function init() {
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
-initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initGewinn();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 

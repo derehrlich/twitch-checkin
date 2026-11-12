@@ -19,6 +19,7 @@ let discordFails = false; // simulierter Discord-Webhook antwortet mit einem Feh
 let modFails = false; // simulierter Twitch lehnt das Löschen ab (Berechtigung fehlt)
 let deletedRewards = 0; // damit neue Reward-IDs nie mit gelöschten kollidieren
 let clipsFail = false, channelsFail = false;
+let whisperFails = false; // simuliertes Twitch lehnt Flüsternachrichten ab
 let clips = [
   { id: 'LangClip', title: 'zu lang', duration: 55, creator_name: 'x' },
   { id: 'GutClip', title: 'Krasser Moment', duration: 14.2, creator_name: 'Fan' },
@@ -43,6 +44,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
   }
+  if (u.pathname.endsWith('/whispers')) return whisperFails ? ok({ error: 'Forbidden', message: 'not allowed' }, 403) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/moderation/chat')) return modFails ? ok({ error: 'Forbidden' }, 403) : new Response(null, { status: 204 });
   if (u.pathname.endsWith('/moderation/bans')) return ok({ data: [{}] });
   if (u.pathname.endsWith('/chat/shoutouts')) return shoutoutFails ? ok({ error: 'cooldown' }, 429) : new Response(null, { status: 204 });
@@ -166,7 +168,7 @@ await test('Setup legt beide Rewards an und abonniert je einen Webhook mit rewar
 
 await test('Admin-Status warnt bei fehlender Shoutout-Berechtigung', async () => {
   assert.ok((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes.includes('moderator:manage:shoutouts'), 'Tokens ohne scopes');
-  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users'] });
+  await db.set('config/tokens', { ...(await db.get('config/tokens')), scopes: ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users', 'user:manage:whispers'] });
   assert.deepEqual((await (await admin(adminReq('GET', 'state', null, cookie))).json()).missingScopes, []);
 });
 
@@ -2752,6 +2754,193 @@ await test('Tickets: ausgeschaltet nimmt nichts an (Punkte zurück)', async () =
   await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, event: { id: 'off1', user_id: 'o1', user_name: 'Olli', user_input: '', reward: { id: ev.rewardId, title: 'x' } } }, { id: 'moff1' }));
   assert.deepEqual(calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === 'off1').map((c) => c.body.status), ['CANCELED']);
   assert.equal((await T('GET', `tickets/${ev.id}`)).entries.length, 0);
+});
+
+
+// ---- Geburtstags-Gewinnspiel
+await test('Gewinnspiel: Ticket, Wochenpunkte, Lose-Deckel, Sperrliste, Ziehung, Links, Nachziehen, Adresse', async () => {
+  const gw = await import('../netlify/lib/belohnungen/gewinn.mjs');
+  const gewinnFn = await import('../netlify/functions/gewinn.mjs');
+  const community = (await import('../netlify/functions/community.mjs')).default;
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const pub = (p, init = {}) => gewinnFn.default(new Request(BASE + p, { headers: { 'x-forwarded-for': init.ip ?? '1.2.3.4', ...(init.body ? { 'content-type': 'application/json' } : {}) }, ...init, body: init.body ? JSON.stringify(init.body) : undefined }));
+  const sent = () => calls.filter((c) => c.path.endsWith('/whispers'));
+  const status = (id) => calls.filter((c) => c.method === 'PATCH' && c.query.id === id).map((c) => c.body.status).at(-1);
+
+  // Ohne Login ist nichts erreichbar; einschalten, Rewards abgleichen
+  assert.equal((await admin(adminReq('GET', 'gewinn'))).status, 401);
+  assert.equal((await admin(adminReq('POST', 'gewinn/draw', { confirm: true }))).status, 401);
+  await admin(adminReq('PUT', 'settings', { gwEnabled: true, gwRevealSeconds: 0, chatEnabled: true }, cookie));
+  const setup = await (await api('POST', 'setup', {})).json();
+  assert.equal(setup.gewinn, 'Geburtstags-Ticket');
+  const state = await db.get('config/state');
+  assert.ok(state.gwRewardId && subs.some((x) => x.condition.reward_id === state.gwRewardId), 'Reward und Webhook');
+
+  // Ziehung anlegen: Zeiten liegen in der Vergangenheit, drei Preise
+  let v = await (await api('POST', 'gewinn/new', {})).json();
+  assert.equal(v.draw.prizes.length, 3);
+  assert.equal(v.window, 'vorher', 'Standard: Fenster öffnet erst am 30.11.');
+  const keyPrize = v.draw.prizes[0];
+  v = await (await api('PUT', 'gewinn/config', { pointsFrom: '2020-01-01T00:00', ticketOpen: '2020-01-01T00:00', prizes: [{ ...keyPrize, key: 'ABCD-1234' }, ...v.draw.prizes.slice(1)] }, )).json();
+  assert.equal(v.window, 'offen');
+  assert.equal(v.draw.pointsFrom, '2020-01-01T00:00', 'Zeiten in der Zeitzone des Kanals');
+  const id = v.draw.id;
+  const redeem = (rid, uid, name) => webhook(signed('notification', redemption(rid, uid, name, state.gwRewardId)));
+  const lastChat = () => chats().at(-1);
+
+  // Wochenpunkte: Check-in (mit Streak-Bonus) und Chat mit Mindestabstand
+  await webhook(signed('notification', redemption('gwc1', '102', 'Bob')));
+  assert.equal((await db.get(`gw/${id}/pts/102`)).points, 50 + 10, 'Check-in 50 + Streak 1 x 10');
+  const settings = await getSettings();
+  const t0 = Date.now();
+  assert.deepEqual([await gw.countChat('102', 'Bob', settings, t0), await gw.countChat('102', 'Bob', settings, t0 + 5000), await gw.countChat('102', 'Bob', settings, t0 + 30_000)], [true, false, true], 'Abstand 20 s');
+  assert.equal((await db.get(`gw/${id}/pts/102`)).points, 64);
+  await db.set(`gw/${id}/pts/103`, { name: 'Cara', checkinDays: [], streakPts: 0, chatCount: 0, chatDay: null, dayMsgs: 0, lastAt: 0, points: 5000 });
+  await db.set(`gw/${id}/pts/104`, { name: 'Dan', checkinDays: [], streakPts: 0, chatCount: 0, chatDay: null, dayMsgs: 0, lastAt: 0, points: 250 });
+  assert.deepEqual([0, 99, 100, 250, 5000].map((p) => gw.lotsFor({ perPoints: 100, maxLots: 10 }, p)), [1, 1, 2, 3, 10], 'Deckel bei 10');
+
+  // Ticket: eins pro Person, auch bei gleichzeitigen Einlösungen; Sperrliste; Fenster zu
+  await redeem('gt101', '101', 'Alice');
+  assert.equal(status('gt101'), 'FULFILLED'); assert.match(lastChat(), /Alice, dein Geburtstags-Ticket/);
+  await redeem('gt101b', '101', 'Alice');
+  assert.equal(status('gt101b'), 'CANCELED', 'zweites Ticket wird erstattet'); assert.match(lastChat(), /schon/);
+  await redeem('gt101', '101', 'Alice'); // dieselbe Zustellung nochmal (EventSub wiederholt)
+  assert.equal((await db.list(`gw/${id}/ticket/`)).length, 1);
+  await Promise.all([redeem('gt106a', '106', 'Fred'), redeem('gt106b', '106', 'Fred')]);
+  assert.equal((await db.list(`gw/${id}/ticket/`)).length, 2, 'gleichzeitig: nur ein Ticket');
+  assert.deepEqual([status('gt106a'), status('gt106b')].sort(), ['CANCELED', 'FULFILLED']);
+  v = await (await api('POST', 'gewinn/block', { name: 'Eve' })).json();
+  await redeem('gt105', '105', 'Eve'); assert.equal(status('gt105'), 'CANCELED'); assert.match(lastChat(), /leider nicht mitmachen/);
+  for (const [rid, uid, name] of [['gt102', '102', 'Bob'], ['gt103', '103', 'Cara'], ['gt104', '104', 'Dan']]) await redeem(rid, uid, name);
+  assert.equal((await db.get(`gw/${id}/ticket/102`)).points, 64, 'Punktestand beim Einlösen wird protokolliert');
+  v = await (await api('GET', 'gewinn')).json();
+  assert.deepEqual(v.tickets.map((t) => [t.name, t.lots]), [['Alice', 1], ['Fred', 1], ['Bob', 1], ['Cara', 10], ['Dan', 3]]);
+  assert.equal(v.stats.totalLots, 16); assert.equal(v.stats.participants, 5);
+  await api('POST', 'gewinn/window', { action: 'close' }); await redeem('gt107', '107', 'Zu'); assert.equal(status('gt107'), 'CANCELED', 'Fenster zu');
+  await api('POST', 'gewinn/window', { action: 'open' });
+
+  // Gewichtete Ziehung: mit Seed nachvollziehbar, Gewichtung wirkt, ohne Zurücklegen
+  const entries = [{ id: 'a', name: 'A', lots: 1 }, { id: 'b', name: 'B', lots: 9 }];
+  assert.deepEqual(gw.weightedDraw(entries, 2, 'x').winners, gw.weightedDraw([...entries].reverse(), 2, 'x').winners, 'Reihenfolge der Eingabe egal');
+  let bFirst = 0; for (let i = 0; i < 600; i++) { const r = gw.weightedDraw(entries, 2, 's' + i).winners; if (r[0].id === 'b') bFirst++; assert.notEqual(r[0].id, r[1].id); }
+  assert.ok(bFirst > 480 && bFirst < 590, `Gewichtung 9:1, B vorn in ${bFirst}/600`);
+  const t1 = await (await api('POST', 'gewinn/test-draw', { seed: 'probe' })).json();
+  assert.deepEqual((await (await api('POST', 'gewinn/test-draw', { seed: 'probe' })).json()).winners, t1.winners, 'fester Seed, gleiches Ergebnis');
+  assert.equal((await db.list(`gw/${id}/w/`)).length, 0, 'Test-Ziehung speichert nichts');
+
+  // Echte Ziehung: Bestätigung nötig, einmalig, Protokoll, Chat und Links
+  assert.equal((await api('POST', 'gewinn/draw', { seed: 'fest' })).status, 400);
+  const chatsBefore = chats().length;
+  v = await (await api('POST', 'gewinn/draw', { confirm: true, seed: 'fest' })).json();
+  assert.equal((await api('POST', 'gewinn/draw', { confirm: true })).status, 409, 'nur einmal');
+  const result = await db.get(`gw/${id}/result`);
+  const expect = gw.weightedDraw(result.entries, 3, 'fest').winners.map((w) => w.id);
+  assert.deepEqual(result.winners.map((w) => w.twitchId), expect);
+  assert.ok(!result.entries.some((e) => e.id === '105'), 'Gesperrte zählen nicht'); assert.equal(result.participants, 5);
+  assert.deepEqual(result.excluded, []); assert.match(result.hash, /^[0-9a-f]{64}$/); assert.equal(result.seed, 'fest');
+  assert.equal(chats().slice(chatsBefore).filter((m) => /gewinnt/.test(m)).length, 3);
+  assert.ok(chats().slice(chatsBefore)[0].startsWith('🎉 Platz 3'), 'vom letzten zum ersten Platz');
+  assert.ok(!chats().slice(chatsBefore).join().includes('/gewinn/'), 'Link nie im öffentlichen Chat');
+  assert.equal(sent().length, 3);
+  assert.ok(sent().every((c) => /\/gewinn\/[A-Za-z0-9_-]{43}/.test(c.body.message)));
+  assert.equal((await redeem('gt108', '108', 'Spät')).status, 204); assert.equal(status('gt108'), 'CANCELED', 'nach der Ziehung keine Tickets mehr');
+  const proto = await (await api('GET', 'gewinn/protocol')).json();
+  assert.equal(proto.result.log.length, 3);
+  assert.equal((await api('PUT', 'gewinn/config', { perPoints: 1 })).status, 200);
+  assert.equal((await db.get(`gw/${id}/../draw/${id}`) ?? await db.get(`gw/draw/${id}`)).perPoints, 100, 'Gewichtung nach der Ziehung gesperrt');
+
+  // Öffentliche Overlay-Daten: nur Gewinner, keine Teilnehmerliste
+  const ov = await (await pub('/gewinn/api/overlay')).json();
+  assert.equal(ov.active, true); assert.equal(ov.winners.length, 3); assert.ok(!JSON.stringify(ov).includes('entries'));
+  assert.equal((await pub('/gewinn/overlay')).status, 200);
+
+  // Gewinner-Links
+  const winners = (await db.list(`gw/${id}/w/`)).length && (await gw.winnersOf(id));
+  const keyW = winners.find((w) => w.kind === 'key'), items = winners.filter((w) => w.kind === 'item');
+  assert.ok(winners.every((w) => w.status === 'link_verschickt' && w.sentVia === 'whisper'));
+  assert.equal((await pub('/gewinn/' + 'x'.repeat(43))).status, 404, 'falscher Code');
+  assert.equal((await pub(`/gewinn/${keyW.code}`)).status, 200);
+  const info = await (await pub(`/gewinn/api/${keyW.code}`)).json();
+  assert.deepEqual([info.state, info.kind], ['confirm', 'key']);
+  assert.equal((await pub(`/gewinn/api/${keyW.code}/confirm`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' })).status, 415);
+  const got = await (await pub(`/gewinn/api/${keyW.code}/confirm`, { method: 'POST', body: {} })).json();
+  assert.equal(got.key, 'ABCD-1234');
+  assert.equal((await pub(`/gewinn/api/${keyW.code}/confirm`, { method: 'POST', body: {} })).status, 410, 'nicht erneut nutzbar');
+  assert.equal((await (await pub(`/gewinn/api/${keyW.code}`)).json()).state, 'done');
+  assert.equal((await gw.getWinner(id, keyW.id)).status, 'abgeschlossen');
+  // Sachpreis: melden, dann Adresse (Zustimmung, Land, Pflichtfelder), danach verbraucht
+  const it = items[0];
+  assert.equal((await (await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: {} })).status), 410, 'Adresse erst nach der Meldung');
+  assert.equal((await (await pub(`/gewinn/api/${it.code}/confirm`, { method: 'POST', body: {} })).json()).kind, 'item');
+  const addr = { name: 'Max Muster', street: 'Hauptstr. 1', zip: '12345', city: 'Berlin', country: 'DE', email: '', consent: true };
+  assert.equal((await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: { ...addr, consent: false } })).status, 400);
+  assert.equal((await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: { ...addr, country: 'AT' } })).status, 400, 'nur Deutschland');
+  assert.equal((await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: { ...addr, street: '' } })).status, 400);
+  assert.equal((await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: addr })).status, 200);
+  assert.equal((await pub(`/gewinn/api/${it.code}/address`, { method: 'POST', body: addr })).status, 410, 'nur einmal');
+  const raw = fs.readFileSync(path.join(process.env.LOCAL_STORE_DIR, 'checkin', encodeURIComponent(`gwaddr/${it.id}`)), 'utf8');
+  assert.ok(!raw.includes('Hauptstr') && !raw.includes('Muster'), 'Adresse liegt verschlüsselt');
+  assert.equal((await (await api('GET', `gewinn/winner/${it.id}/address`)).json()).address.city, 'Berlin');
+  assert.equal((await admin(adminReq('GET', `gewinn/winner/${it.id}/address`))).status, 401);
+  const bk = await (await api('GET', 'backup')).text();
+  assert.ok(bk.includes('gw/draw/') && !bk.includes('gwaddr/') && !bk.includes('Hauptstr'), 'Sicherung enthält die Ziehung, aber keine Adressen');
+
+  // Nicht gemeldet nach 24 Stunden: automatisch nachziehen, neuer Link, alter ungültig
+  const late = (await gw.winnersOf(id)).find((w) => w.id === items[1].id);
+  const oldCode = late.code, wBefore = sent().length;
+  assert.deepEqual(await gw.gewinnTick(await getSettings(), Date.parse(late.deadline) - 1000), { redrawn: 0, deleted: 0 });
+  assert.equal((await (await pub(`/gewinn/api/${oldCode}`)).json()).state, 'confirm');
+  const r = await gw.gewinnTick(await getSettings(), Date.parse(late.deadline) + 1000);
+  assert.equal(r.redrawn, 1);
+  assert.equal((await gw.getWinner(id, late.id)).status, 'verfallen');
+  assert.equal((await pub(`/gewinn/api/${oldCode}`)).status, 404, 'alter Link tot');
+  const all = await gw.winnersOf(id);
+  const fresh = all.find((w) => w.place === late.place && w.status === 'link_verschickt');
+  assert.ok(fresh && fresh.twitchId !== late.twitchId && !winners.some((w) => w.twitchId === fresh.twitchId) , 'neuer Gewinner, kein bisheriger');
+  assert.equal(sent().length, wBefore + 1); assert.match(chats().at(-1), /Nachgezogen/);
+  assert.equal((await db.list(`gw/${id}/redraw/`)).length, 1, 'Nachziehen im Protokoll');
+  // Abgelaufener Link (Frist vorbei, noch nicht nachgezogen)
+  fresh.deadline = new Date(Date.now() - 1000).toISOString(); await gw.saveWinner(fresh);
+  assert.equal((await (await pub(`/gewinn/api/${fresh.code}`)).json()).state, 'expired');
+  assert.equal((await pub(`/gewinn/api/${fresh.code}/confirm`, { method: 'POST', body: {} })).status, 410);
+
+  fresh.deadline = new Date(Date.now() + 60 * 86_400_000).toISOString(); await gw.saveWinner(fresh); // für die Zeitsprünge unten
+
+  // Manuell: als versendet markieren, Adresse wird nach der Aufbewahrung gelöscht
+  assert.equal((await api('POST', `gewinn/winner/${it.id}/shipped`, {})).status, 200);
+  const shipped = await gw.getWinner(id, it.id); assert.equal(shipped.status, 'versendet');
+  assert.equal((await gw.gewinnTick(await getSettings(), Date.now() + 29 * 86_400_000)).deleted, 0);
+  assert.equal((await gw.gewinnTick(await getSettings(), Date.now() + 31 * 86_400_000)).deleted, 1);
+  assert.equal(await gw.readAddress(it.id), null); assert.equal((await gw.getWinner(id, it.id)).status, 'abgeschlossen');
+
+  // Flüstern geht nicht: verknüpftes Konto bekommt eine Discord-DM, sonst bleibt es bei „von Hand“
+  whisperFails = true;
+  const target = (await gw.winnersOf(id)).find((w) => w.status === 'link_verschickt' && w.kind === 'item');
+  assert.ok(target);
+  await db.set('link/twitch/' + target.twitchId, { discordId: '123456789012345678', discordName: 'x', twitchId: target.twitchId, twitchName: target.name });
+  assert.equal((await api('POST', `gewinn/winner/${target.id}/link`, {})).status, 200);
+  const re = await gw.getWinner(id, target.id);
+  assert.equal(re.dmQueued, true); assert.equal(re.status, 'gezogen');
+  process.env.LINK_SECRET ||= 'geheim-link';
+  const cReq = (m, p, b) => community(new Request(BASE + '/api/community/' + p, { method: m, headers: { authorization: 'Bearer ' + process.env.LINK_SECRET }, body: b ? JSON.stringify(b) : undefined }));
+  const dms = (await (await cReq('GET', 'gewinn/dm')).json()).dms;
+  assert.equal(dms.length, 1); assert.match(dms[0].message, /\/gewinn\//);
+  assert.equal((await community(new Request(BASE + '/api/community/gewinn/dm'))).status, 401);
+  assert.equal((await (await cReq('POST', 'gewinn/dm/ack', { winnerId: dms[0].winnerId })).json()).ok, true);
+  assert.equal((await gw.getWinner(id, target.id)).status, 'link_verschickt');
+  whisperFails = false;
+
+  // Missbrauchsabwehr: viele falsche Codes von einer Adresse werden gebremst
+  gewinnFn.resetLimits();
+  const codes = []; for (let i = 0; i < 12; i++) codes.push((await pub(`/gewinn/api/${'y'.repeat(42)}${i % 10}`, { ip: '9.9.9.9' })).status);
+  assert.deepEqual(codes.slice(0, 10), Array(10).fill(404)); assert.equal(codes[11], 429);
+  assert.equal((await pub('/gewinn/api/overlay', { ip: '8.8.8.8' })).status, 200, 'andere Adresse unbetroffen');
+  gewinnFn.resetLimits();
+  // Bedingungen erst nach Veröffentlichung sichtbar
+  assert.equal((await pub('/gewinn/bedingungen')).status, 404);
+  await api('PUT', 'gewinn/config', { termsPublished: true });
+  assert.match(await (await pub('/gewinn/bedingungen')).text(), /Twitch ist weder Veranstalter noch Sponsor/);
+  await admin(adminReq('PUT', 'settings', { gwEnabled: false }, cookie));
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

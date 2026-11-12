@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark light">
+<title>Dein Gewinn – EhrlichVerwirrt</title>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<style>
+  main { max-width: 620px; margin: 0 auto; padding: 28px 20px 56px; display: grid; gap: 18px; }
+  section.card { padding: 22px 26px 26px; }
+  .hidden { display: none !important; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .ok { color: var(--gruen); font-weight: 700; } .bad { color: var(--rot); font-weight: 700; }
+  .key { font: 700 20px/1.3 ui-monospace, Menlo, monospace; padding: 14px; border-radius: 10px; background: var(--feld, #0003); word-break: break-all; user-select: all; }
+  .grid { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; } .grid .full { grid-column: 1 / -1; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } main { padding: 18px 14px 40px; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="brand"><div><small>EhrlichVerwirrt</small><h1>Dein Gewinn 🎁</h1></div></div></header>
+<main>
+  <section class="card" id="box"><p>Einen Moment …</p></section>
+  <p class="muted"><a href="/gewinn/bedingungen">Teilnahmebedingungen</a></p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const code = location.pathname.split('/').filter(Boolean)[1] || '';
+const base = '/gewinn/api/' + encodeURIComponent(code);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const when = (iso) => new Date(iso).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+const post = async (p, body) => { const r = await fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Fehler'); return d; };
+let view = null;
+
+function render(extra = '') {
+  const box = $('box');
+  if (!view) { box.innerHTML = '<h2>Link ungültig</h2><p>Diesen Link gibt es nicht (mehr).</p>'; return; }
+  const head = `<h2>Glückwunsch, ${esc(view.name)}!</h2><p>Du hast <b>${esc(view.prize)}</b> gewonnen. 🎉</p>`;
+  if (view.state === 'expired') box.innerHTML = head + '<p class="bad">Dieser Link ist abgelaufen. Der Preis wurde weitergegeben.</p>';
+  else if (view.state === 'done') box.innerHTML = head + `<p class="ok">Bereits gemeldet ✓</p>${extra}<p class="muted">Dieser Link kann nicht noch einmal genutzt werden.</p>`;
+  else if (view.state === 'confirm') box.innerHTML = head + `<p>Bitte melde dich bis <b>${esc(when(view.deadline))}</b>, sonst wird nachgezogen.</p>${view.kind === 'item' ? '<p class="muted">Danach fragen wir kurz nach deiner Adresse für den Versand.</p>' : ''}<div class="row"><button id="go">Ja, ich melde mich!</button></div><p id="msg" class="bad" role="alert"></p>`;
+  else if (view.state === 'address') box.innerHTML = head + `<p class="ok">Gemeldet ✓</p><p>Wohin dürfen wir es schicken? Bitte bis <b>${esc(when(view.deadline))}</b> ausfüllen.</p>
+    <form id="f" class="grid" autocomplete="on">
+      <div class="full"><label for="name">Name</label><input id="name" maxlength="80" required autocomplete="name"></div>
+      <div class="full"><label for="street">Straße und Hausnummer</label><input id="street" maxlength="100" required autocomplete="street-address"></div>
+      <div><label for="zip">PLZ</label><input id="zip" maxlength="12" required autocomplete="postal-code"></div>
+      <div><label for="city">Ort</label><input id="city" maxlength="60" required autocomplete="address-level2"></div>
+      <div class="full"><label for="country">Land</label><select id="country">${view.countries.map((c) => `<option value="${esc(c.code)}">${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="full"><label for="email">E-Mail für Rückfragen (freiwillig)</label><input id="email" type="email" maxlength="120" autocomplete="email"></div>
+      <label class="full"><input id="consent" type="checkbox"> Ich willige ein, dass meine Adresse nur für den Versand dieses Preises gespeichert wird. Sie wird danach automatisch gelöscht und an niemanden weitergegeben (außer den Versanddienstleister).</label>
+      <div class="full row"><button type="submit">Adresse senden</button></div>
+    </form><p id="msg" class="bad" role="alert"></p>`;
+  $('go')?.addEventListener('click', async () => {
+    $('go').disabled = true;
+    try {
+      const r = await post('/confirm');
+      if (r.kind === 'key') { view = { ...view, state: 'done' }; render(r.key ? `<p>Dein Key:</p><div class="key">${esc(r.key)}</div><p class="muted">Bitte jetzt kopieren und sicher aufbewahren. Du bekommst ihn zusätzlich per Flüstern, falls es klappt.</p>` : '<p>Danke! Den Key schickt dir Marcel persönlich.</p>'); }
+      else { view = { ...view, state: 'address', deadline: r.addressUntil }; render(); }
+    } catch (e) { $('go').disabled = false; $('msg').textContent = e.message; }
+  });
+  $('f')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await post('/address', { name: $('name').value, street: $('street').value, zip: $('zip').value, city: $('city').value, country: $('country').value, email: $('email').value, consent: $('consent').checked });
+      view = { ...view, state: 'done' }; render('<p>Danke, deine Adresse ist angekommen. Dein Preis geht bald raus. 📦</p>');
+    } catch (err) { $('msg').textContent = err.message; }
+  });
+}
+fetch(base).then((r) => (r.ok ? r.json() : null)).then((v) => { view = v; render(); }).catch(() => { view = null; render(); });
+</script>
+</body>
+</html>

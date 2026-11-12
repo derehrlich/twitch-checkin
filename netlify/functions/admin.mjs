@@ -16,6 +16,7 @@ import { backup } from '../lib/admin/backup.mjs';
 import { sport } from '../lib/admin/sport.mjs';
 import { update } from '../lib/admin/update.mjs';
 import { moderation } from '../lib/admin/moderation.mjs';
+import { gewinn } from '../lib/admin/gewinn.mjs';
 import { health } from '../lib/admin/gesundheit.mjs';
 import { tickets } from '../lib/admin/tickets.mjs';
 
@@ -42,6 +43,7 @@ const ROUTES = {
   update,
   moderation,
   health,
+  gewinn,
   tickets,
 };
 

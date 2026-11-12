@@ -3,6 +3,7 @@ import { sendChat, setRedemptionStatus } from '../kern/twitch.mjs';
 import { activeSoundFor } from '../belohnungen/entrysound.mjs';
 import { linkTip } from '../belohnungen/community.mjs';
 import { awardTip } from '../belohnungen/award.mjs';
+import { countCheckin as countGewinnCheckin } from '../belohnungen/gewinn.mjs';
 import { findRescue, getStreamDays, parseLevels, streakFor } from './streak.mjs';
 
 const pad = (n) => String(n).padStart(15, '0');
@@ -68,6 +69,7 @@ export async function handleRedemption(redemption, settings) {
     const entrySound = await activeSoundFor(user_id, settings).catch((e) => { console.warn('Einlaufsound nicht geladen:', e.message); return null; });
     await pushOverlay({ type: 'checkin', user: user_name, count: result.count, streak: streak.current, milestone, ...(entrySound ? { entrySound } : {}) });
     if (settings.chatEnabled) await sendChat(fill(milestone ? settings.milestoneTemplate : settings.chatTemplate, vars)).catch((e) => console.warn('Chat fehlgeschlagen:', e.message));
+    if (settings.gwEnabled) await countGewinnCheckin(user_id, user_name, streak.current, settings).catch((e) => console.warn('Wochenpunkte fehlgeschlagen:', e.message));
     await setRedemptionStatus(id, reward.id, 'FULFILLED');
     if (settings.chatEnabled) { // Tipp zur Verknüpfung, einmal im Monat und nur für Unverknüpfte
       const tip = await linkTip(user_id, user_name, settings).catch(() => null);
