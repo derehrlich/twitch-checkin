@@ -38,7 +38,7 @@ netlify/lib/         Logik, ein Ordner je Admin-Reiter:
   medien/              images, sounds
   system/              autobackup, gesundheit (Störungs-Meldungen an Discord)
 netlify/lib/admin/   Admin-Routen je Reiter
-public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html), Alpaka-Leiste (alpakas.html), waagerechter Chat (chat.html, Daten aus `netlify/lib/chatlog.mjs`, Schlüssel `chatlog`)
+public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html), Alpaka-Leiste (alpakas.html), waagerechter Chat (chat.html, Daten aus `netlify/lib/chat/chatlog.mjs`, Schlüssel `chatlog`; der Stil einer Person gilt beim Abruf auch für schon sichtbare Nachrichten)
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
 - Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/kern/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Neuer fester Chat-Befehl = nur eine Zeile in `BEFEHLE` (`netlify/lib/chat/befehle.mjs`). Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
