@@ -3044,17 +3044,21 @@ await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gew
   // !geburtstag: aus, solange nicht eingeschaltet; dann Restzeit und Plan; nach dem Ziel der andere Text
   await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, bdayEnabled: false });
   assert.deepEqual(await chatMsg('!geburtstag', 'g1', 'Gast'), []);
-  (await import('../netlify/lib/chat/befehle.mjs')).SENDE_PAUSE.ms = 0;
-  // Standard: Satz mit der Restzeit zuerst (ohne Plan), dann jeder Planeintrag als eigene Nachricht, in dieser Reihenfolge
-  await api('PUT', 'settings', { bdayEnabled: true, bdayPlan: 'Mo 19:00 Slides\nDi 20:30 Bauabend' });
+  // Der Chat bekommt nur Restzeit und Link (er kennt keine Zeilenumbrüche), der Plan steht auf der öffentlichen Seite /woche
+  const wocheFn = (await import('../netlify/functions/woche.mjs')).default;
+  const plan = 'Mo 23.11. 19:00 Slides\nDi 24.11. ab 20:30 Bauabend\nSa 28.11. Mitternachtsstream\nIrgendein freier Text';
+  assert.deepEqual(await (await wocheFn(new Request(BASE + '/api/woche'))).json(), { enabled: false }, 'Seite ist aus, solange der Befehl aus ist');
+  await api('PUT', 'settings', { bdayEnabled: true, bdayPlan: plan });
   const msgs = await chatMsg('!geburtstag', 'g2', 'Gast');
-  assert.equal(msgs.length, 3); assert.match(msgs[0], /^🎂 Noch .* bis Marcels Geburtstag! Das Programm:$/);
-  assert.deepEqual(msgs.slice(1), ['Mo 19:00 Slides', 'Di 20:30 Bauabend']);
-  // Ohne den Haken: alles in einer Nachricht, mit · verbunden
-  await api('PUT', 'settings', { bdayEachLine: false });
-  const [one] = await chatMsg('!geburtstag', 'g4', 'Gast');
-  assert.match(one, /Noch .* bis Marcels Geburtstag.*Mo 19:00 Slides · Di 20:30 Bauabend/);
-  await api('PUT', 'settings', { bdayEachLine: true });
+  assert.equal(msgs.length, 1); assert.match(msgs[0], /^🎂 Noch .* bis Marcels Geburtstag! Das ganze Programm der Woche: .*\/woche$/);
+  assert.ok(!msgs[0].includes('Slides'), 'Plan steht nicht im Chat');
+  const wv = await (await wocheFn(new Request(BASE + '/api/woche'))).json();
+  assert.equal(wv.enabled, true); assert.ok(Math.abs(wv.now - Date.now()) < 5000); assert.ok(wv.target);
+  assert.deepEqual(wv.lines.map((l) => [l.day, l.date ? l.date.slice(5) : null, l.time, l.text]), [['Mo 23.11.', '11-23', '19:00', 'Slides'], ['Di 24.11.', '11-24', 'ab 20:30', 'Bauabend'], ['Sa 28.11.', '11-28', '', 'Mitternachtsstream'], ['', null, '', 'Irgendein freier Text']]);
+  assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(wv.today));
+  await api('PUT', 'settings', { bdayPlan: plan + '\n<script>alert(1)</script>' });
+  assert.equal((await (await wocheFn(new Request(BASE + '/api/woche'))).json()).lines.at(-1).text, '<script>alert(1)</script>', 'Seite setzt Text per textContent ein, die API liefert ihn unverändert');
+  await api('PUT', 'settings', { bdayPlan: plan });
   await api('PUT', 'feier/countdown', { target: '2020-01-01T00:00' });
   assert.match((await chatMsg('!geburtstag', 'g3', 'Gast'))[0], /Marcel hat Geburtstag/);
   await api('PUT', 'settings', { bdayEnabled: false });

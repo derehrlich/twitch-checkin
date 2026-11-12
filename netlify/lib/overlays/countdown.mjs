@@ -4,6 +4,7 @@
 import { db } from '../kern/store.mjs';
 import { parseLocal, toLocal } from '../belohnungen/gewinn.mjs';
 import { fill } from '../zuschauer/checkin.mjs';
+import { siteUrl } from '../kern/twitch.mjs';
 
 export const CONFIG_KEY = 'countdown/config';
 export const DEFAULT_CONFIG = { show: false, title: 'Noch bis Mitternacht', target: null, endText: 'Alles Gute zum Geburtstag! 🎂', holdMinutes: 15 };
@@ -47,21 +48,33 @@ export function fmtRemaining(ms) {
   return `${m} Min ${s % 60} Sek`;
 }
 
-/** Antwort auf den Geburtstags-Befehl: Restzeit bis zum Countdown-Ziel plus Wochenplan (eine Zeile pro Eintrag).
- *  Der Twitch-Chat kennt keine Zeilenumbrüche. Mit `bdayEachLine` kommt deshalb erst der Satz mit der Restzeit (ohne {plan}),
- *  dann jeder Planeintrag als eigene Nachricht (höchstens 12). Ohne den Haken: eine Nachricht, Einträge mit · verbunden.
- *  Gibt eine Liste von Nachrichten zurück. */
+const planLines = (settings) => String(settings.bdayPlan ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+
+/** Antwort auf den Geburtstags-Befehl: Restzeit bis zum Countdown-Ziel plus Link zur Seite /woche (der Chat kennt keine Zeilenumbrüche, der Plan steht auf der Seite). */
 export async function birthdayReply(settings, now = Date.now()) {
   const c = await getConfig();
-  const lines = String(settings.bdayPlan ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const over = c.target && now >= Date.parse(c.target);
-  const template = over ? settings.bdayDoneTemplate : settings.bdayTemplate;
-  const countdown = c.target && !over ? fmtRemaining(Date.parse(c.target) - now) : 'ein bisschen';
-  if (settings.bdayEachLine && lines.length) {
-    const head = fill(template, { countdown, plan: '' }).replace(/\s+/g, ' ').trim();
-    return [head, ...lines.slice(0, 12)];
-  }
-  return [fill(template, { countdown, plan: lines.join(' · ') || 'Der Plan kommt gleich.' })];
+  return fill(over ? settings.bdayDoneTemplate : settings.bdayTemplate, {
+    countdown: c.target && !over ? fmtRemaining(Date.parse(c.target) - now) : 'ein bisschen', url: `${siteUrl()}/woche`, plan: planLines(settings).join(' · ') || 'Der Plan kommt gleich.',
+  });
+}
+
+/** Eine Planzeile „Mo 23.11. ab 19:00 Titel“ in Tag, Datum, Uhrzeit und Text zerlegen. Was nicht passt, bleibt ganz im Text. */
+export function parsePlanLine(line, year) {
+  const m = line.match(/^(\p{L}{2})\.?\s+(\d{1,2})\.(\d{1,2})\.?\s+(.*)$/u);
+  if (!m) return { day: '', date: null, time: '', text: line };
+  const z = (n) => String(n).padStart(2, '0');
+  const t = m[4].match(/^((?:ab\s+)?\d{1,2}:\d{2})\s*(.*)$/i);
+  return { day: `${m[1]} ${m[2]}.${m[3]}.`, date: `${year}-${z(m[3])}-${z(m[2])}`, time: t ? t[1] : '', text: t ? t[2] : m[4] };
+}
+
+/** Öffentliche Wochenplan-Seite (/woche): nur sichtbar, solange der Geburtstags-Befehl eingeschaltet ist. */
+export async function weekView(settings, now = Date.now()) {
+  if (!settings.bdayEnabled) return { enabled: false };
+  const c = await getConfig();
+  const fmt = (o) => new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone, ...o });
+  const today = fmt({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
+  return { enabled: true, now, today, target: c.target ? Date.parse(c.target) : null, endText: c.endText, lines: planLines(settings).slice(0, 30).map((l) => parsePlanLine(l, today.slice(0, 4))) };
 }
 
 export async function adminView(settings, now = Date.now()) {

@@ -41,6 +41,11 @@
   status = 200
 
 [[redirects]]
+  from = "/woche"
+  to = "/woche.html"
+  status = 200
+
+[[redirects]]
   from = "/countdown"
   to = "/countdown.html"
   status = 200
