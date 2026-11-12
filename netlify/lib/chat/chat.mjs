@@ -4,6 +4,7 @@ import { fill, streamDay } from '../zuschauer/checkin.mjs';
 import { clipById, sendChat } from '../kern/twitch.mjs';
 import { countChat, recordChatter } from '../overlays/credits.mjs';
 import { countCommunityChat, linkByTwitch, secretSet } from '../belohnungen/community.mjs';
+import { countChat as countGewinnChat } from '../belohnungen/gewinn.mjs';
 import { ensureAward } from '../belohnungen/award.mjs';
 import { touchAlpaca } from '../belohnungen/alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
@@ -51,6 +52,8 @@ export async function handleChat(e, settings) {
   if (settings.alpacaEnabled && !ignore.includes(String(name).toLowerCase())) await touchAlpaca(id, name, settings).catch((err) => console.warn('Alpaka fehlgeschlagen:', err.message)); // auch der Kanalinhaber bekommt eins
   if (settings.awardEnabled) await ensureAward(settings).catch((err) => console.warn('Monatsabschluss fehlgeschlagen:', err.message)); // schließt den Vormonat einmalig ab
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
+
+  if (counted && settings.gwEnabled) await countGewinnChat(id, name, settings).catch((err) => console.warn('Wochenpunkte fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
   await recordChatMessage(e, settings).catch((err) => console.warn('Chat-Overlay fehlgeschlagen:', err.message));

@@ -1,6 +1,6 @@
 import { db } from './store.mjs';
 
-export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users'];
+export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users', 'user:manage:whispers'];
 
 export const siteUrl = (req) =>
   (process.env.SITE_URL || process.env.URL || (req ? new URL(req.url).origin : '')).replace(/\/$/, '');
@@ -74,6 +74,13 @@ export async function timeoutChatter(userId, seconds, reason) {
     query: { broadcaster_id: user_id, moderator_id: user_id },
     body: { data: { user_id: userId, duration: seconds, reason: String(reason).slice(0, 500) } },
   });
+}
+
+// Flüsternachricht an eine Person (für den persönlichen Gewinner-Link). Twitch erlaubt das nur mit der Berechtigung
+// user:manage:whispers, und der Absender braucht eine bestätigte Telefonnummer. Klappt es nicht, wirft die Funktion.
+export async function sendWhisper(toUserId, message) {
+  const { user_id } = await userToken();
+  await helix('POST', 'whispers', { query: { from_user_id: user_id, to_user_id: String(toUserId) }, body: { message: String(message).slice(0, 500) } });
 }
 
 export async function setRedemptionStatus(redemptionId, rewardId, status) {
@@ -172,8 +179,16 @@ export async function ensureRewards(settings, entry = null) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gradientRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.gradientRewardId;
   }
+  // Geburtstags-Ticket (Sonderziehung)
+  let gewinn = null;
+  if (settings.gwEnabled) {
+    gewinn = await make({ stateKey: 'gwRewardId', title: settings.gwRewardTitle, cost: settings.gwRewardCost, prompt: 'Ein Los für die Geburtstags-Ziehung im Danke-Stream. Pro Person ein Ticket. Wer in der Geburtstagswoche aktiv war, bekommt Bonuslose. Abos und Bits ändern nichts.', color: '#8A5A2B', syncPrompt: true });
+  } else if (state.gwRewardId) {
+    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gwRewardId }, body: { is_enabled: false } }).catch(() => {});
+    delete state.gwRewardId;
+  }
   await db.set('config/state', state);
-  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient };
+  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient, gewinn };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge

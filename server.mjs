@@ -204,5 +204,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { sweepOffers } = await import('./netlify/lib/belohnungen/tickets.mjs');
   const { getSettings } = await import('./netlify/lib/kern/settings.mjs');
   setInterval(() => getSettings().then((st) => (st.ticketsEnabled ? sweepOffers(st) : null)).catch((e) => console.error('Ticket-Fristen:', e.message)), 60_000).unref();
+  // Geburtstags-Ziehung: jede Minute Fristen prüfen (nicht gemeldet -> nachziehen), Adressen nach Aufbewahrung löschen
+  const { gewinnTick } = await import('./netlify/lib/belohnungen/gewinn.mjs');
+  const gw = async () => { const s = await getSettings(); if (!s.gwEnabled) return; const r = await gewinnTick(s); if (r.redrawn || r.deleted) console.log(`Gewinnspiel: ${r.redrawn} nachgezogen, ${r.deleted} Adressen gelöscht`); };
+  setInterval(() => gw().catch((e) => console.error('Gewinnspiel:', e.message)), 60_000).unref();
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
 }

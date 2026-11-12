@@ -6,10 +6,13 @@
 //   GET  /api/community/link?twitch=name     zu einem Twitch-Namen das Discord-Konto: { linked, discordId, twitchName }
 //   POST /api/community/bonus    Bonuspunkte für den Monat { key, points, reason, discordId | twitch }, jeder key zählt nur einmal
 //   POST /api/community/sync     Discord-Zahlen des Monats melden { month, rows: [{ discordId, msgs, days }] }
+//   GET  /api/community/gewinn/dm       Gewinner-Links, die per Discord-DM verschickt werden sollen [{ winnerId, discordId, message }]
+//   POST /api/community/gewinn/dm/ack   { winnerId } nach dem Senden der DM
 //   POST /api/community/unlink   Verknüpfung löschen { discordId }
 // Öffentlich zugänglich ist nur die Rangliste in /api/leaderboard.
 import { getSettings } from '../lib/kern/settings.mjs';
 import { announceAgain, awardForBot } from '../lib/belohnungen/award.mjs';
+import { ackDm, pendingDms } from '../lib/belohnungen/gewinn.mjs';
 import { json } from '../lib/kern/http.mjs';
 import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
@@ -52,6 +55,8 @@ export default async (req) => {
     const res = await addBonus(settings, { key: body.key, link, points: body.points, reason: body.reason });
     return res.error ? json(res, 400) : json(res);
   }
+  if (route[0] === 'gewinn' && route[1] === 'dm' && !route[2] && req.method === 'GET') return json({ dms: (await pendingDms()).map((d) => ({ winnerId: d.winnerId, discordId: d.discordId, message: d.message })) });
+  if (route[0] === 'gewinn' && route[1] === 'dm' && route[2] === 'ack' && writes) return json({ ok: await ackDm(String(body.winnerId ?? '')) });
   if (route[0] === 'unlink' && writes) return json({ ok: await removeLink({ discordId: String(body.discordId ?? '') }) });
   return json({ error: 'Not found' }, 404);
 };

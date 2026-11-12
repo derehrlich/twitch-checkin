@@ -53,6 +53,11 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - `pending` = Einlösung liegt noch unerfüllt in der Twitch-Queue (Warteliste, Nachrücker, Events mit „Punkte zurück bei Nichterscheinen“). Erfüllte Einlösungen lassen sich per API nicht mehr erstatten.
 - Nachrück-Frist (`promoteMinutes`, 0 = aus): Status `offered`, Bestätigung mit `!dabei`, Ablauf prüft `sweepOffers` (Timer in `server.mjs`, jede Minute).
 
+## Gewinnspiel (Geburtstags-Ziehung)
+- Logik `netlify/lib/belohnungen/gewinn.mjs`, Admin `netlify/lib/admin/gewinn.mjs` (Reiter „Gewinnspiel“, `public/admin/js/gewinn.js`), öffentlich `netlify/functions/gewinn.mjs` (`/gewinn/<code>`, `/gewinn/overlay`, Seiten `public/gewinn.html`, `gewinn-overlay.html`). Einstellungen mit Präfix `gw…` im Schema, Zeiten/Preise/Lose je Ziehung in `gw/draw/<id>`. Doku für Marcel: `docs/gewinnspiel.md`.
+- Adressen liegen verschlüsselt unter `gwaddr/` und bewusst nicht in der Sicherung. Das Protokoll `gw/<id>/result` wird nur einmal geschrieben. Zufall: HMAC-SHA256(seed, i), gewichtet ohne Zurücklegen.
+- Offen: Abholung der Discord-DMs im VerwirrBot (`GET /api/community/gewinn/dm`, `POST …/ack`).
+
 ## Tests
 - `npm ci && npm test` (aktuell 125 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
