@@ -40,6 +40,7 @@
       <button data-tab="belohnungen" role="tab">Belohnungen</button>
       <button data-tab="tickets" role="tab">Events / Tickets</button>
       <button data-tab="gewinn" role="tab">Gewinnspiel</button>
+      <button data-tab="feier" role="tab">Geburtstagswoche</button>
       <button data-tab="overlays" role="tab">Overlays</button>
       <button data-tab="medien" role="tab">Medien</button>
       <button data-tab="system" role="tab">System</button>
@@ -300,6 +301,9 @@
           <div><label for="gwFrom">Wochenpunkte zählen ab</label><input id="gwFrom" type="datetime-local"></div>
           <div><label for="gwOpenAt">Ticket-Fenster öffnet</label><input id="gwOpenAt" type="datetime-local"></div>
           <div><label for="gwCloseAt">Ticket-Fenster schließt (leer = bis zur Ziehung)</label><input id="gwCloseAt" type="datetime-local"></div>
+          <div><label for="gwBonusOpen">Mitternachts-Los: Fenster öffnet</label><input id="gwBonusOpen" type="datetime-local"></div>
+          <div><label for="gwBonusClose">Mitternachts-Los: Fenster schließt</label><input id="gwBonusClose" type="datetime-local"></div>
+          <div><label for="gwBonusLots">Mitternachts-Los: Extra-Lose pro Person</label><input id="gwBonusLots" type="number" min="1" max="10"></div>
           <div><label for="gwPlanned">Geplante Ziehung (nur zur Erinnerung)</label><input id="gwPlanned" type="datetime-local"></div>
           <div><label for="gwPer">Wochenpunkte pro Bonuslos (X)</label><input id="gwPer" type="number" min="1" max="100000"></div>
           <div><label for="gwMax">Höchstens so viele Lose pro Person</label><input id="gwMax" type="number" min="1" max="1000"></div>
@@ -354,6 +358,78 @@
         <p class="muted">Das ist ein Entwurf und keine Rechtsberatung. Vor der Veröffentlichung selbst prüfen oder gegenlesen lassen. Welche Daten verarbeitet werden, steht in <code>docs/gewinnspiel.md</code>.</p>
       </section>
       <div data-schema="gewinn" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="feier">
+      <p class="muted intro">Alles für die Geburtstagswoche: Countdown, Glücksrad und der Geburtstags-Befehl. Beide Overlays bleiben in OBS unsichtbar, bis du sie hier einblendest.</p>
+      <section class="card">
+        <h2>Countdown</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="cdUrl"></code> anlegen. Mit <code>?pos=top-right</code>, <code>bottom</code>, <code>center</code> … hinter der Adresse änderst du den Platz, mit <code>?size=0.7</code> die Größe. Er kann die ganze Woche mitlaufen. Bei 0 erscheint der Text unten, dazu Konfetti, danach verschwindet er von selbst.</p>
+        <div class="grid">
+          <div><label for="cdTitle">Überschrift</label><input id="cdTitle" maxlength="60"></div>
+          <div><label for="cdTarget">Zielzeit</label><input id="cdTarget" type="datetime-local"></div>
+          <div><label for="cdEnd">Text bei 0</label><input id="cdEnd" maxlength="80"></div>
+          <div><label for="cdHold">So lange bleibt der Text stehen (Minuten, 0 = bleibt)</label><input id="cdHold" type="number" min="0" max="1440"></div>
+        </div>
+        <p class="muted" id="cdInfo"></p>
+        <div class="row">
+          <button id="cdShow">Einblenden</button>
+          <button id="cdSave" class="ghost">Speichern</button>
+          <a class="btn ghost" href="/countdown?demo" target="_blank" rel="noopener">Vorschau (3 Minuten)</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Glücksrad</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="radUrl"></code> anlegen. Mit <code>?pos=left</code> oder <code>right</code> schiebst du es zur Seite, mit <code>?size=0.7</code> machst du es kleiner. Das Ergebnis würfelt die Stadtwache, das Overlay dreht nur dorthin. „Drehen“ blendet das Rad bei Bedarf selbst ein.</p>
+        <div class="row">
+          <div><label for="radSel">Rad</label><select id="radSel"></select></div>
+          <button id="radSpin">🎡 Drehen</button>
+          <button id="radShow" class="ghost">Einblenden</button>
+          <a class="btn ghost" href="/rad?demo" target="_blank" rel="noopener">Vorschau</a>
+        </div>
+        <p id="radLast" class="muted"></p>
+        <div id="radHistory" class="muted"></div>
+      </section>
+      <section class="card">
+        <h2>Rad bearbeiten</h2>
+        <p class="muted">Ein Feld pro Zeile. Wer ein Feld größer machen will (höhere Chance), schreibt ein Gewicht dahinter: <code>Leuchtturm ; 3</code>. Eine eigene Farbe geht so: <code>Leuchtturm ; 1 ; #ff8800</code>. Ohne Farbe nimmt das Rad die Farben des Streams. Gleiche Namen behalten beim Speichern ihren Stand „schon dran“.</p>
+        <div class="grid">
+          <div><label for="radName">Name des Rads</label><input id="radName" maxlength="40"></div>
+          <div style="align-self:end"><label class="check"><input id="radRemove" type="checkbox"> Gedrehte Felder danach ausgrauen (jedes Feld kommt nur einmal dran)</label></div>
+        </div>
+        <label for="radSegs">Felder</label>
+        <textarea id="radSegs" rows="10" style="width:100%" aria-label="Felder des Rads"></textarea>
+        <div class="row">
+          <button id="radSave">Rad speichern</button>
+          <button id="radReset" class="ghost">Alle Felder wieder frei</button>
+          <button id="radDelete" class="danger">Rad löschen</button>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div><label for="radNewName">Neues Rad</label><input id="radNewName" maxlength="40" placeholder="z. B. Spiel oder Community-Aktion"></div>
+          <button id="radNew" class="ghost">Anlegen</button>
+          <button id="radExamples" class="ghost">Beispielräder anlegen (Gebäudeart, Baustil, Community-Aktion)</button>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Adventure-Einreichungen</h2>
+        <p class="muted" id="advInfo"></p>
+        <p class="muted">Eingereicht wird im Twitch-Chat mit <code id="advCmd"></code> (zum Beispiel „!adventure Lamas Rache“) und im Discord über den VerwirrBot. Beides landet hier in derselben Liste. Mit „Aufs Glücksrad übertragen“ wird aus den offenen Einträgen ein Rad (jedes Feld kommt nur einmal dran, im Ergebnis steht, wer es eingereicht hat). Ein gedrehtes Adventure wird hier als „vom Rad gewählt“ markiert. Ein-/Ausschalten, Schließen und Texte stehen ganz unten.</p>
+        <div class="row">
+          <div><label for="advText">Von Hand ergänzen (Name, gern mit Link)</label><input id="advText" maxlength="400" placeholder="Lamas Rache https://…"></div>
+          <div><label for="advWho">Eingereicht von</label><input id="advWho" maxlength="40" placeholder="z. B. Max"></div>
+          <button id="advAdd" class="ghost">Hinzufügen</button>
+        </div>
+        <div id="advList"></div>
+        <div class="row" style="margin-top:14px">
+          <div><label for="advWheel">Übertragen auf</label><select id="advWheel"></select></div>
+          <div><label for="advWheelName">Name des neuen Rads</label><input id="advWheelName" maxlength="40" placeholder="Adventures Freitag"></div>
+          <button id="advToWheel">🎡 Offene aufs Glücksrad übertragen</button>
+          <button id="advClearDone" class="ghost">Gedrehte und gespielte entfernen</button>
+          <button id="advClearAll" class="danger">Liste leeren</button>
+        </div>
+      </section>
+      <div data-schema="adventure" style="display:grid; gap:22px;"></div>
+      <div data-schema="feier" style="display:grid; gap:22px;"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="overlays">

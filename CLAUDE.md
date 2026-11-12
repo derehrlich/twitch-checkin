@@ -56,10 +56,17 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 ## Gewinnspiel (Geburtstags-Ziehung)
 - Logik `netlify/lib/belohnungen/gewinn.mjs`, Admin `netlify/lib/admin/gewinn.mjs` (Reiter „Gewinnspiel“, `public/admin/js/gewinn.js`), öffentlich `netlify/functions/gewinn.mjs` (`/gewinn/<code>`, `/gewinn/overlay`, Seiten `public/gewinn.html`, `gewinn-overlay.html`). Einstellungen mit Präfix `gw…` im Schema, Zeiten/Preise/Lose je Ziehung in `gw/draw/<id>`. Doku für Marcel: `docs/gewinnspiel.md`.
 - Adressen liegen verschlüsselt unter `gwaddr/` und bewusst nicht in der Sicherung. Das Protokoll `gw/<id>/result` wird nur einmal geschrieben. Zufall: HMAC-SHA256(seed, i), gewichtet ohne Zurücklegen.
-- Offen: Abholung der Discord-DMs im VerwirrBot (`GET /api/community/gewinn/dm`, `POST …/ack`).
+- Die Discord-DMs holt der VerwirrBot jede Minute ab (`GET /api/community/gewinn/dm`, `POST …/ack`).
+- **Mitternachts-Los:** zweiter Reward (`gwBonusRewardId`, Einstellungen `gwBonus…`), Fenster `draw.bonusOpen/bonusClose` (Standard 29.11. 0:00–0:30), `gw/<id>/bonus/<userId>` per `setIfNew`. Extra-Los (`draw.bonusLots`) kommt in `totalLots` obendrauf und zählt nur mit Ticket. `syncTicketReward` pausiert beide Rewards außerhalb ihres Fensters.
+
+## Geburtstagswoche (Countdown, Glücksrad, `!geburtstag`)
+- Reiter „Geburtstagswoche“ (`public/admin/js/feier.js`, Route `netlify/lib/admin/feier.mjs`). Doku für Marcel: `docs/geburtstagswoche.md`.
+- Countdown: `netlify/lib/overlays/countdown.mjs`, Schlüssel `countdown/config`, Seite `public/countdown.html`, öffentlich `GET /api/countdown` (mit Serverzeit). `birthdayReply` (Befehl `!geburtstag`, Einstellungen `bday…`, Plan in `bdayPlan`) nutzt dieselbe Zielzeit.
+- Glücksrad: `netlify/lib/overlays/gluecksrad.mjs`, Schlüssel `rad/wheel/<id>`, `rad/state`, Seite `public/rad.html`, öffentlich `GET /api/rad`. Das Ergebnis würfelt der Server (`pick`, crypto, nach Gewicht), das Overlay dreht nur dorthin. Felder aus Text `Name ; Gewicht ; #Farbe`.
+- Adventure-Einreichung: `netlify/lib/belohnungen/adventures.mjs` (`adv/entry/<id>`, `adv/title/<sha>` gegen Doppelte), Chat-Befehl `advCommand`, Admin `netlify/lib/admin/adventure.mjs`, Bot-Schnittstelle `GET/POST /api/community/adventure` (Discord: `/adventure einreichen` und `/adventure liste` im VerwirrBot). `toWheel` macht aus offenen Einträgen ein Rad (Feld-Verweis `ref`, `spin` setzt den Eintrag auf `gedreht`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 125 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 129 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Glücksrad</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Glücksrad als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Welches Rad gezeigt wird, was darauf liegt und das Drehen steuerst du im Admin (Reiter „Geburtstagswoche“).
+     ?pos=center (Standard) | left | right   Platz auf dem Bild    ?size=0.5 … 1.5   Größe (Standard 1 = 880 Pixel)    ?demo   Beispielrad, dreht alle 12 Sekunden */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #stage { position: fixed; top: 50%; left: 50%; width: 880px; transform: translate(-50%, -50%) scale(var(--s, 1)) translateY(var(--hide, 0)); opacity: 0; transition: transform .8s cubic-bezier(.2, .9, .3, 1), opacity .5s; }
+  body.left #stage { left: 30px; transform-origin: 0 50%; transform: translate(0, -50%) scale(var(--s, 1)) translateY(var(--hide, 0)); }
+  body.right #stage { left: auto; right: 30px; transform-origin: 100% 50%; transform: translate(0, -50%) scale(var(--s, 1)) translateY(var(--hide, 0)); }
+  #stage.on { opacity: 1; --hide: 0; }
+  #stage:not(.on) { --hide: 40px; }
+  .plaque { position: absolute; left: 50%; top: -64px; transform: translateX(-50%); padding: 8px 34px 10px; white-space: nowrap; font: 700 34px/1 var(--wordmark); letter-spacing: 3px; text-transform: uppercase; color: var(--ink); z-index: 2; }
+  canvas { display: block; width: 880px; height: 880px; }
+  #result { position: absolute; left: 50%; bottom: -34px; transform: translate(-50%, 40px) scale(.9); opacity: 0; transition: transform .45s cubic-bezier(.2, 1.4, .4, 1), opacity .3s; padding: 16px 40px 20px; text-align: center; max-width: 820px; z-index: 2; }
+  #result.on { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  #result small { display: block; font-size: 16px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--ink-soft); }
+  #result em { display: block; margin-top: 6px; font-style: normal; font-size: 20px; font-weight: 600; color: var(--ink-soft); }
+  #result em:empty { display: none; }
+  #result b { display: block; margin-top: 4px; font: 700 50px/1.1 var(--wordmark); color: var(--ink); word-break: break-word; }
+  #fx { position: fixed; inset: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="plaque" id="name">Glücksrad</div>
+  <canvas id="c" width="1000" height="1000"></canvas>
+  <div class="px-box" id="result"><small id="rname"></small><b id="rlabel"></b><em id="rnote"></em></div>
+</div>
+<canvas id="fx"></canvas>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+if (params.get('pos') === 'left') document.body.classList.add('left');
+if (params.get('pos') === 'right') document.body.classList.add('right');
+const size = Number(params.get('size')); if (size >= 0.3 && size <= 2) $('stage').style.setProperty('--s', size);
+
+const TAU = Math.PI * 2, C = 500, R = 470;     // Mitte und Außenradius (Zeichenfläche 1000×1000)
+const RIM = 44, HUB = 62;                       // Breite des Holzrings, Radius der Nabe
+const mod = (x, m) => ((x % m) + m) % m;
+const ease = (t) => 1 - Math.pow(1 - t, 4);     // schnell los, sanft auslaufen
+
+let view = null, offset = 0, rot = 0;
+let anim = null;                                // { id, from, to, startedAt, durationMs, segmentId }
+let shownResult = null, lastSpinId = null, confettiFor = null;
+const demo = params.has('demo');
+const DEMO_SEGS = ['Wohnhaus', 'Taverne', 'Leuchtturm', 'Burg', 'Markthalle', 'Geburtstagstorte', 'Werkstatt', 'Brücke'];
+const PALETTE = ['#f6b82e', '#4fb8c4', '#e5533d', '#58a84a', '#9146ff', '#f08a24', '#ff8fc0', '#2a7fbf'];
+
+// Winkel jedes Felds nach Gewicht, Start oben-rechts bei 0 (3 Uhr), im Uhrzeigersinn
+function layout(segs) {
+  const total = segs.reduce((a, s) => a + s.weight, 0);
+  let a = 0;
+  return segs.map((s) => { const span = (s.weight / total) * TAU, out = { ...s, a0: a, a1: a + span, span }; a += span; return out; });
+}
+const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const m = (v) => Math.max(0, Math.min(255, Math.round(v * f))); return `rgb(${m(n >> 16)},${m((n >> 8) & 255)},${m(n & 255)})`; };
+
+// Zielwinkel: Feld `seg` steht unter dem Zeiger (oben), Position im Feld = land (0.1 … 0.9)
+function targetRot(L, from, turns, land) {
+  const mid = L.a0 + L.span * land;
+  const base = mod(-Math.PI / 2 - mid, TAU);
+  return Math.ceil((from - base) / TAU) * TAU + base + turns * TAU;
+}
+
+const cv = $('c'), ctx = cv.getContext('2d');
+function draw(wheel, angle) {
+  ctx.clearRect(0, 0, 1000, 1000);
+  const L = layout(wheel.segments);
+  // Schatten und Holzring
+  ctx.save(); ctx.shadowColor = 'rgba(10,5,2,.55)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12;
+  ctx.beginPath(); ctx.arc(C, C, R, 0, TAU); ctx.fillStyle = '#583620'; ctx.fill(); ctx.restore();
+  const wood = ctx.createRadialGradient(C, C - 120, R * .5, C, C, R);
+  wood.addColorStop(0, '#8a5a35'); wood.addColorStop(1, '#4f301a');
+  ctx.beginPath(); ctx.arc(C, C, R, 0, TAU); ctx.fillStyle = wood; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = '#2b180c'; ctx.stroke();
+  const rin = R - RIM;
+  ctx.save(); ctx.translate(C, C); ctx.rotate(angle);
+  // Felder
+  for (const s of L) {
+    const used = s.used;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, rin, s.a0, s.a1); ctx.closePath();
+    const g = ctx.createRadialGradient(0, 0, HUB, 0, 0, rin);
+    const col = used ? '#8d8472' : s.color;
+    g.addColorStop(0, shade(col, .82)); g.addColorStop(1, shade(col, 1.05));
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(43,24,12,.8)'; ctx.stroke();
+    // Beschriftung entlang des Radius, außen bündig
+    ctx.save(); ctx.rotate(s.a0 + s.span / 2);
+    const avail = rin - HUB - 46, chord = 2 * (rin * .62) * Math.sin(Math.min(s.span, Math.PI) / 2);
+    let fs = Math.min(46, chord * .62);
+    ctx.font = `600 ${fs}px Fredoka, sans-serif`;
+    const w = ctx.measureText(s.label).width;
+    if (w > avail) { fs = Math.max(11, fs * avail / w); ctx.font = `600 ${fs}px Fredoka, sans-serif`; }
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const dark = lum(col) > .55;
+    ctx.fillStyle = used ? 'rgba(43,24,12,.55)' : dark ? '#2b180c' : '#fff6e2';
+    if (!used && !dark) { ctx.shadowColor = 'rgba(43,24,12,.7)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; }
+    ctx.fillText(s.label, rin - 22, 0);
+    if (used) { const tw = ctx.measureText(s.label).width; ctx.fillRect(rin - 22 - tw, -1.5, tw, 3); }
+    ctx.restore();
+  }
+  // Messingnägel am Ring zwischen den Feldern
+  for (const s of L) {
+    const x = Math.cos(s.a0) * (R - RIM / 2), y = Math.sin(s.a0) * (R - RIM / 2);
+    const pg = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, 11);
+    pg.addColorStop(0, '#fff3bd'); pg.addColorStop(.5, '#e2b04a'); pg.addColorStop(1, '#7a4f12');
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, TAU); ctx.fillStyle = pg; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#2b180c'; ctx.stroke();
+  }
+  ctx.restore();
+  // Nabe aus Messing
+  const hg = ctx.createRadialGradient(C - 14, C - 16, 4, C, C, HUB);
+  hg.addColorStop(0, '#fff3bd'); hg.addColorStop(.45, '#e2b04a'); hg.addColorStop(1, '#8a5a14');
+  ctx.beginPath(); ctx.arc(C, C, HUB, 0, TAU); ctx.fillStyle = hg; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#2b180c'; ctx.stroke();
+  // Zeiger oben: wippt, wenn ein Feld-Rand vorbeiläuft
+  let tilt = 0;
+  for (const s of L) {
+    const d = mod(s.a0 + angle + Math.PI / 2 + Math.PI, TAU) - Math.PI; // Abstand Feldrand zum Zeiger (oben)
+    if (d > 0 && d < .12) tilt = Math.max(tilt, (1 - d / .12) * .5);
+  }
+  ctx.save(); ctx.translate(C, C - R + 10); ctx.rotate(tilt);
+  ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 5;
+  ctx.beginPath(); ctx.moveTo(-30, -36); ctx.lineTo(30, -36); ctx.lineTo(0, 52); ctx.closePath();
+  const pg2 = ctx.createLinearGradient(-30, -36, 30, 20); pg2.addColorStop(0, '#fff3bd'); pg2.addColorStop(.5, '#e2b04a'); pg2.addColorStop(1, '#8a5a14');
+  ctx.fillStyle = pg2; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#2b180c'; ctx.stroke();
+  ctx.restore();
+}
+
+function showResult(name, label, note = '') {
+  if (label == null) { $('result').classList.remove('on'); shownResult = null; return; }
+  if (shownResult === label + anim?.id) return;
+  shownResult = label + anim?.id;
+  $('rname').textContent = name; $('rlabel').textContent = label; $('rnote').textContent = note;
+  $('result').classList.add('on');
+}
+
+let demoNext = 0;
+async function poll() {
+  try {
+    if (demo) {
+      if (!view) view = { show: true, now: Date.now(), wheel: { id: 'demo', name: 'Gebäudeart', removeWon: false, segments: DEMO_SEGS.map((l, i) => ({ id: 'd' + i, label: l, weight: 1, color: PALETTE[i % PALETTE.length], used: false })) }, spin: null };
+      view.now = Date.now();
+      if (Date.now() > demoNext) { demoNext = Date.now() + 12_000; const i = Math.floor(Math.random() * DEMO_SEGS.length); view.spin = { id: 'demo' + Date.now(), wheelId: 'demo', startedAt: Date.now(), durationMs: 7000, index: i, segmentId: 'd' + i, label: DEMO_SEGS[i], turns: 5, land: .3 + Math.random() * .4 }; }
+    } else view = await (await fetch('/api/rad', { cache: 'no-store' })).json();
+    offset = view.now - Date.now();
+  } catch { return; }
+  const wheel = view.wheel, spin = view.spin;
+  $('stage').classList.toggle('on', Boolean(view.show && wheel));
+  if (!wheel) return;
+  $('name').textContent = wheel.name;
+  if (spin && spin.id !== lastSpinId) {
+    lastSpinId = spin.id;
+    const L = layout(wheel.segments)[spin.index];
+    const age = Date.now() + offset - spin.startedAt;
+    // Neuer Dreh startet dort, wo das Rad gerade steht. Beim Laden mitten im Dreh oder danach: ab 0, nur das Ziel zählt.
+    const from = age < 500 ? mod(rot, TAU) : 0;
+    anim = { id: spin.id, from, to: targetRot(L, from, spin.turns, spin.land), startedAt: spin.startedAt, durationMs: spin.durationMs, label: spin.label, note: spin.note ?? '' };
+    if (age < 500) showResult(null, null);
+    confettiFor = null;
+  }
+  if (!spin) { anim = null; lastSpinId = null; showResult(null, null); }
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (!view?.wheel) return;
+  let angle = rot;
+  if (anim) {
+    const t = (Date.now() + offset - anim.startedAt) / anim.durationMs;
+    angle = anim.from + (anim.to - anim.from) * ease(Math.max(0, Math.min(1, t)));
+    if (t >= 1) { showResult(view.wheel.name, anim.label, anim.note); if (confettiFor !== anim.id && Date.now() + offset - anim.startedAt < anim.durationMs + 4000) { confettiFor = anim.id; burst(); } }
+    else if (t >= 0) showResult(null, null);
+  }
+  rot = angle;
+  draw(view.wheel, angle);
+}
+
+// Konfetti beim Ergebnis
+const fx = $('fx'), fctx = fx.getContext('2d');
+let parts = [];
+function resize() { fx.width = innerWidth; fx.height = innerHeight; }
+addEventListener('resize', resize); resize();
+function burst() {
+  const cx = fx.width / 2, cy = fx.height / 2;
+  for (let i = 0; i < 120; i++) { const a = Math.random() * TAU, v = 4 + Math.random() * 9; parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 5, w: 8 + Math.random() * 8, h: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: PALETTE[i % PALETTE.length], life: 1 }); }
+}
+(function loop() {
+  requestAnimationFrame(loop);
+  fctx.clearRect(0, 0, fx.width, fx.height);
+  parts = parts.filter((p) => p.y < fx.height + 30 && p.life > 0);
+  for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += .22; p.vx *= .985; p.r += p.vr; p.life -= .004; fctx.save(); fctx.globalAlpha = Math.min(1, p.life * 2); fctx.translate(p.x, p.y); fctx.rotate(p.r); fctx.fillStyle = p.c; fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore(); }
+})();
+
+Promise.all([document.fonts.load('600 40px Fredoka'), document.fonts.load('700 34px "Pixelify Sans"')]).catch(() => {}).finally(() => { poll(); setInterval(poll, 1000); frame(); });
+</script>
+</body>
+</html>

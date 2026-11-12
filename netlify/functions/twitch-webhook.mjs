@@ -8,7 +8,7 @@ import { handleAlert } from '../lib/ereignisse/alerts.mjs';
 import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
 import { eventByReward, handleTicket } from '../lib/belohnungen/tickets.mjs';
-import { handleGewinnTicket } from '../lib/belohnungen/gewinn.mjs';
+import { handleGewinnBonus, handleGewinnTicket } from '../lib/belohnungen/gewinn.mjs';
 import { handleAlpaca } from '../lib/belohnungen/alpaca.mjs';
 import { handleChat } from '../lib/chat/chat.mjs';
 import { handleGlitter, handleGradient } from '../lib/chat/chatlog.mjs';
@@ -77,8 +77,9 @@ export default async (req) => {
     const isGradient = Boolean(state.gradientRewardId) && e.reward.id === state.gradientRewardId;
     const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
     const isGewinn = Boolean(state.gwRewardId) && e.reward.id === state.gwRewardId;
-    const ticketEvent = isCheckin || isGewinn || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient || board ? null : await eventByReward(e.reward.id);
-    if (!isGewinn && !isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !isGradient && !board && !ticketEvent) return new Response(null, { status: 204 });
+    const isGewinnBonus = Boolean(state.gwBonusRewardId) && e.reward.id === state.gwBonusRewardId;
+    const ticketEvent = isCheckin || isGewinn || isGewinnBonus || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient || board ? null : await eventByReward(e.reward.id);
+    if (!isGewinn && !isGewinnBonus && !isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !isGradient && !board && !ticketEvent) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
@@ -87,6 +88,7 @@ export default async (req) => {
       const settings = await getSettings();
       if (board) await handleSoundboard(redemption, board, settings);
       else if (isGewinn) await handleGewinnTicket(redemption, settings);
+      else if (isGewinnBonus) await handleGewinnBonus(redemption, settings);
       else if (ticketEvent) await handleTicket(redemption, ticketEvent, settings);
       else if (isAlpaca) await handleAlpaca(redemption, settings);
       else if (isGlitter) await handleGlitter(redemption, settings);

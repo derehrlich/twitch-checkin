@@ -6,6 +6,7 @@
 //   gw/draw/<id>                 Einstellungen der Ziehung (Zeiten, Lose-Rechnung, Preise, Sperrliste, Bedingungen)
 //   gw/<id>/pts/<twitchId>       Wochenpunkte { name, checkinDays, streakPts, chatCount, chatDay, dayMsgs, lastAt, points }
 //   gw/<id>/ticket/<twitchId>    eingelöstes Ticket { name, at, points, redemptionId } (setIfNew = genau eines pro Person)
+//   gw/<id>/bonus/<twitchId>     Mitternachts-Los { name, at, redemptionId } (setIfNew = eines pro Person, zählt nur zusammen mit einem Ticket)
 //   gw/<id>/result               Ziehungsprotokoll, wird nur einmal geschrieben und nie geändert
 //   gw/<id>/redraw/<zeit>        Protokoll je Nachziehen (ebenfalls unveränderlich)
 //   gw/<id>/w/<winnerId>         Gewinner eines Preises { status, code, deadline, ... }
@@ -83,6 +84,7 @@ export function defaultDraw(settings, now = new Date()) {
   return {
     id: rid(), name: 'Geburtstags-Ziehung 2026', createdAt: now.toISOString(),
     pointsFrom: parseLocal('2026-11-23T00:00', tz), ticketOpen: parseLocal('2026-11-30T00:00', tz), ticketClose: null, manualClosed: false, plannedDraw: null,
+    bonusOpen: parseLocal('2026-11-29T00:00', tz), bonusClose: parseLocal('2026-11-29T00:30', tz), bonusLots: 1,
     perPoints: 100, maxLots: 10,
     weights: { checkin: 50, streak: 10, streakCap: 7, chat: 2, chatDayCap: 20, chatGap: 20 },
     prizes: [
@@ -137,6 +139,14 @@ export function windowState(draw, now = Date.now()) {
   return draw.ticketOpen ? 'offen' : 'vorher';
 }
 
+/** Fenster des Mitternachts-Loses: 'vorher' | 'offen' | 'zu'. Ohne Zeiten bleibt es zu. */
+export function bonusState(draw, now = Date.now()) {
+  if (!draw || draw.drawnAt || !draw.bonusOpen) return 'zu';
+  if (now < Date.parse(draw.bonusOpen)) return 'vorher';
+  if (draw.bonusClose && now >= Date.parse(draw.bonusClose)) return 'zu';
+  return 'offen';
+}
+
 // ---- Einstellungen der Ziehung prüfen
 
 const num = (v, min, max, def) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def; };
@@ -151,7 +161,8 @@ export function applyConfig(draw, input, settings) {
   const time = (v) => (v === '' || v == null ? null : parseLocal(v, tz));
   if (!locked) {
     if ('name' in i) next.name = str(i.name, 60) || draw.name;
-    for (const k of ['pointsFrom', 'ticketOpen', 'ticketClose', 'plannedDraw']) if (k in i) next[k] = time(i[k]);
+    for (const k of ['pointsFrom', 'ticketOpen', 'ticketClose', 'plannedDraw', 'bonusOpen', 'bonusClose']) if (k in i) next[k] = time(i[k]);
+    if ('bonusLots' in i) next.bonusLots = num(i.bonusLots, 1, 10, draw.bonusLots ?? 1);
     if ('perPoints' in i) next.perPoints = num(i.perPoints, 1, 100000, draw.perPoints);
     if ('maxLots' in i) next.maxLots = num(i.maxLots, 1, 1000, draw.maxLots);
     const w = i.weights ?? {};
@@ -215,6 +226,9 @@ export async function countCheckin(id, name, streak, settings, now = Date.now())
 }
 
 export const lotsFor = (draw, points) => Math.min(draw.maxLots, 1 + Math.floor(Math.max(0, points) / draw.perPoints));
+/** Lose gesamt: Ticket plus Wochenpunkte (mit Deckel) plus das Mitternachts-Los obendrauf (zählt nicht gegen den Deckel). */
+export const totalLots = (draw, points, extra) => lotsFor(draw, points) + (extra ? draw.bonusLots ?? 1 : 0);
+const hasBonus = async (did, id) => Boolean(await db.get(`gw/${did}/bonus/${id}`));
 const pointsOf = async (did, id) => (await db.get(ptsKey(did, id)))?.points ?? 0;
 
 // ---- Sperrliste
@@ -241,9 +255,26 @@ export async function handleGewinnTicket(redemption, settings, now = Date.now())
   if (!(await db.setIfNew(`gw/${draw.id}/ticket/${id}`, { name, at: new Date(now).toISOString(), points, redemptionId: rid_ }))) {
     await say(settings, settings.gwDuplicateTemplate, vars); await refund(redemption); return { ok: false, reason: 'duplicate' };
   }
-  await say(settings, settings.gwTicketTemplate, { ...vars, lots: lotsFor(draw, points) });
+  const lots = totalLots(draw, points, await hasBonus(draw.id, id));
+  await say(settings, settings.gwTicketTemplate, { ...vars, lots });
   await setRedemptionStatus(rid_, redemption.reward.id, 'FULFILLED');
-  return { ok: true, points, lots: lotsFor(draw, points) };
+  return { ok: true, points, lots };
+}
+
+/** Reward „Mitternachts-Los“: ein Extra-Los pro Person, nur im Bonus-Fenster (Standard 29.11. 0:00 bis 0:30). Sonst Hinweis und Punkte zurück. */
+export async function handleGewinnBonus(redemption, settings, now = Date.now()) {
+  const { id: rid_, user_id: id, user_name: name } = redemption;
+  const draw = await currentDraw();
+  const vars = { user: name, cost: settings.gwBonusRewardCost };
+  if (!draw || bonusState(draw, now) !== 'offen') { await say(settings, settings.gwBonusClosedTemplate, vars); await refund(redemption); return { ok: false, reason: 'closed' }; }
+  if (isBlocked(draw, id, name)) { await say(settings, settings.gwBlockedTemplate, vars); await refund(redemption); return { ok: false, reason: 'blocked' }; }
+  if (!(await db.setIfNew(`gw/${draw.id}/bonus/${id}`, { name, at: new Date(now).toISOString(), redemptionId: rid_ }))) {
+    await say(settings, settings.gwBonusDuplicateTemplate, vars); await refund(redemption); return { ok: false, reason: 'duplicate' };
+  }
+  const hasTicket = Boolean(await db.get(`gw/${draw.id}/ticket/${id}`));
+  await say(settings, hasTicket ? settings.gwBonusTemplate : settings.gwBonusNoTicketTemplate, { ...vars, lots: draw.bonusLots ?? 1 });
+  await setRedemptionStatus(rid_, redemption.reward.id, 'FULFILLED');
+  return { ok: true, hasTicket };
 }
 
 // ---- Teilnehmer und Lose
@@ -263,11 +294,12 @@ export async function broadcasterId() {
 export async function participants(draw) {
   const owner = await broadcasterId();
   const pts = new Map((await readAll(`gw/${draw.id}/pts/`)).map(([k, v]) => [k.split('/').pop(), v]));
+  const bonus = new Set((await db.list(`gw/${draw.id}/bonus/`)).map((k) => k.split('/').pop()));
   const rows = (await readAll(`gw/${draw.id}/ticket/`)).map(([k, t]) => {
     const id = k.split('/').pop();
     const points = pts.get(id)?.points ?? 0;
     const blocked = isBlocked(draw, id, t.name);
-    return { id, name: t.name, at: t.at, pointsAtTicket: t.points, points, lots: lotsFor(draw, points), blocked, eligible: !blocked && id !== owner };
+    return { id, name: t.name, at: t.at, pointsAtTicket: t.points, points, extra: bonus.has(id), lots: totalLots(draw, points, bonus.has(id)), blocked, eligible: !blocked && id !== owner };
   });
   return rows.sort((a, b) => a.at.localeCompare(b.at));
 }
@@ -589,17 +621,19 @@ export async function winnerAction(settings, winnerId, action, now = Date.now())
 
 // ---- Regelmäßige Aufgaben (jede Minute)
 
-/** Ticket-Reward in Twitch pausieren, solange das Fenster zu ist (Best Effort). */
+/** Ticket-Reward und Mitternachts-Los-Reward in Twitch pausieren, solange ihr Fenster zu ist (Best Effort). */
 async function syncTicketReward(draw, now) {
   const state = (await db.get('config/state')) ?? {};
-  if (!state.gwRewardId) return;
-  const paused = windowState(draw, now) !== 'offen';
-  if (state.gwPaused === paused) return;
-  try {
-    const { user_id } = await userToken();
-    await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gwRewardId }, body: { is_paused: paused } });
-    await db.set('config/state', { ...((await db.get('config/state')) ?? {}), gwPaused: paused });
-  } catch (e) { console.warn('Ticket-Reward nicht pausiert:', e.message); }
+  for (const [idKey, pausedKey, open] of [['gwRewardId', 'gwPaused', windowState(draw, now) === 'offen'], ['gwBonusRewardId', 'gwBonusPaused', bonusState(draw, now) === 'offen']]) {
+    if (!state[idKey]) continue;
+    const paused = !open;
+    if (state[pausedKey] === paused) continue;
+    try {
+      const { user_id } = await userToken();
+      await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state[idKey] }, body: { is_paused: paused } });
+      await db.set('config/state', { ...((await db.get('config/state')) ?? {}), [pausedKey]: paused });
+    } catch (e) { console.warn('Reward nicht pausiert:', e.message); }
+  }
 }
 
 /** Nicht gemeldet nach der Frist -> verfallen und nachziehen. Adressen nach Ablauf der Aufbewahrung löschen. Ticket-Fenster abgleichen. */
@@ -633,11 +667,11 @@ export async function adminView(settings, now = Date.now()) {
   const rows = await participants(draw);
   const result = await getResult(draw.id);
   const winners = (await winnersOf(draw.id)).map((w) => ({ ...w, statusLabel: STATUS_LABEL[w.status], link: ['gezogen', 'link_verschickt', 'gemeldet'].includes(w.status) ? linkOf(w) : '', expired: ['gezogen', 'link_verschickt'].includes(w.status) && now > Date.parse(w.deadline), code: undefined }));
-  const view = { ...draw, ticketOpen: toLocal(draw.ticketOpen, tz), ticketClose: toLocal(draw.ticketClose, tz), pointsFrom: toLocal(draw.pointsFrom, tz), plannedDraw: toLocal(draw.plannedDraw, tz), drawnAt: draw.drawnAt };
+  const view = { ...draw, bonusOpen: toLocal(draw.bonusOpen, tz), bonusClose: toLocal(draw.bonusClose, tz), ticketOpen: toLocal(draw.ticketOpen, tz), ticketClose: toLocal(draw.ticketClose, tz), pointsFrom: toLocal(draw.pointsFrom, tz), plannedDraw: toLocal(draw.plannedDraw, tz), drawnAt: draw.drawnAt };
   return {
-    enabled: settings.gwEnabled, draws, draw: view, window: windowState(draw, now), timezone: tz,
+    enabled: settings.gwEnabled, draws, draw: view, window: windowState(draw, now), bonusWindow: bonusState(draw, now), timezone: tz,
     tickets: rows, stats: distribution(rows), result: result ? { ...result, entries: undefined, log: undefined, entryCount: result.entries.length } : null, winners,
-    overlay: await overlayView(settings, now), rewardReady: Boolean(((await db.get('config/state')) ?? {}).gwRewardId),
+    overlay: await overlayView(settings, now), rewardReady: Boolean(((await db.get('config/state')) ?? {}).gwRewardId), bonusRewardReady: Boolean(((await db.get('config/state')) ?? {}).gwBonusRewardId),
   };
 }
 

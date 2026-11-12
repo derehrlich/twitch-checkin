@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2975,6 +2975,205 @@ await test('Gewinnspiel: Ticket, Wochenpunkte, Lose-Deckel, Sperrliste, Ziehung,
   await api('PUT', 'gewinn/config', { termsPublished: true });
   assert.match(await (await pub('/gewinn/bedingungen')).text(), /Twitch ist weder Veranstalter noch Sponsor/);
   await admin(adminReq('PUT', 'settings', { gwEnabled: false }, cookie));
+});
+
+await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit Ticket, Reward-Pause)', async () => {
+  const gw = await import('../netlify/lib/belohnungen/gewinn.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  await api('PUT', 'settings', { gwEnabled: true, gwBonusEnabled: true, gwRevealSeconds: 0, chatEnabled: true });
+  const setup = await (await api('POST', 'setup', {})).json();
+  assert.equal(setup.gewinnBonus, 'Mitternachts-Los');
+  assert.equal((await getSettings()).gwBonusRewardCost, 15, 'Preis 15 Kanalpunkte');
+  const state = await db.get('config/state');
+  assert.ok(state.gwBonusRewardId && subs.some((x) => x.condition.reward_id === state.gwBonusRewardId), 'Reward und Webhook');
+  const v = await (await api('POST', 'gewinn/new', {})).json();
+  const id = v.draw.id;
+  assert.equal(v.draw.bonusOpen, '2026-11-29T00:00'); assert.equal(v.draw.bonusClose, '2026-11-29T00:30');
+  const d = await gw.getDraw(id);
+  const tz = (await getSettings()).timezone;
+  const at = (hhmm) => Date.parse(gw.parseLocal(`2026-11-29T${hhmm}`, tz));
+  assert.deepEqual([at('23:59') - 86_400_000, at('00:00'), at('00:29'), at('00:30')].map((t) => gw.bonusState(d, t)), ['vorher', 'offen', 'offen', 'zu']);
+  const bonus = (rid, uid, name) => ({ id: rid, user_id: uid, user_name: name, reward: { id: state.gwBonusRewardId } });
+  const settings = await getSettings();
+  // Außerhalb des Fensters: Hinweis und Punkte zurück
+  const before = chats().length;
+  assert.equal((await gw.handleGewinnBonus(bonus('b0', '301', 'Eva'), settings, at('00:00') - 60_000)).reason, 'closed');
+  assert.equal(chats().length, before + 1);
+  // Im Fenster: eins pro Person, auch bei gleichzeitigen Einlösungen
+  const [r1, r2] = await Promise.all([gw.handleGewinnBonus(bonus('b1', '301', 'Eva'), settings, at('00:05')), gw.handleGewinnBonus(bonus('b2', '301', 'Eva'), settings, at('00:05'))]);
+  assert.deepEqual([r1.ok, r2.ok].sort(), [false, true]);
+  assert.equal((await db.list(`gw/${id}/bonus/`)).length, 1);
+  // Extra-Los zählt nur mit Ticket, obendrauf und nicht gegen den Deckel
+  await api('PUT', 'gewinn/config', { pointsFrom: '2020-01-01T00:00', ticketOpen: '2020-01-01T00:00' });
+  const blank = { checkinDays: [], streakPts: 0, chatCount: 0, chatDay: null, dayMsgs: 0, lastAt: 0 };
+  await db.set(`gw/${id}/pts/301`, { ...blank, name: 'Eva', points: 5000 });
+  await db.set(`gw/${id}/pts/302`, { ...blank, name: 'Finn', points: 0 });
+  await db.set(`gw/${id}/ticket/301`, { name: 'Eva', at: '2026-11-30T00:01:00.000Z', points: 0, redemptionId: 't1' });
+  await db.set(`gw/${id}/ticket/302`, { name: 'Finn', at: '2026-11-30T00:02:00.000Z', points: 0, redemptionId: 't2' });
+  await db.set(`gw/${id}/bonus/999`, { name: 'OhneTicket', at: new Date().toISOString(), redemptionId: 'b9' });
+  const rows = await gw.participants(await gw.getDraw(id));
+  assert.deepEqual(rows.map((r) => [r.name, r.lots, r.extra]), [['Eva', 11, true], ['Finn', 1, false]], 'Eva: 10 (Deckel) + 1 Extra, ohne Ticket zählt nichts');
+  // Reward-Pause folgt dem Fenster
+  const paused = () => calls.filter((c) => c.method === 'PATCH' && c.query.id === state.gwBonusRewardId && 'is_paused' in c.body).at(-1)?.body.is_paused;
+  await gw.gewinnTick(settings, at('00:10')); assert.equal(paused(), false, 'im Fenster aktiv');
+  await gw.gewinnTick(settings, at('00:40')); assert.equal(paused(), true, 'danach pausiert');
+  await api('PUT', 'settings', { gwEnabled: false });
+});
+
+const { parseLocal: gwParseLocal } = await import('../netlify/lib/belohnungen/gewinn.mjs');
+const gwParse = (str) => gwParseLocal(str, 'Europe/Berlin');
+await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gewicht, einmalig, Chat), !geburtstag', async () => {
+  const cdFn = (await import('../netlify/functions/countdown.mjs')).default;
+  const radFn = (await import('../netlify/functions/rad.mjs')).default;
+  const cdLib = await import('../netlify/lib/overlays/countdown.mjs');
+  const rad = await import('../netlify/lib/overlays/gluecksrad.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'feier/rad'))).status, 401, 'Admin nur mit Login');
+
+  // Countdown: Standard unsichtbar, Zielzeit in der Zeitzone des Kanals, öffentliche Seite liefert Serverzeit
+  assert.equal((await (await cdFn(new Request(BASE + '/api/countdown'))).json()).show, false);
+  let v = await (await api('PUT', 'feier/countdown', { title: 'Noch bis Mitternacht', target: '2026-11-29T00:00', show: true })).json();
+  assert.equal(v.config.target, '2026-11-29T00:00');
+  const pub = await (await cdFn(new Request(BASE + '/api/countdown'))).json();
+  assert.equal(pub.show, true); assert.equal(pub.target, Date.parse(gwParse('2026-11-29T00:00'))); assert.ok(Math.abs(pub.now - Date.now()) < 5000);
+  assert.equal((await api('PUT', 'feier/countdown', { target: 'quatsch' })).status, 400);
+  assert.equal(cdLib.fmtRemaining(3 * 86_400_000 + 4 * 3_600_000 + 12 * 60_000), '3 Tage 4 Std 12 Min');
+  assert.equal(cdLib.fmtRemaining(86_400_000 + 3_600_000), '1 Tag 1 Std 0 Min');
+  assert.equal(cdLib.fmtRemaining(125_000), '2 Min 5 Sek');
+
+  // !geburtstag: aus, solange nicht eingeschaltet; dann Restzeit und Plan; nach dem Ziel der andere Text
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, bdayEnabled: false });
+  assert.deepEqual(await chatMsg('!geburtstag', 'g1', 'Gast'), []);
+  await api('PUT', 'settings', { bdayEnabled: true, bdayPlan: 'Mo 19:00 Slides\nDi 20:30 Bauabend' });
+  const [r] = await chatMsg('!geburtstag', 'g2', 'Gast');
+  assert.match(r, /Noch .* bis Marcels Geburtstag.*Mo 19:00 Slides · Di 20:30 Bauabend/);
+  await api('PUT', 'feier/countdown', { target: '2020-01-01T00:00' });
+  assert.match((await chatMsg('!geburtstag', 'g3', 'Gast'))[0], /Marcel hat Geburtstag/);
+  await api('PUT', 'settings', { bdayEnabled: false });
+
+  // Glücksrad: ohne Rad nichts, Felder aus Text mit Gewicht und Farbe, Beispiele, Gewicht, einmalig, Ergebnis im Chat
+  assert.equal((await api('POST', 'feier/rad/spin', {})).status, 404);
+  assert.equal((await api('POST', 'feier/rad/wheel', { name: 'Zu klein', segmentsText: 'nur eins' })).status, 400);
+  const seg = rad.parseSegments('A\nB ; 3\nC ; 2 ; #FF8800\n\n  \nD ; 999 ; kaputt');
+  assert.deepEqual(seg.map((x) => [x.label, x.weight, x.color]), [['A', 1, ''], ['B', 3, ''], ['C', 2, '#ff8800'], ['D', 100, '']]);
+  assert.equal(rad.segmentsText({ segments: seg }).split('\n')[2], 'C ; 2 ; #ff8800');
+  assert.throws(() => rad.parseSegments(Array.from({ length: 41 }, (_, i) => 'F' + i).join('\n')), /Höchstens 40/);
+  v = await (await api('POST', 'feier/rad/examples', {})).json();
+  assert.deepEqual(v.wheels.map((w) => w.name), ['Gebäudeart', 'Baustil', 'Community-Aktion']);
+  assert.equal(v.state.wheelId, v.wheels[0].id, 'erstes Rad ist gewählt');
+  assert.equal((await (await radFn(new Request(BASE + '/api/rad'))).json()).show, false);
+
+  // Gewicht: ein Feld mit 99 gegen eins trifft fast immer
+  const heavy = rad.parseSegments('Selten\nOft ; 99');
+  let often = 0; for (let i = 0; i < 400; i++) if (rad.pick(heavy).label === 'Oft') often++;
+  assert.ok(often > 360, `Gewicht wirkt (${often}/400)`);
+  assert.equal(rad.pick(heavy.map((x) => ({ ...x, used: true }))), null);
+
+  // Drehen: Ergebnis steht fest, zweiter Dreh währenddessen wird abgelehnt, Ergebnis kommt in den Chat, Rad ist sichtbar
+  await api('PUT', 'settings', { chatEnabled: true, radChatEnabled: true, radTemplate: '🎡 {wheel}: {result}!' });
+  const wheel = v.wheels[0];
+  v = await (await api('PUT', `feier/rad/wheel/${wheel.id}`, { removeWon: true, segments: 'Eins\nZwei' })).json();
+  const chatsBefore = chats().length;
+  v = await (await api('POST', 'feier/rad/spin', {})).json();
+  assert.ok(['Eins', 'Zwei'].includes(v.state.spin.label)); assert.equal(v.state.show, true);
+  assert.equal((await api('POST', 'feier/rad/spin', {})).status, 409, 'dreht noch');
+  const pubRad = await (await radFn(new Request(BASE + '/api/rad'))).json();
+  assert.equal(pubRad.show, true); assert.equal(pubRad.wheel.segments.length, 2); assert.ok(pubRad.wheel.segments.every((x) => /^#[0-9a-f]{6}$/.test(x.color)), 'Farben aus der Palette');
+  assert.equal(pubRad.wheel.segments.filter((x) => x.used).length, 1, 'gedrehtes Feld ist ausgegraut');
+  assert.equal(pubRad.spin.index, pubRad.wheel.segments.findIndex((x) => x.label === v.state.spin.label));
+  // zweiter und dritter Dreh nach der Drehzeit: jedes Feld nur einmal, danach „alle dran“, Zurücksetzen hilft
+  const later = Date.now() + 20_000;
+  assert.equal((await rad.spin(await getSettings(), { now: later, announce: false })).ok, true);
+  assert.equal((await rad.spin(await getSettings(), { now: later + 20_000, announce: false })).status, 409);
+  v = await (await api('POST', `feier/rad/wheel/${wheel.id}/reset`, {})).json();
+  assert.ok(v.wheels[0].segments.every((x) => !x.used));
+  assert.equal(chats().length, chatsBefore, 'Chat-Ergebnis kommt erst nach der Drehzeit');
+  assert.equal(v.state.history.length, 2);
+  // Rad wechseln setzt den Dreh zurück, Löschen räumt auf
+  v = await (await api('PUT', 'feier/rad/state', { wheelId: v.wheels[1].id })).json();
+  assert.equal(v.state.spin, null);
+  assert.equal((await api('PUT', 'feier/rad/state', { wheelId: 'ffffffff' })).status, 400);
+  v = await (await api('DELETE', `feier/rad/wheel/${v.wheels[1].id}`)).json();
+  assert.equal(v.wheels.length, 2); assert.equal(v.state.wheelId, v.wheels[0].id);
+  assert.equal((await api('DELETE', 'feier/rad/wheel/ffffffff')).status, 404);
+  await api('PUT', 'settings', { radChatEnabled: false });
+});
+
+await test('Adventure-Einreichung: Twitch und Discord in einer Liste, Duplikate, Limit, verknüpfte Konten, aufs Glücksrad', async () => {
+  const adv = await import('../netlify/lib/belohnungen/adventures.mjs');
+  const rad = await import('../netlify/lib/overlays/gluecksrad.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
+  const community = (await import('../netlify/functions/community.mjs')).default;
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const bot = (m, p, b) => community(new Request(BASE + '/api/community/' + p, { method: m, headers: { 'content-type': 'application/json', authorization: 'Bearer geheimwort-12345' }, body: b ? JSON.stringify(b) : undefined }));
+  assert.equal((await admin(adminReq('GET', 'adventure'))).status, 401);
+
+  // Ausgeschaltet: der Befehl reagiert nicht, Discord bekommt „geschlossen“
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, advEnabled: false });
+  assert.deepEqual(await chatMsg('!adventure Lamas Rache', 'a1', 'Anna'), []);
+  assert.equal((await (await bot('POST', 'adventure', { discordId: '700000001', discordName: 'Zed', text: 'X' })).json()).reason, 'closed');
+  await api('PUT', 'settings', { advEnabled: true, advOpen: true, advMaxPerPerson: 2 });
+
+  // Twitch: angenommen, ohne Text gibt es einen Hinweis, doppelt wird abgelehnt (auch anders geschrieben), Limit 2 je Person
+  assert.match((await chatMsg('!adventure Lamas Rache', 'a1', 'Anna'))[0], /Anna, dein Adventure „Lamas Rache“ ist in der Liste \(Nr\. 1\)/);
+  assert.match((await chatMsg('!adventure', 'a1', 'Anna'))[0], /schreib den Namen oder den Link/);
+  assert.match((await chatMsg('!adventure  lamas   RACHE ', 'a2', 'Ben'))[0], /schon in der Liste/);
+  assert.match((await chatMsg('!adventure Die Mine https://example.com/mine javascript:alert(1)', 'a1', 'Anna'))[0], /Nr\. 2/);
+  assert.match((await chatMsg('!adventure Dritte Karte', 'a1', 'Anna'))[0], /schon 2 Adventures eingereicht/);
+  let list = (await adv.listEntries());
+  assert.deepEqual(list.map((e) => [e.title, e.link, e.name, e.source]), [['Lamas Rache', '', 'Anna', 'twitch'], ['Die Mine javascript:alert(1)', 'https://example.com/mine', 'Anna', 'twitch']]);
+  assert.deepEqual(adv.parseSubmission('https://www.beispiel.de/x?y=1'), { title: 'beispiel.de', link: 'https://www.beispiel.de/x?y=1' });
+  assert.deepEqual(adv.parseSubmission('ftp://nein'), { title: 'ftp://nein', link: '' }, 'nur http(s) wird zum Link');
+
+  // Discord (verknüpft: zählt mit den Twitch-Einreichungen derselben Person; unverknüpft: eigene Person)
+  await com.saveLink({ discordId: '700000002', discordName: 'AnnaDC', twitchId: 'a1', twitchName: 'Anna' });
+  const viaBot = async (id, name, text) => (await (await bot('POST', 'adventure', { discordId: id, discordName: name, text })).json());
+  assert.equal((await viaBot('700000002', 'AnnaDC', 'Noch eins')).reason, 'limit', 'Anna hat über Twitch schon 2');
+  const z1 = await viaBot('700000001', 'Zed', 'Burgbau');
+  assert.equal(z1.ok, true); assert.match(z1.reply, /Zed, dein Adventure „Burgbau“/);
+  assert.equal((await viaBot('700000001', 'Zed', 'Burgbau')).reason, 'duplicate');
+  assert.equal((await bot('POST', 'adventure', { discordId: 'abc', text: 'x' })).status, 400);
+  const view = await (await bot('GET', 'adventure')).json();
+  assert.equal(view.count, 3); assert.ok(!JSON.stringify(view).includes('example.com'), 'Bot bekommt keine Links');
+
+  // Geschlossen: nichts mehr, Admin kann trotzdem von Hand ergänzen
+  await api('PUT', 'settings', { advOpen: false });
+  assert.match((await chatMsg('!adventure Spät dran', 'a3', 'Cleo'))[0], /geschlossen/);
+  let v = await (await api('POST', 'adventure/entry', { text: 'Vom Admin', name: 'Dora' })).json();
+  assert.equal(v.counts.all, 4);
+  assert.equal((await api('POST', 'adventure/entry', { text: '   ' })).status, 400);
+
+  // Aufs Glücksrad: neues Rad mit Zusatzzeile und Verweis, nur offene Einträge
+  const doraId = v.entries.find((e) => e.name === 'Dora').id;
+  await api('PUT', `adventure/entry/${doraId}`, { status: 'gespielt' });
+  v = await (await api('POST', 'adventure/to-wheel', { name: 'Adventures Freitag' })).json();
+  assert.equal(v.used, 3); assert.equal(v.wheel.name, 'Adventures Freitag');
+  const wheel = await rad.getWheel(v.wheel.id);
+  assert.equal(wheel.removeWon, true);
+  assert.deepEqual(wheel.segments.map((x) => [x.label, x.note]).sort(), [['Burgbau', 'eingereicht von Zed'], ['Die Mine javascript:alert(1)', 'eingereicht von Anna'], ['Lamas Rache', 'eingereicht von Anna']]);
+  assert.ok(wheel.segments.every((x) => x.ref));
+  // Text-Bearbeitung des Rads behält Zusatzzeile und Verweis bei gleichem Namen
+  const edited = await rad.updateWheel(wheel.id, { segments: rad.segmentsText(wheel) + '\nNeu von Hand' });
+  assert.equal(edited.segments.find((x) => x.label === 'Burgbau').note, 'eingereicht von Zed');
+  assert.equal(edited.segments.length, 4);
+  await rad.updateWheel(wheel.id, { segments: rad.segmentsText(wheel) }); // Zusatzfeld wieder weg
+  // Drehen markiert den Eintrag als „vom Rad gewählt“ und liefert die Zusatzzeile
+  await rad.updateState({ wheelId: wheel.id });
+  const r = await rad.spin(await getSettings(), { announce: false });
+  assert.ok(r.ok && r.spin.note.startsWith('eingereicht von '));
+  const picked = (await adv.listEntries()).filter((e) => e.status === 'gedreht');
+  assert.equal(picked.length, 1);
+  // Löschen räumt auch die Doppel-Sperre auf; nur 1 Eintrag reicht nicht für ein Rad
+  assert.equal((await api('DELETE', `adventure/entry/${doraId}`)).status, 200);
+  assert.equal((await viaBot('700000009', 'Neu', 'Vom Admin')).ok, false, 'Einreichung ist noch geschlossen');
+  await api('PUT', 'settings', { advOpen: true });
+  assert.equal((await viaBot('700000009', 'Neu', 'Vom Admin')).ok, true, 'Titel ist nach dem Löschen wieder frei');
+  await api('POST', 'adventure/clear', {});
+  assert.equal((await adv.listEntries()).length, 0);
+  assert.equal((await api('POST', 'adventure/to-wheel', {})).status, 400);
+  await api('PUT', 'settings', { advEnabled: false });
+  delete process.env.LINK_SECRET;
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

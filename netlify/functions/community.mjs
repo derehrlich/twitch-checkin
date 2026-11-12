@@ -8,11 +8,14 @@
 //   POST /api/community/sync     Discord-Zahlen des Monats melden { month, rows: [{ discordId, msgs, days }] }
 //   GET  /api/community/gewinn/dm       Gewinner-Links, die per Discord-DM verschickt werden sollen [{ winnerId, discordId, message }]
 //   POST /api/community/gewinn/dm/ack   { winnerId, failed? } nach dem Senden der DM (failed: true = nicht zustellbar)
+//   GET  /api/community/adventure   Adventure-Einreichungen { enabled, open, count, entries: [{ title, name, source, status }] }
+//   POST /api/community/adventure   Adventure einreichen { discordId, discordName, text } -> { ok, reason, reply } (reply = Text für die Antwort im Discord)
 //   POST /api/community/unlink   Verknüpfung löschen { discordId }
 // Öffentlich zugänglich ist nur die Rangliste in /api/leaderboard.
 import { getSettings } from '../lib/kern/settings.mjs';
 import { announceAgain, awardForBot } from '../lib/belohnungen/award.mjs';
 import { ackDm, pendingDms } from '../lib/belohnungen/gewinn.mjs';
+import { botView, submitFromDiscord } from '../lib/belohnungen/adventures.mjs';
 import { json } from '../lib/kern/http.mjs';
 import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
@@ -57,6 +60,11 @@ export default async (req) => {
   }
   if (route[0] === 'gewinn' && route[1] === 'dm' && !route[2] && req.method === 'GET') return json({ dms: (await pendingDms()).map((d) => ({ winnerId: d.winnerId, discordId: d.discordId, message: d.message })) });
   if (route[0] === 'gewinn' && route[1] === 'dm' && route[2] === 'ack' && writes) return json({ ok: await ackDm(String(body.winnerId ?? ''), { failed: body.failed === true }) });
+  if (route[0] === 'adventure' && !route[1] && req.method === 'GET') return json(await botView(settings));
+  if (route[0] === 'adventure' && !route[1] && writes) {
+    const res = await submitFromDiscord(settings, { discordId: body.discordId, discordName: body.discordName, text: body.text });
+    return json({ ok: res.ok, reason: res.reason ?? null, reply: res.reply }, res.status ?? 200);
+  }
   if (route[0] === 'unlink' && writes) return json({ ok: await removeLink({ discordId: String(body.discordId ?? '') }) });
   return json({ error: 'Not found' }, 404);
 };

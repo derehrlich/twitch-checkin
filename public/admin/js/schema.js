@@ -232,6 +232,12 @@ export const SCHEMA = {
     { title: 'Geburtstags-Ziehung: Ticket und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du darüber in der Karte „Geburtstags-Ziehung“. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
       c('gwEnabled', false, 'Geburtstags-Ziehung einschalten (legt den Reward an und zählt die Wochenpunkte, braucht den Chat-Webhook)'),
       t('gwRewardTitle', 'Geburtstags-Ticket', 'Reward-Name', { maxlength: 45 }), n('gwRewardCost', 500, 'Preis des Tickets (Kanalpunkte, günstig halten)', { min: 1, max: 1000000 }),
+      c('gwBonusEnabled', true, 'Mitternachts-Los anbieten (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind; das Fenster stellst du in der Karte „Geburtstags-Ziehung“ ein)'),
+      t('gwBonusRewardTitle', 'Mitternachts-Los', 'Mitternachts-Los: Reward-Name', { maxlength: 45 }), n('gwBonusRewardCost', 15, 'Mitternachts-Los: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      a('gwBonusTemplate', '🌙 {user}, dein Mitternachts-Los ist drin! Du hast {lots} Extra-Los obendrauf. Alles Gute zum Geburtstag!', 'Mitternachts-Los erhalten (mit Ticket)', { user: 'Max', lots: 1 }),
+      a('gwBonusNoTicketTemplate', '🌙 {user}, dein Mitternachts-Los ist gemerkt! Damit es zählt, brauchst du noch das Geburtstags-Ticket (kommt am Danke-Stream).', 'Mitternachts-Los erhalten (noch ohne Ticket)', { user: 'Max', lots: 1 }),
+      a('gwBonusDuplicateTemplate', '{user}, du hast dein Mitternachts-Los schon ✅ Pro Person gibt es eins. Deine Punkte bekommst du zurück.', 'Zweites Mitternachts-Los (Punkte werden erstattet)', { user: 'Max' }),
+      a('gwBonusClosedTemplate', '{user}, das Mitternachts-Los gibt es gerade nicht mehr. Deine Punkte bekommst du zurück.', 'Mitternachts-Los: Fenster zu (Punkte werden erstattet)', { user: 'Max' }),
       n('gwRevealSeconds', 8, 'Sekunden je Platz bei der Aufdeckung (Overlay, Chat und Link im Takt, 0 = alles sofort)', { min: 0, max: 60 }),
       a('gwTicketTemplate', '🎟️ {user}, dein Geburtstags-Ticket ist drin! Du hast aktuell {lots} Los(e). Bonuslose gibt es für Aktivität bis zur Ziehung.', 'Ticket erhalten', { user: 'Max', lots: 3 }),
       a('gwDuplicateTemplate', '{user}, du hast dein Geburtstags-Ticket schon ✅ Pro Person gibt es eins. Deine Punkte bekommst du zurück.', 'Zweites Ticket (Punkte werden erstattet)', { user: 'Max' }),
@@ -240,6 +246,34 @@ export const SCHEMA = {
       a('gwWinnerTemplate', '🎉 Platz {place}: {user} gewinnt {prize}! Du bekommst gleich eine Flüsternachricht mit deinem persönlichen Link, du hast {hours} Stunden Zeit.', 'Gewinner-Ansage im Chat', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24 }),
       a('gwRedrawTemplate', '🔁 Nachgezogen: {user} gewinnt {prize} (Platz {place}). {old} hat sich nicht gemeldet. Persönlicher Link per Flüstern, {hours} Stunden Zeit.', 'Nachgezogen', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24, old: 'Anna' }),
       a('gwWhisperTemplate', 'Glückwunsch {user}! Du hast {prize} gewonnen 🎉 Dein persönlicher Link (nur für dich, {hours} Stunden gültig, bitte nicht weitergeben): {url}', 'Flüsternachricht mit dem Link', { user: 'Max', prize: 'Enshrouded', hours: 24, url: 'https://…' }),
+    ] },
+  ],
+
+  feier: [
+    { title: 'Geburtstags-Befehl', hint: `Der Befehl zeigt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Wochenplan. Platzhalter: ${code('countdown')} Restzeit, ${code('plan')} der Plan. Im Plan steht ein Eintrag pro Zeile, im Chat werden sie mit · verbunden (zusammen höchstens 400 Zeichen, der Chat nimmt 500).`, items: [
+      c('bdayEnabled', false, 'Geburtstags-Befehl einschalten (braucht den Chat-Webhook)'),
+      t('bdayCommand', '!geburtstag', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!geburtstag' }),
+      a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das Programm: {plan}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
+      a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {plan}', 'Antwort nach der Zielzeit', { plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
+      a('bdayPlan', 'Mo 23.11. 19:00 Wie alles begann (Slides)\nDi 24.11. 20:30 Bau-Abend mit Glücksrad\nMi 25.11. 19:00 Community-Tag 1\nDo 26.11. 20:30 Chat-Abend\nFr 27.11. 19:00 Community-Tag 2\nSa 28.11. ab 19:00 Mitternachtsstream\nMo 30.11. Danke-Stream', 'Wochenplan (eine Zeile pro Eintrag)'),
+    ] },
+    { title: 'Glücksrad: Chat', hint: `Die Räder und ihre Felder pflegst du im Reiter „Geburtstagswoche“. Platzhalter: ${code('wheel')} Name des Rads, ${code('result')} Ergebnis.`, items: [
+      c('radChatEnabled', true, 'Ergebnis nach dem Drehen in den Chat schreiben'),
+      a('radTemplate', '🎡 {wheel}: {result}!', 'Chatnachricht mit dem Ergebnis', { wheel: 'Gebäudeart', result: 'Leuchtturm' }),
+    ] },
+  ],
+
+  adventure: [
+    { title: 'Adventure-Einreichung: Befehl und Texte', hint: `Zuschauer reichen im Chat mit dem Befehl ein, zum Beispiel <code>!adventure Name oder Link</code>. Im Discord geht es über den VerwirrBot in dieselbe Liste. Die Liste und die Übertragung aufs Glücksrad findest du oben in der Karte „Adventure-Einreichungen“. Platzhalter: ${code('user')} ${code('title')} ${code('count')} Einreichungen insgesamt, ${code('max')} Einreichungen je Person.`, items: [
+      c('advEnabled', false, 'Adventure-Einreichung einschalten (Chat-Befehl und Discord, braucht den Chat-Webhook)'),
+      c('advOpen', true, 'Einreichung ist offen (zum Schließen abhaken, die Liste bleibt)'),
+      t('advCommand', '!adventure', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!adventure' }),
+      n('advMaxPerPerson', 2, 'So viele Adventures darf jede Person einreichen (Twitch und Discord zusammen)', { min: 1, max: 20 }),
+      a('advAddedTemplate', '🗺️ {user}, dein Adventure „{title}“ ist in der Liste (Nr. {count}). Danke!', 'Adventure angenommen', { user: 'Max', title: 'Lamas Rache', count: 4 }),
+      a('advDuplicateTemplate', '{user}, „{title}“ ist schon in der Liste ✅', 'Adventure schon eingereicht', { user: 'Max', title: 'Lamas Rache' }),
+      a('advLimitTemplate', '{user}, du hast schon {max} Adventures eingereicht. Mehr gehen leider nicht.', 'Zu viele Einreichungen', { user: 'Max', max: 2 }),
+      a('advNoTextTemplate', '{user}, schreib den Namen oder den Link hinter den Befehl, zum Beispiel !adventure Lamas Rache', 'Nichts dahinter geschrieben', { user: 'Max' }),
+      a('advClosedTemplate', '{user}, die Adventure-Einreichung ist gerade geschlossen.', 'Einreichung geschlossen', { user: 'Max' }),
     ] },
   ],
 
@@ -300,4 +334,4 @@ export const CHECKS = all.filter((i) => i.type === 'check').map((i) => i.id);
 export const FIELDS = all.filter((i) => i.type !== 'check').map((i) => i.id);
 
 // Änderungen an diesen Feldern erfordern „Rewards & Webhooks abgleichen“
-export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'gradientEnabled', 'gradientRewardTitle', 'gradientRewardCost', 'gradientDays', 'gwEnabled', 'gwRewardTitle', 'gwRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];
+export const SYNC_KEYS = ['rewardTitle', 'rewardCost', 'checkoutEnabled', 'checkoutRewardTitle', 'checkoutRewardCost', 'streakRescueEnabled', 'streakRewardTitle', 'streakRewardCost', 'communityEnabled', 'entrySoundEnabled', 'entrySoundBuyTitle', 'entrySoundBuyCost', 'entrySoundBuyMonths', 'entrySoundExtendTitle', 'entrySoundExtendCost', 'entrySoundMaxSeconds', 'entrySoundMaxMonths', 'alpacaEnabled', 'alpacaRewardTitle', 'alpacaRewardCost', 'glitterEnabled', 'glitterRewardTitle', 'glitterRewardCost', 'glitterDays', 'gradientEnabled', 'gradientRewardTitle', 'gradientRewardCost', 'gradientDays', 'gwEnabled', 'gwRewardTitle', 'gwRewardCost', 'gwBonusEnabled', 'gwBonusRewardTitle', 'gwBonusRewardCost', 'raidEnabled', 'alertsEnabled', 'creditsEnabled', 'chatCommands', 'chatStats', 'modEnabled'];
