@@ -78,3 +78,11 @@ details summary { cursor: pointer; }
 .tab-panel h2.part { margin: 14px 0 -6px; font-size: 1.25rem; color: var(--gelb); border-bottom: 1px solid var(--rand); padding-bottom: 6px; }
 .tab-panel h2.part:first-of-type { margin-top: 0; }
 .tab-panel .intro { margin: 0; }
+
+/* Events / Tickets */
+.tk-list { margin-top: 14px; overflow-x: auto; }
+table.tk { width: 100%; border-collapse: collapse; font-size: .95rem; }
+table.tk th { text-align: left; color: var(--leise); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--rand); }
+table.tk td { padding: 6px 8px; border-bottom: 1px solid var(--rand); vertical-align: middle; }
+table.tk input { margin: 0; min-width: 150px; }
+.tk-act { white-space: nowrap; } .tk-act button { padding: 5px 10px; margin: 2px 2px 2px 0; }

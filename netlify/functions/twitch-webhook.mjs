@@ -7,6 +7,7 @@ import { handleRaid } from '../lib/ereignisse/raid.mjs';
 import { handleAlert } from '../lib/ereignisse/alerts.mjs';
 import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
+import { eventByReward, handleTicket } from '../lib/belohnungen/tickets.mjs';
 import { handleAlpaca } from '../lib/belohnungen/alpaca.mjs';
 import { handleChat } from '../lib/chat/chat.mjs';
 import { handleGlitter, handleGradient } from '../lib/chat/chatlog.mjs';
@@ -74,7 +75,8 @@ export default async (req) => {
     const isGlitter = Boolean(state.glitterRewardId) && e.reward.id === state.glitterRewardId;
     const isGradient = Boolean(state.gradientRewardId) && e.reward.id === state.gradientRewardId;
     const board = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient ? null : (await getBoard()).find((x) => x.rewardId === e.reward.id);
-    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !isGradient && !board) return new Response(null, { status: 204 });
+    const ticketEvent = isCheckin || isCheckout || isRescue || isEntryBuy || isEntryExtend || isAlpaca || isGlitter || isGradient || board ? null : await eventByReward(e.reward.id);
+    if (!isCheckin && !isCheckout && !isRescue && !isEntryBuy && !isEntryExtend && !isAlpaca && !isGlitter && !isGradient && !board && !ticketEvent) return new Response(null, { status: 204 });
 
     // Twitch wiederholt Zustellungen: jede Einlösung nur einmal verarbeiten
     if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
@@ -82,6 +84,7 @@ export default async (req) => {
       const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, user_input: e.user_input, reward: e.reward };
       const settings = await getSettings();
       if (board) await handleSoundboard(redemption, board, settings);
+      else if (ticketEvent) await handleTicket(redemption, ticketEvent, settings);
       else if (isAlpaca) await handleAlpaca(redemption, settings);
       else if (isGlitter) await handleGlitter(redemption, settings);
       else if (isGradient) await handleGradient(redemption, settings);

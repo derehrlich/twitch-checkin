@@ -2210,7 +2210,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'tickets', 'platz', 'absagen', 'dabei', 'ingame', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2625,6 +2625,133 @@ await test('Störungs-Meldungen: Probleme erkennen, erst beim zweiten Mal melden
   assert.equal(await gh.healthTick(T + 40 * 3_600_000), null);
   assert.equal((await api('POST', 'health/test', {})).status, 400, 'ohne Adresse kein Test');
   await put({ healthEnabled: false }); await db.delete('health/state');
+});
+
+// ---- Ticket-System
+await test('Tickets: Event mit Reward, Plätze, Warteliste, Ausverkauf, Doppel-Einlösung, Absage mit Nachrücken', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const T = (m, p, b) => admin(adminReq(m, p, b, cookie)).then((r) => r.json());
+  await admin(adminReq('PUT', 'settings', { ticketsEnabled: true, chatEnabled: true, chatCommands: true, commandCooldown: 0 }, cookie));
+  const made = await T('POST', 'tickets', { name: 'Community-Abend Mittwoch', startsAt: '2026-11-25T19:00', seats: 2, cost: 700, status: 'open', waitlistMax: 2 });
+  assert.equal(made.warning, null);
+  const ev = made.event;
+  const reward = rewards.find((r) => r.id === ev.rewardId);
+  assert.equal(reward.title, 'Ticket: Community-Abend Mittwoch');
+  assert.equal(reward.cost, 700);
+  assert.equal(reward.is_enabled, true);
+  assert.ok(subs.some((x) => x.condition.reward_id === ev.rewardId), 'Webhook-Abo für den Reward');
+
+  let rn = 0;
+  const redeem = async (uid, name) => {
+    const id = 'tr' + ++rn;
+    const res = await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, event: { id, user_id: uid, user_name: name, user_input: '', reward: { id: ev.rewardId, title: reward.title } } }, { id: 'm' + id }));
+    assert.equal(res.status, 204);
+    return id;
+  };
+  const statusOf = (id) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === id).map((c) => c.body.status);
+  const detail = async () => T('GET', `tickets/${ev.id}`);
+
+  const a = await redeem('t1', 'Anna'); const b = await redeem('t2', 'Bernd');
+  assert.deepEqual([statusOf(a), statusOf(b)], [['FULFILLED'], ['FULFILLED']]);
+  assert.match(chats().at(-2), /Anna, du hast Platz 1 von 2/);
+  const c = await redeem('t3', 'Carla'); const d = await redeem('t4', 'Dirk');
+  assert.deepEqual([statusOf(c), statusOf(d)], [[], []], 'Warteliste bleibt unerfüllt in der Queue');
+  assert.match(chats().at(-2), /Carla.*Position 1/); assert.match(chats().at(-1), /Dirk.*Position 2/);
+  assert.equal(rewards.find((r) => r.id === ev.rewardId).is_paused, true, 'voll samt Warteliste: Reward pausiert');
+
+  // Ausverkauft und doppelt
+  const e5 = await redeem('t5', 'Emil');
+  assert.deepEqual(statusOf(e5), ['CANCELED']); assert.match(chats().at(-1), /ausgebucht/);
+  const dup = await redeem('t1', 'Anna');
+  assert.deepEqual(statusOf(dup), ['CANCELED']); assert.match(chats().at(-1), /schon einen Platz/);
+  assert.equal((await detail()).entries.length, 4);
+
+  // Chat-Befehle
+  const say = async (text, id = 't3', name = 'Carla', badges = []) => { const n0 = chats().length; await handleChat({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges, message_id: 'tk-' + Math.random(), message: { text } }, await getSettings()); return chats().slice(n0); };
+  assert.match((await say('!tickets'))[0], /Community-Abend Mittwoch \(Mi 25\.11\. 19:00\): 0 von 2 Plätzen frei, Warteliste: 2/);
+  assert.match((await say('!platz'))[0], /Carla.*Warteliste, Position 1/);
+  assert.match((await say('!ingame CarlaMC'))[0], /CarlaMC/);
+  assert.equal((await detail()).entries.find((x) => x.name === 'Carla').ingame, 'CarlaMC');
+
+  // Absage: Anna gibt zurück, Carla rückt nach, Einlösung wird erfüllt, Reward wieder frei
+  const out = await say('!absagen', 't1', 'Anna');
+  assert.match(out[0], /Carla ist nachgerückt/); assert.match(out[1], /Anna.*zurückgegeben/);
+  assert.deepEqual(statusOf(c), ['FULFILLED']);
+  assert.equal(rewards.find((r) => r.id === ev.rewardId).is_paused, false, 'Platz in der Warteliste frei: Reward wieder offen');
+  const after = (await detail()).entries;
+  assert.deepEqual(after.map((x) => [x.name, x.status, x.position]), [['Anna', 'cancelled', null], ['Bernd', 'ticket', null], ['Carla', 'ticket', null], ['Dirk', 'waitlist', 1]]);
+
+  // Mods: von Hand hinzufügen und entfernen, normale Zuschauer dürfen das nicht
+  assert.deepEqual(await say('!ticketadd raiderin', 't9', 'Zuschauer'), []);
+  const mod = [{ set_id: 'moderator', id: '1' }];
+  assert.match((await say('!ticketadd raiderin', 't9', 'ModMax', mod))[0], /RaiderIn steht auf der Warteliste.*Platz 2/);
+  assert.match((await say('!ticketremove dirk', 't9', 'ModMax', mod))[0], /Dirk ist bei Community-Abend Mittwoch entfernt/);
+  assert.deepEqual(statusOf(d), ['CANCELED'], 'Wartelisten-Einlösung wird erstattet');
+  assert.match((await say('!ticketremove niemand', 't9', 'ModMax', mod))[0], /kein Ticket/);
+
+  // Admin: Anwesenheit, Nachrücken von Hand, Event beenden
+  assert.equal((await T('POST', `tickets/${ev.id}/attendance`, { userId: 't2', status: 'attended' })).ok, true);
+  assert.equal((await T('POST', `tickets/${ev.id}/attendance`, { userId: 't3', status: 'noshow' })).ok, true);
+  const csv = await (await admin(adminReq('GET', `tickets/${ev.id}/csv`, null, cookie))).text();
+  assert.match(csv, /"Bernd","attended".*\n.*"Carla","noshow"/);
+  const list = await T('GET', 'tickets');
+  assert.deepEqual([list.events[0].attended, list.events[0].noshow, list.events[0].taken], [1, 1, 2]);
+  const ended = await T('PUT', `tickets/${ev.id}`, { status: 'ended' });
+  assert.equal(ended.event.status, 'ended');
+  assert.equal((await detail()).entries.find((x) => x.name === 'RaiderIn').status, 'cancelled', 'Warteliste am Event-Ende storniert');
+  assert.equal(rewards.find((r) => r.id === ev.rewardId).is_enabled, false);
+});
+
+await test('Tickets: gleichzeitige Einlösungen überschreiten das Limit nie; Ein-Ticket-pro-Woche; Nachrück-Frist', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const { sweepOffers } = await import('../netlify/lib/belohnungen/tickets.mjs');
+  const T = (m, p, b) => admin(adminReq(m, p, b, cookie)).then((r) => r.json());
+  const wed = (await T('POST', 'tickets', { name: 'Mittwoch', startsAt: '2026-11-25T19:00', seats: 3, cost: 500, status: 'open', waitlistMax: 20, oneWeek: true })).event;
+  const fri = (await T('POST', 'tickets', { name: 'Freitag', startsAt: '2026-11-27T19:00', seats: 2, cost: 500, status: 'open', waitlistMax: 20, oneWeek: true, promoteMinutes: 10 })).event;
+  let rn = 100;
+  const redeem = (ev, uid, name) => webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, event: { id: 'cr' + ++rn, user_id: uid, user_name: name, user_input: '', reward: { id: ev.rewardId, title: 'x' } } }, { id: 'cm' + rn }));
+  await Promise.all(Array.from({ length: 8 }, (_, i) => redeem(wed, 'u' + i, 'Gast' + i)));
+  const rows = (await T('GET', `tickets/${wed.id}`)).entries;
+  assert.equal(rows.filter((x) => x.status === 'ticket').length, 3, 'genau 3 Tickets');
+  assert.equal(rows.filter((x) => x.status === 'waitlist').length, 5);
+  assert.deepEqual(rows.filter((x) => x.status === 'waitlist').map((x) => x.position).sort(), [1, 2, 3, 4, 5]);
+
+  // wer am Mittwoch dabei ist (oder wartet), bekommt am Freitag kein Ticket
+  const n0 = chats().length;
+  await redeem(fri, 'u0', 'Gast0');
+  assert.match(chats().at(-1), /pro Woche gibt es nur ein Ticket/);
+  assert.equal(calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === 'cr' + rn).at(-1).body.status, 'CANCELED');
+  assert.equal((await T('GET', `tickets/${fri.id}`)).entries.length, 0);
+
+  // Nachrück-Frist am Freitag: 2 Plätze, 3 Leute
+  await redeem(fri, 'f1', 'Fee'); await redeem(fri, 'f2', 'Flo'); const late = 'cr' + (rn + 1); await redeem(fri, 'f3', 'Fynn');
+  const cancel = async (id, name, text = '!absagen') => handleChat({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges: [], message_id: 'ab-' + Math.random(), message: { text } }, await getSettings());
+  await cancel('f1', 'Fee');
+  let f = (await T('GET', `tickets/${fri.id}`)).entries.find((x) => x.name === 'Fynn');
+  assert.equal(f.status, 'offered'); assert.match(chats().at(-2), /Fynn.*10 Minuten.*!dabei/);
+  assert.deepEqual(calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === late).map((c) => c.body.status), [], 'noch nicht erfüllt');
+  // Frist läuft ab: Platz wird frei, sonst steht niemand mehr auf der Warteliste
+  assert.equal(await sweepOffers(await getSettings(), Date.now() + 11 * 60_000), 1);
+  f = (await T('GET', `tickets/${fri.id}`)).entries.find((x) => x.name === 'Fynn');
+  assert.equal(f.status, 'cancelled');
+  assert.deepEqual(calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === late).map((c) => c.body.status), ['CANCELED']);
+  assert.match(chats().at(-1), /Fynn hat sich nicht gemeldet/);
+
+  // Event löschen räumt Reward und Abo ab
+  for (const ev of [wed, fri]) assert.equal((await T('DELETE', `tickets/${ev.id}`)).ok, true);
+  assert.ok(!rewards.some((r) => r.id === wed.rewardId));
+  assert.ok(!subs.some((x) => x.condition.reward_id === wed.rewardId));
+  assert.equal((await T('GET', 'tickets')).events.length, 1, 'nur das erste Event ist noch da');
+  assert.equal((await admin(adminReq('GET', 'tickets'))).status, 401, 'ohne Login');
+});
+
+await test('Tickets: ausgeschaltet nimmt nichts an (Punkte zurück)', async () => {
+  const T = (m, p, b) => admin(adminReq(m, p, b, cookie)).then((r) => r.json());
+  const ev = (await T('POST', 'tickets', { name: 'Aus', startsAt: '2026-12-01T19:00', seats: 2, status: 'open' })).event;
+  await admin(adminReq('PUT', 'settings', { ticketsEnabled: false }, cookie));
+  await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, event: { id: 'off1', user_id: 'o1', user_name: 'Olli', user_input: '', reward: { id: ev.rewardId, title: 'x' } } }, { id: 'moff1' }));
+  assert.deepEqual(calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === 'off1').map((c) => c.body.status), ['CANCELED']);
+  assert.equal((await T('GET', `tickets/${ev.id}`)).entries.length, 0);
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

@@ -14,6 +14,7 @@ import { allUsers } from '../admin/common.mjs';
 import { addQuote, deleteQuote, pickQuote, quoteText, shoutChannel } from './extras.mjs';
 import { allowed } from './commands.mjs';
 import { PERMIT_SECONDS, permit } from './moderation.mjs';
+import { cancelByUser, confirmByUser, ingameByUser, modCommand, mySeat, sweepOffers, ticketsInfo } from '../belohnungen/tickets.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
 
@@ -91,6 +92,13 @@ export const BEFEHLE = [
       return `✅ @${login} darf in den nächsten ${PERMIT_SECONDS} Sekunden einen Link posten.`;
     },
   },
+  { id: 'tickets', wort: (s) => s.ticketsCommand, aktiv: (s) => s.ticketsEnabled, run: ({ settings }) => ticketsInfo(settings) },
+  { id: 'platz', wort: (s) => s.ticketSeatCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return mySeat(e.chatter_user_id, e.chatter_user_name, settings); } },
+  { id: 'absagen', wort: (s) => s.ticketCancelCommand, aktiv: (s) => s.ticketsEnabled, run: ({ e, args, settings }) => cancelByUser(e, args, settings) },
+  { id: 'dabei', wort: (s) => s.ticketConfirmCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return confirmByUser(e, settings); } },
+  { id: 'ingame', wort: (s) => s.ticketIngameCommand, aktiv: (s) => s.ticketsEnabled, run: ({ e, args, settings }) => ingameByUser(e, args, settings) },
+  { id: 'ticketadd', wort: (s) => s.ticketAddCommand, aktiv: (s) => s.ticketsEnabled, rolle: 'mod', run: ({ e, args, settings }) => modCommand('add', e, args, settings) },
+  { id: 'ticketremove', wort: (s) => s.ticketRemoveCommand, aktiv: (s) => s.ticketsEnabled, rolle: 'mod', run: ({ e, args, settings }) => modCommand('remove', e, args, settings) },
 ];
 
 export const findeBefehl = (cmd, settings) => BEFEHLE.find((b) => (b.aktiv ? b.aktiv(settings) : true) && b.wort(settings) === cmd);

@@ -33,7 +33,7 @@ netlify/lib/         Logik, ein Ordner je Admin-Reiter:
   zuschauer/           checkin, streak
   ereignisse/          alerts, raid
   chat/                chat (Webhook), befehle (feste Befehle als Liste BEFEHLE), commands (eigene Commands), extras (Shoutout, Zitate), moderation (Links, Wörter, Caps, Wiederholung, Emote-Spam), chatlog
-  belohnungen/         soundboard, playlock, entrysound, award (Top des Monats), community, alpaca
+  belohnungen/         soundboard, playlock, entrysound, award (Top des Monats), community, alpaca, tickets (Events mit Plätzen, Warteliste, Nachrücken)
   overlays/            credits (Abspann), sport
   medien/              images, sounds
   system/              autobackup, gesundheit (Störungs-Meldungen an Discord)
@@ -42,11 +42,19 @@ public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einl
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
 - Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/kern/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Neuer fester Chat-Befehl = nur eine Zeile in `BEFEHLE` (`netlify/lib/chat/befehle.mjs`). Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
-- Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
+- Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Events / Tickets · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
 - Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `modlog/<zeit>`, `modstrike/<id>`, `modlast/<id>`, `modpermit/<login>`, `chatstyle/<id>` (Farbe, Glitzer, `glitterUntil`), `health/state`, `alpaca-active`, `alpaca-color/<id>`).
 
+## Ticket-System (Community-Abende)
+- Logik `netlify/lib/belohnungen/tickets.mjs`, Admin-Route `netlify/lib/admin/tickets.mjs`, Reiter `public/admin/js/tickets.js`. Schalter `ticketsEnabled` (standardmäßig aus), Befehle und Texte im Schema-Schlüssel `tickets`.
+- Speicher: `ticket/event/<id>`, `ticket/entry/<eventId>/<userId>` (Status ticket, offered, waitlist, cancelled, attended, noshow), `ticket/ingame/<userId>`. Es gibt keine SQL-Tabellen, der Speicher ist Schlüssel/Wert.
+- Alles, was Plätze ändert, läuft durch `withLock` (ein Server-Prozess, ein Schloss): so überschreiten gleichzeitige Einlösungen das Limit nie. Doppelte EventSub-Zustellungen fängt der Webhook über `seen/<redemptionId>` ab.
+- Je Event ein eigener Reward (`rewardId`, `rewardSync` merkt den letzten Stand): nur bei „Verkauf offen“ an, pausiert, wenn Plätze und Warteliste voll sind. Je Reward ein eigenes Webhook-Abo (`ensureSubscription`, im Setup mit allen anderen).
+- `pending` = Einlösung liegt noch unerfüllt in der Twitch-Queue (Warteliste, Nachrücker, Events mit „Punkte zurück bei Nichterscheinen“). Erfüllte Einlösungen lassen sich per API nicht mehr erstatten.
+- Nachrück-Frist (`promoteMinutes`, 0 = aus): Status `offered`, Bestätigung mit `!dabei`, Ablauf prüft `sweepOffers` (Timer in `server.mjs`, jede Minute).
+
 ## Tests
-- `npm ci && npm test` (aktuell 122 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 125 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen

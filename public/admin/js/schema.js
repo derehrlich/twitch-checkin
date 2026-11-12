@@ -228,6 +228,38 @@ export const SCHEMA = {
     ] },
   ],
 
+  tickets: [
+    { title: 'Ticket-System', hint: `Die Events (Name, Datum, Plätze, Preis) legst du unten in der Eventliste an. Hier stehen nur Schalter, Chat-Befehle und Texte. Ausgeschaltet nimmt das Ticket-System keine Einlösungen an (die Punkte gehen zurück). Platzhalter in den Texten: ${code('user')} Name, ${code('event')} Eventname, ${code('seat')} Platznummer, ${code('max')} Plätze insgesamt, ${code('free')} freie Plätze, ${code('pos')} Wartelisten-Position, ${code('minutes')} Frist zum Melden.`, items: [
+      c('ticketsEnabled', false, 'Ticket-System einschalten'),
+      t('ticketsCommand', '!tickets', 'Befehl: freie Plätze und Warteliste', { maxlength: 26, kind: 'command', placeholder: '!tickets' }),
+      t('ticketSeatCommand', '!platz', 'Befehl: mein Ticket oder meine Wartelisten-Position', { maxlength: 26, kind: 'command', placeholder: '!platz' }),
+      t('ticketCancelCommand', '!absagen', 'Befehl: Ticket zurückgeben (der Erste auf der Warteliste rückt nach)', { maxlength: 26, kind: 'command', placeholder: '!absagen' }),
+      t('ticketConfirmCommand', '!dabei', 'Befehl: Nachrücker meldet sich (nur bei Nachrück-Frist)', { maxlength: 26, kind: 'command', placeholder: '!dabei' }),
+      t('ticketIngameCommand', '!ingame', 'Befehl: Ingame- oder Discord-Namen eintragen', { maxlength: 26, kind: 'command', placeholder: '!ingame' }),
+      t('ticketAddCommand', '!ticketadd', 'Mod-Befehl: Person von Hand eintragen', { maxlength: 26, kind: 'command', placeholder: '!ticketadd' }),
+      t('ticketRemoveCommand', '!ticketremove', 'Mod-Befehl: Person von Hand entfernen', { maxlength: 26, kind: 'command', placeholder: '!ticketremove' }),
+    ] },
+    { title: 'Ticket-Texte im Chat', hint: `Kurz und freundlich halten. Platzhalter wie oben, zusätzlich ${code('when')} Datum und Uhrzeit (nur bei der Übersicht) und ${code('wait')} Länge der Warteliste, ${code('name')} Ingame-Name.`, items: [
+      a('ticketGotTemplate', '🎟️ @{user}, du hast Platz {seat} von {max}! ({event})', 'Ticket bekommen', { user: 'Max', event: 'Community-Abend Mittwoch', seat: 3, max: 10 }),
+      a('ticketWaitTemplate', '🕐 @{user}, alle {max} Plätze sind vergeben. Du stehst auf der Warteliste, Position {pos}. Rückt jemand nach vorn, sagen wir Bescheid! ({event})', 'Auf die Warteliste gekommen', { user: 'Max', event: 'Community-Abend Mittwoch', max: 10, pos: 2 }),
+      a('ticketDupTemplate', '@{user}, du hast für {event} schon einen Platz oder stehst auf der Warteliste ✅ Deine Punkte bekommst du zurück.', 'Doppelte Einlösung (Punkte werden erstattet)', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketClosedTemplate', '@{user}, für {event} läuft gerade kein Ticketverkauf. Deine Punkte bekommst du zurück.', 'Verkauf nicht offen (Punkte werden erstattet)', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketFullTemplate', '@{user}, {event} ist leider komplett ausgebucht, auch die Warteliste ist voll. Deine Punkte bekommst du zurück.', 'Ausverkauft samt Warteliste (Punkte werden erstattet)', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketWeekTemplate', '@{user}, pro Woche gibt es nur ein Ticket, damit möglichst viele dabei sein können 💚 Deine Punkte bekommst du zurück.', 'Schon ein Ticket in dieser Woche (Punkte werden erstattet)', { user: 'Max' }),
+      a('ticketMovedTemplate', '🎉 @{user} ist nachgerückt und hat jetzt einen Platz für {event}!', 'Nachgerückt (ohne Frist)', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketOfferTemplate', '🎉 @{user}, ein Platz für {event} ist frei geworden! Du hast {minutes} Minuten Zeit, dich mit !dabei zu melden, sonst rückt der Nächste nach.', 'Nachgerückt (mit Frist zum Melden)', { user: 'Max', event: 'Community-Abend Mittwoch', minutes: 30 }),
+      a('ticketConfirmedTemplate', '✅ @{user}, dein Platz für {event} ist sicher. Bis dann!', 'Nachrücker hat sich gemeldet', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketExpiredTemplate', '⌛ @{user} hat sich nicht gemeldet, der Platz für {event} geht weiter.', 'Frist abgelaufen', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketCancelTemplate', '👋 @{user}, dein Platz für {event} ist zurückgegeben. Schade, bis zum nächsten Mal!', 'Ticket zurückgegeben', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketsLineTemplate', '{event} ({when}): {free} von {max} Plätzen frei, Warteliste: {wait}', 'Übersicht mit !tickets (eine Zeile je Event)', { event: 'Community-Abend Mittwoch', when: 'Mi 25.11. 19:00', free: 4, max: 10, wait: 0 }),
+      a('ticketsNoneTemplate', 'Gerade gibt es keine Events mit Tickets 🎟️', 'Übersicht, wenn es kein Event gibt', {}),
+      a('ticketSeatTemplate', '@{user}, du hast ein Ticket für {event} 🎟️', 'Mit !platz: Person hat ein Ticket', { user: 'Max', event: 'Community-Abend Mittwoch' }),
+      a('ticketWaitPosTemplate', '@{user}, du stehst für {event} auf der Warteliste, Position {pos} 🕐', 'Mit !platz: Wartelisten-Position', { user: 'Max', event: 'Community-Abend Mittwoch', pos: 2 }),
+      a('ticketSeatNoneTemplate', '@{user}, du hast gerade kein Ticket und stehst auf keiner Warteliste.', 'Mit !platz oder !absagen: nichts gefunden', { user: 'Max' }),
+      a('ticketIngameTemplate', '✅ @{user}, ich habe „{name}“ für dich eingetragen.', 'Ingame-Name gespeichert', { user: 'Max', name: 'MaxMiner' }),
+    ] },
+  ],
+
   allgemein: [
     { title: 'Allgemein', hint: 'Der Stream-Tag wechselt zur eingestellten Uhrzeit, damit Streams nach Mitternacht nicht doppelt zählen.', items: [
       n('volume', 0.6, 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
