@@ -2928,6 +2928,13 @@ await test('Gewinnspiel: Ticket, Wochenpunkte, Lose-Deckel, Sperrliste, Ziehung,
   assert.equal((await community(new Request(BASE + '/api/community/gewinn/dm'))).status, 401);
   assert.equal((await (await cReq('POST', 'gewinn/dm/ack', { winnerId: dms[0].winnerId })).json()).ok, true);
   assert.equal((await gw.getWinner(id, target.id)).status, 'link_verschickt');
+  // DM nicht zustellbar (Empfänger hat DMs gesperrt): Eintrag verschwindet, Dashboard zeigt „von Hand schicken“
+  assert.equal((await api('POST', `gewinn/winner/${target.id}/link`, {})).status, 200);
+  assert.equal((await (await cReq('GET', 'gewinn/dm')).json()).dms.length, 1);
+  assert.equal((await (await cReq('POST', 'gewinn/dm/ack', { winnerId: target.id, failed: true })).json()).ok, true);
+  const nodm = await gw.getWinner(id, target.id);
+  assert.deepEqual([nodm.dmQueued, nodm.sendError, nodm.status], [false, 'Discord-DM nicht zustellbar', 'gezogen']);
+  assert.equal((await (await cReq('GET', 'gewinn/dm')).json()).dms.length, 0);
   whisperFails = false;
 
   // Missbrauchsabwehr: viele falsche Codes von einer Adresse werden gebremst
