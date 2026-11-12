@@ -28,7 +28,7 @@ function listOf(id) {
       <td><b>${esc(e.name)}</b>${e.note ? ` <span class="muted">(${esc(e.note)})</span>` : ''}</td>
       <td class="muted">${new Date(e.redeemedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</td>
       <td>${esc(LABEL[e.status])}</td>
-      <td><input data-f="ingame" maxlength="40" value="${esc(e.ingame ?? '')}" placeholder="Ingame-/Discord-Name" ${live ? '' : 'disabled'}></td>
+      <td><input data-f="ingame" maxlength="40" value="${esc(e.ingame ?? '')}" placeholder="Steam-Name" ${live ? '' : 'disabled'}></td>
       <td class="tk-act">
         ${e.status === 'waitlist' ? '<button data-act="promote" class="ghost">Nachrücken</button>' : ''}
         ${seat ? `<button data-act="att" data-s="attended" class="ghost" ${e.status === 'attended' ? 'disabled' : ''}>✔ erschienen</button><button data-act="att" data-s="noshow" class="ghost" ${e.status === 'noshow' ? 'disabled' : ''}>✖ nicht da</button>` : ''}
@@ -36,7 +36,7 @@ function listOf(id) {
       </td></tr>`;
   }).join('');
   return `<div class="tk-list">
-    <table class="tk"><thead><tr><th>Warte&shy;liste</th><th>Twitch-Name</th><th>Eingelöst</th><th>Status</th><th>Ingame / Discord</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Noch niemand.</td></tr>'}</tbody></table>
+    <table class="tk"><thead><tr><th>Warte&shy;liste</th><th>Twitch-Name</th><th>Eingelöst</th><th>Status</th><th>Steam-Name</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Noch niemand.</td></tr>'}</tbody></table>
     <div class="row" style="margin-top:12px">
       <div><label>Person von Hand hinzufügen (Twitch-Name)</label><input data-f="addname" maxlength="25" placeholder="z. B. marcel"></div>
       <button data-act="add">Hinzufügen</button>

@@ -2210,7 +2210,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'tickets', 'platz', 'absagen', 'dabei', 'ingame', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2670,7 +2670,7 @@ await test('Tickets: Event mit Reward, Plätze, Warteliste, Ausverkauf, Doppel-E
   const say = async (text, id = 't3', name = 'Carla', badges = []) => { const n0 = chats().length; await handleChat({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges, message_id: 'tk-' + Math.random(), message: { text } }, await getSettings()); return chats().slice(n0); };
   assert.match((await say('!tickets'))[0], /Community-Abend Mittwoch \(Mi 25\.11\. 19:00\): 0 von 2 Plätzen frei, Warteliste: 2/);
   assert.match((await say('!platz'))[0], /Carla.*Warteliste, Position 1/);
-  assert.match((await say('!ingame CarlaMC'))[0], /CarlaMC/);
+  assert.match((await say('!steam CarlaMC'))[0], /CarlaMC/);
   assert.equal((await detail()).entries.find((x) => x.name === 'Carla').ingame, 'CarlaMC');
 
   // Absage: Anna gibt zurück, Carla rückt nach, Einlösung wird erfüllt, Reward wieder frei

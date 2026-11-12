@@ -4,7 +4,7 @@
 //   ticket/event/<id>                { id, name, startsAt: '2026-11-25T19:00', seats, cost, status, rewardId, rewardTitle, rewardSync,
 //                                      waitlistMax, oneWeek, refundNoShow, promoteMinutes, createdAt }
 //   ticket/entry/<eventId>/<userId>  { eventId, userId, name, status, redeemedAt, redemptionId, rewardId, pending, ingame, offerUntil, note }
-//   ticket/ingame/<userId>           { ingame }   zuletzt gemerkter Ingame-/Discord-Name (gilt für neue Tickets)
+//   ticket/ingame/<userId>           { ingame }   zuletzt gemerkter Steam-Name (gilt für neue Tickets)
 //
 // Status eines Platzes: ticket · offered (nachgerückt, muss sich noch melden) · waitlist · cancelled · attended · noshow
 // `pending` heißt: die Einlösung liegt noch „unerfüllt“ in der Twitch-Queue (Warteliste, Nachrücker, oder Event mit Erstattung bei Nichterscheinen).
@@ -323,7 +323,7 @@ export function setAttendance(ev0, userId, status) {
   });
 }
 
-/** Ingame-/Discord-Name eines Zuschauers: gilt für alle seine laufenden Tickets und wird für spätere gemerkt. */
+/** Steam-Name eines Zuschauers: gilt für alle seine laufenden Tickets und wird für spätere gemerkt. */
 export async function setIngame(userId, ingame) {
   const value = String(ingame).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
   if (!value) return { ok: false };
@@ -443,10 +443,10 @@ export async function confirmByUser(e, settings) {
   return null;
 }
 
-/** !ingame Name */
+/** !steam Name */
 export async function ingameByUser(e, args, settings) {
   const user = e.chatter_user_name;
-  if (!args.trim()) return `${user}, schreib deinen Ingame- oder Discord-Namen dazu: ${settings.ticketIngameCommand} Name`;
+  if (!args.trim()) return `${user}, schreib deinen Steam-Namen dazu: ${settings.ticketIngameCommand} Name`;
   const r = await setIngame(e.chatter_user_id, args);
   return r.ok ? fill(settings.ticketIngameTemplate, { user, name: r.value }) : null;
 }

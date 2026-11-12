@@ -96,7 +96,7 @@ export const BEFEHLE = [
   { id: 'platz', wort: (s) => s.ticketSeatCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return mySeat(e.chatter_user_id, e.chatter_user_name, settings); } },
   { id: 'absagen', wort: (s) => s.ticketCancelCommand, aktiv: (s) => s.ticketsEnabled, run: ({ e, args, settings }) => cancelByUser(e, args, settings) },
   { id: 'dabei', wort: (s) => s.ticketConfirmCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return confirmByUser(e, settings); } },
-  { id: 'ingame', wort: (s) => s.ticketIngameCommand, aktiv: (s) => s.ticketsEnabled, run: ({ e, args, settings }) => ingameByUser(e, args, settings) },
+  { id: 'steam', wort: (s) => s.ticketIngameCommand, aktiv: (s) => s.ticketsEnabled, run: ({ e, args, settings }) => ingameByUser(e, args, settings) },
   { id: 'ticketadd', wort: (s) => s.ticketAddCommand, aktiv: (s) => s.ticketsEnabled, rolle: 'mod', run: ({ e, args, settings }) => modCommand('add', e, args, settings) },
   { id: 'ticketremove', wort: (s) => s.ticketRemoveCommand, aktiv: (s) => s.ticketsEnabled, rolle: 'mod', run: ({ e, args, settings }) => modCommand('remove', e, args, settings) },
 ];

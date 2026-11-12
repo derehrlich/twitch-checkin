@@ -61,7 +61,7 @@ export async function tickets({ req, route, method, body }) {
     return json({ ok: true });
   }
   if (sub === 'csv' && method === 'GET') {
-    const rows = ['platz,twitch_name,status,eingeloest_am,ingame_discord_name'];
+    const rows = ['platz,twitch_name,status,eingeloest_am,steam_name'];
     const entries = await entriesOf(ev.id);
     const s = stats(ev, entries);
     for (const e of entries.filter((x) => ACTIVE.includes(x.status))) {

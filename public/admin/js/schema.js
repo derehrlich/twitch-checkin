@@ -235,7 +235,7 @@ export const SCHEMA = {
       t('ticketSeatCommand', '!platz', 'Befehl: mein Ticket oder meine Wartelisten-Position', { maxlength: 26, kind: 'command', placeholder: '!platz' }),
       t('ticketCancelCommand', '!absagen', 'Befehl: Ticket zurückgeben (der Erste auf der Warteliste rückt nach)', { maxlength: 26, kind: 'command', placeholder: '!absagen' }),
       t('ticketConfirmCommand', '!dabei', 'Befehl: Nachrücker meldet sich (nur bei Nachrück-Frist)', { maxlength: 26, kind: 'command', placeholder: '!dabei' }),
-      t('ticketIngameCommand', '!ingame', 'Befehl: Ingame- oder Discord-Namen eintragen', { maxlength: 26, kind: 'command', placeholder: '!ingame' }),
+      t('ticketIngameCommand', '!steam', 'Befehl: Steam-Namen eintragen', { maxlength: 26, kind: 'command', placeholder: '!steam' }),
       t('ticketAddCommand', '!ticketadd', 'Mod-Befehl: Person von Hand eintragen', { maxlength: 26, kind: 'command', placeholder: '!ticketadd' }),
       t('ticketRemoveCommand', '!ticketremove', 'Mod-Befehl: Person von Hand entfernen', { maxlength: 26, kind: 'command', placeholder: '!ticketremove' }),
     ] },
@@ -256,7 +256,7 @@ export const SCHEMA = {
       a('ticketSeatTemplate', '@{user}, du hast ein Ticket für {event} 🎟️', 'Mit !platz: Person hat ein Ticket', { user: 'Max', event: 'Community-Abend Mittwoch' }),
       a('ticketWaitPosTemplate', '@{user}, du stehst für {event} auf der Warteliste, Position {pos} 🕐', 'Mit !platz: Wartelisten-Position', { user: 'Max', event: 'Community-Abend Mittwoch', pos: 2 }),
       a('ticketSeatNoneTemplate', '@{user}, du hast gerade kein Ticket und stehst auf keiner Warteliste.', 'Mit !platz oder !absagen: nichts gefunden', { user: 'Max' }),
-      a('ticketIngameTemplate', '✅ @{user}, ich habe „{name}“ für dich eingetragen.', 'Ingame-Name gespeichert', { user: 'Max', name: 'MaxMiner' }),
+      a('ticketIngameTemplate', '✅ @{user}, ich habe „{name}“ für dich eingetragen.', 'Steam-Name gespeichert', { user: 'Max', name: 'MaxSteam' }),
     ] },
   ],
 
