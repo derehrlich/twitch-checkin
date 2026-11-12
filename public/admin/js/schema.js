@@ -250,13 +250,12 @@ export const SCHEMA = {
   ],
 
   feier: [
-    { title: 'Geburtstags-Befehl', hint: `Der Befehl zeigt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Wochenplan. Platzhalter: ${code('countdown')} Restzeit, ${code('plan')} der Plan. Im Plan steht ein Eintrag pro Zeile (zusammen höchstens 400 Zeichen). Der Chat kennt keine Zeilenumbrüche: Entweder kommt jeder Eintrag als eigene Nachricht (Haken unten) oder alles in einer Nachricht (höchstens 500 Zeichen), mit · verbunden.`, items: [
+    { title: 'Geburtstags-Befehl und Wochenplan-Seite', hint: `Der Befehl schreibt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Link zur Seite <code>/woche</code>. Dort steht der Wochenplan, ohne Anmeldung erreichbar. Die Seite ist nur sichtbar, solange der Befehl eingeschaltet ist. Im Plan steht ein Eintrag pro Zeile, am schönsten als „Mo 23.11. 19:00 Titel“ (Tag, Datum, Uhrzeit, Text). Platzhalter: ${code('countdown')} Restzeit, ${code('url')} Adresse der Seite, ${code('plan')} der Plan in einer Zeile (nur wenn du ihn doch im Chat willst).`, items: [
       c('bdayEnabled', false, 'Geburtstags-Befehl einschalten (braucht den Chat-Webhook)'),
-      c('bdayEachLine', true, 'Jeden Planeintrag als eigene Chat-Nachricht senden (der Twitch-Chat kennt keine Zeilenumbrüche, so bleibt der Plan lesbar; zuerst kommt der Satz mit der Restzeit ohne {plan}). Ohne Haken kommt alles in einer Nachricht, die Einträge mit · verbunden'),
       t('bdayCommand', '!geburtstag', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!geburtstag' }),
-      a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das Programm: {plan}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
-      a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {plan}', 'Antwort nach der Zielzeit', { plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
-      a('bdayPlan', 'Mo 23.11. 19:00 Wie alles begann (Slides)\nDi 24.11. 20:30 Bau-Abend mit Glücksrad\nMi 25.11. 19:00 Community-Tag 1\nDo 26.11. 20:30 Chat-Abend\nFr 27.11. 19:00 Community-Tag 2\nSa 28.11. ab 19:00 Mitternachtsstream\nMo 30.11. Danke-Stream', 'Wochenplan (eine Zeile pro Eintrag)'),
+      a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das ganze Programm der Woche: {url}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', url: 'https://…/woche' }),
+      a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {url}', 'Antwort nach der Zielzeit', { url: 'https://…/woche' }),
+      a('bdayPlan', 'Mo 23.11. 19:00 Geburtstagswoche startet: Rückblick auf die Kanalgeschichte\nDi 24.11. 20:30 Bauabend\nMi 25.11. 19:00 Community-Tag: Adventures & Community Votes\nDo 26.11. 20:30 1.0 Story-Abend\nFr 27.11. 19:00 Community-Tag: Adventures & Community Votes\nSa 28.11. ab 19:00 Mitternachtsstream, um 0:00 Extra-Los\nSo 29.11. Geburtstag, kein Stream\nMo 30.11. ab 19:30 Danke-Stream mit Ziehung', 'Wochenplan für die Seite /woche (eine Zeile pro Eintrag, zum Beispiel: Mo 23.11. 19:00 Titel)'),
     ] },
     { title: 'Glücksrad: Chat', hint: `Die Räder und ihre Felder pflegst du im Reiter „Geburtstagswoche“. Platzhalter: ${code('wheel')} Name des Rads, ${code('result')} Ergebnis.`, items: [
       c('radChatEnabled', true, 'Ergebnis nach dem Drehen in den Chat schreiben'),

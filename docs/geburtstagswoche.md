@@ -15,8 +15,11 @@ Admin-Reiter **Geburtstagswoche**. Alles läuft auf der Stadtwache, die OBS-Seit
 - „Beispielräder anlegen“ erstellt Gebäudeart, Baustil und Community-Aktion zum Ändern.
 - „Drehen“ würfelt auf der Stadtwache (nicht im Browser) und blendet das Rad ein. Das Ergebnis geht nach der Drehzeit (7 Sekunden) in den Chat (Text unter „Glücksrad: Chat“ änderbar).
 
-## Befehl `!geburtstag`
-Zeigt im Chat die Restzeit bis zur Zielzeit des Countdowns und den Wochenplan. Standardmäßig **aus**. Einschalten und den **Plan** eintragen: Reiter Geburtstagswoche, Karte „Geburtstags-Befehl“ (ein Eintrag pro Zeile, im Chat mit · verbunden). Vorbelegt ist dein Entwurf, bitte prüfen. Nach der Zielzeit kommt der zweite Text („Marcel hat Geburtstag!“).
+## Wochenplan-Seite (`/woche`) und Befehl `!geburtstag`
+- Die Seite `https://wache.ehrlichverwirrt.de/woche` zeigt Countdown (bis zur Zielzeit des Countdowns) und den Wochenplan. Sie ist ohne Anmeldung erreichbar und nur sichtbar, solange der Befehl eingeschaltet ist. Heute wird gelb markiert. Auf dem Handy passt sie auch.
+- `!geburtstag` schreibt nur einen Satz mit der Restzeit und dem Link zur Seite in den Chat (der Twitch-Chat kennt keine Zeilenumbrüche, deshalb steht der Plan nicht im Chat).
+- Einschalten und den **Plan** eintragen: Reiter Geburtstagswoche, Karte „Geburtstags-Befehl und Wochenplan-Seite“. Ein Eintrag pro Zeile, am schönsten als `Mo 23.11. 19:00 Titel` (Tag, Datum, Uhrzeit, Text). Auch `ab 19:00` geht. Zeilen in anderer Form erscheinen als freier Text. Nach der Zielzeit kommt der zweite Chat-Text („Marcel hat Geburtstag!“).
+- Cloudflare Access darf nicht vor `/woche` und `/api/woche` liegen (wie bei Rangliste und Overlays).
 
 ## Adventure-Einreichung (Community-Tage)
 - Admin → Geburtstagswoche → „Adventure-Einreichungen“. Einschalten und Texte: Karte darunter (standardmäßig **aus**).

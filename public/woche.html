@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geburtstagswoche bei EhrlichVerwirrt</title>
+<meta name="description" content="Der Wochenplan der Geburtstagswoche mit Countdown.">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<style>
+  /* Öffentliche Wochenplan-Seite, der Link kommt mit !geburtstag in den Chat. Plan und Zielzeit stellst du im Admin ein (Reiter „Geburtstagswoche“). */
+  main { max-width: 760px; margin: 0 auto; padding: 28px 18px 56px; display: grid; gap: 20px; }
+  .card { padding: 22px 22px 24px; }
+  .count { text-align: center; }
+  .count small { display: block; color: var(--leise); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .time { display: flex; justify-content: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .unit { min-width: 76px; padding: 10px 12px 8px; border-radius: 12px; background: var(--feld); border: 1px solid var(--rand); }
+  .unit b { display: block; font: 700 2.2rem/1.1 var(--pixel); color: var(--gelb); font-variant-numeric: tabular-nums; }
+  .unit span { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--leise); }
+  .done { font: 700 1.5rem/1.3 var(--pixel); color: var(--gelb); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 5.6em 5em 1fr; gap: 6px 12px; padding: 12px 8px; border-bottom: 1px solid var(--rand); align-items: baseline; }
+  li:last-child { border-bottom: 0; }
+  li .tag { font-weight: 700; white-space: nowrap; }
+  li .zeit { color: var(--leise); white-space: nowrap; }
+  li .text { overflow-wrap: anywhere; }
+  li.heute { background: color-mix(in srgb, var(--gelb) 14%, transparent); border-radius: 10px; border-bottom-color: transparent; }
+  li.heute .tag::after { content: ' · heute'; color: var(--gelb); font-weight: 600; }
+  @media (max-width: 520px) { .time { gap: 8px; } .unit { min-width: 62px; padding: 8px 6px 6px; } .unit b { font-size: 1.7rem; } li { grid-template-columns: 5.2em 1fr; } li .zeit { grid-column: 2; grid-row: 1; text-align: right; } li .text { grid-column: 1 / -1; } }
+  .leer { text-align: center; color: var(--leise); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Geburtstagswoche</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+</header>
+<main>
+  <section class="card count" id="countCard" hidden>
+    <small id="countTitle">Noch bis Marcels Geburtstag</small>
+    <div class="time" id="time">
+      <div class="unit" id="uD"><b id="d">0</b><span>Tage</span></div>
+      <div class="unit"><b id="h">00</b><span>Std</span></div>
+      <div class="unit"><b id="m">00</b><span>Min</span></div>
+      <div class="unit"><b id="s">00</b><span>Sek</span></div>
+    </div>
+    <div class="done" id="done" hidden></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-top:0">Das Programm</h2>
+    <ul id="plan"></ul>
+    <p class="leer" id="empty" hidden>Der Plan ist noch nicht freigegeben. Schau bald wieder vorbei!</p>
+  </section>
+</main>
+<script src="/thema.js" defer></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let view = null, offset = 0;
+
+function renderPlan() {
+  const ul = $('plan');
+  ul.replaceChildren(...view.lines.map((l) => {
+    const li = document.createElement('li');
+    const cell = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; return s; };
+    if (l.day) { li.append(cell('tag', l.day), cell('zeit', l.time), cell('text', l.text)); if (l.date === view.today) li.classList.add('heute'); }
+    else { const t = cell('text', l.text); t.style.gridColumn = '1 / -1'; li.append(t); }
+    return li;
+  }));
+}
+
+async function poll() {
+  try {
+    view = await (await fetch('/api/woche', { cache: 'no-store' })).json();
+    offset = view.now - Date.now();
+    const on = view.enabled && view.lines.length > 0;
+    $('empty').hidden = on; $('plan').hidden = !on;
+    $('countCard').hidden = !(view.enabled && view.target);
+    if (on) renderPlan();
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+const two = (n) => String(n).padStart(2, '0');
+function tick() {
+  if (!view?.enabled || !view.target) return;
+  const left = view.target - (Date.now() + offset);
+  $('time').hidden = left <= 0; $('done').hidden = left > 0;
+  if (left <= 0) { $('countTitle').textContent = ''; $('done').textContent = view.endText; return; }
+  const s = Math.floor(left / 1000), d = Math.floor(s / 86400);
+  $('d').textContent = d; $('uD').hidden = d === 0;
+  $('h').textContent = two(Math.floor((s % 86400) / 3600)); $('m').textContent = two(Math.floor((s % 3600) / 60)); $('s').textContent = two(s % 60);
+}
+poll(); setInterval(poll, 60_000); setInterval(tick, 1000); tick();
+</script>
+</body>
+</html>
