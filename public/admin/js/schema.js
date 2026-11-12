@@ -249,6 +249,20 @@ export const SCHEMA = {
     ] },
   ],
 
+  feier: [
+    { title: 'Geburtstags-Befehl', hint: `Der Befehl zeigt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Wochenplan. Platzhalter: ${code('countdown')} Restzeit, ${code('plan')} der Plan. Im Plan steht ein Eintrag pro Zeile, im Chat werden sie mit · verbunden (zusammen höchstens 400 Zeichen, der Chat nimmt 500).`, items: [
+      c('bdayEnabled', false, 'Geburtstags-Befehl einschalten (braucht den Chat-Webhook)'),
+      t('bdayCommand', '!geburtstag', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!geburtstag' }),
+      a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das Programm: {plan}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
+      a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {plan}', 'Antwort nach der Zielzeit', { plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
+      a('bdayPlan', 'Mo 23.11. 19:00 Wie alles begann (Slides)\nDi 24.11. 20:30 Bau-Abend mit Glücksrad\nMi 25.11. 19:00 Community-Tag 1\nDo 26.11. 20:30 Chat-Abend\nFr 27.11. 19:00 Community-Tag 2\nSa 28.11. ab 19:00 Mitternachtsstream\nMo 30.11. Danke-Stream', 'Wochenplan (eine Zeile pro Eintrag)'),
+    ] },
+    { title: 'Glücksrad: Chat', hint: `Die Räder und ihre Felder pflegst du im Reiter „Geburtstagswoche“. Platzhalter: ${code('wheel')} Name des Rads, ${code('result')} Ergebnis.`, items: [
+      c('radChatEnabled', true, 'Ergebnis nach dem Drehen in den Chat schreiben'),
+      a('radTemplate', '🎡 {wheel}: {result}!', 'Chatnachricht mit dem Ergebnis', { wheel: 'Gebäudeart', result: 'Leuchtturm' }),
+    ] },
+  ],
+
   tickets: [
     { title: 'Ticket-System', hint: `Die Events (Name, Datum, Plätze, Preis) legst du unten in der Eventliste an. Hier stehen nur Schalter, Chat-Befehle und Texte. Ausgeschaltet nimmt das Ticket-System keine Einlösungen an (die Punkte gehen zurück). Platzhalter in den Texten: ${code('user')} Name, ${code('event')} Eventname, ${code('seat')} Platznummer, ${code('max')} Plätze insgesamt, ${code('free')} freie Plätze, ${code('pos')} Wartelisten-Position, ${code('minutes')} Frist zum Melden.`, items: [
       c('ticketsEnabled', false, 'Ticket-System einschalten'),

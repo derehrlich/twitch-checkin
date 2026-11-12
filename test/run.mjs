@@ -2212,7 +2212,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2991,6 +2991,85 @@ await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit 
   await gw.gewinnTick(settings, at('00:10')); assert.equal(paused(), false, 'im Fenster aktiv');
   await gw.gewinnTick(settings, at('00:40')); assert.equal(paused(), true, 'danach pausiert');
   await api('PUT', 'settings', { gwEnabled: false });
+});
+
+const { parseLocal: gwParseLocal } = await import('../netlify/lib/belohnungen/gewinn.mjs');
+const gwParse = (str) => gwParseLocal(str, 'Europe/Berlin');
+await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gewicht, einmalig, Chat), !geburtstag', async () => {
+  const cdFn = (await import('../netlify/functions/countdown.mjs')).default;
+  const radFn = (await import('../netlify/functions/rad.mjs')).default;
+  const cdLib = await import('../netlify/lib/overlays/countdown.mjs');
+  const rad = await import('../netlify/lib/overlays/gluecksrad.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'feier/rad'))).status, 401, 'Admin nur mit Login');
+
+  // Countdown: Standard unsichtbar, Zielzeit in der Zeitzone des Kanals, öffentliche Seite liefert Serverzeit
+  assert.equal((await (await cdFn(new Request(BASE + '/api/countdown'))).json()).show, false);
+  let v = await (await api('PUT', 'feier/countdown', { title: 'Noch bis Mitternacht', target: '2026-11-29T00:00', show: true })).json();
+  assert.equal(v.config.target, '2026-11-29T00:00');
+  const pub = await (await cdFn(new Request(BASE + '/api/countdown'))).json();
+  assert.equal(pub.show, true); assert.equal(pub.target, Date.parse(gwParse('2026-11-29T00:00'))); assert.ok(Math.abs(pub.now - Date.now()) < 5000);
+  assert.equal((await api('PUT', 'feier/countdown', { target: 'quatsch' })).status, 400);
+  assert.equal(cdLib.fmtRemaining(3 * 86_400_000 + 4 * 3_600_000 + 12 * 60_000), '3 Tage 4 Std 12 Min');
+  assert.equal(cdLib.fmtRemaining(86_400_000 + 3_600_000), '1 Tag 1 Std 0 Min');
+  assert.equal(cdLib.fmtRemaining(125_000), '2 Min 5 Sek');
+
+  // !geburtstag: aus, solange nicht eingeschaltet; dann Restzeit und Plan; nach dem Ziel der andere Text
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, bdayEnabled: false });
+  assert.deepEqual(await chatMsg('!geburtstag', 'g1', 'Gast'), []);
+  await api('PUT', 'settings', { bdayEnabled: true, bdayPlan: 'Mo 19:00 Slides\nDi 20:30 Bauabend' });
+  const [r] = await chatMsg('!geburtstag', 'g2', 'Gast');
+  assert.match(r, /Noch .* bis Marcels Geburtstag.*Mo 19:00 Slides · Di 20:30 Bauabend/);
+  await api('PUT', 'feier/countdown', { target: '2020-01-01T00:00' });
+  assert.match((await chatMsg('!geburtstag', 'g3', 'Gast'))[0], /Marcel hat Geburtstag/);
+  await api('PUT', 'settings', { bdayEnabled: false });
+
+  // Glücksrad: ohne Rad nichts, Felder aus Text mit Gewicht und Farbe, Beispiele, Gewicht, einmalig, Ergebnis im Chat
+  assert.equal((await api('POST', 'feier/rad/spin', {})).status, 404);
+  assert.equal((await api('POST', 'feier/rad/wheel', { name: 'Zu klein', segmentsText: 'nur eins' })).status, 400);
+  const seg = rad.parseSegments('A\nB ; 3\nC ; 2 ; #FF8800\n\n  \nD ; 999 ; kaputt');
+  assert.deepEqual(seg.map((x) => [x.label, x.weight, x.color]), [['A', 1, ''], ['B', 3, ''], ['C', 2, '#ff8800'], ['D', 100, '']]);
+  assert.equal(rad.segmentsText({ segments: seg }).split('\n')[2], 'C ; 2 ; #ff8800');
+  assert.throws(() => rad.parseSegments(Array.from({ length: 41 }, (_, i) => 'F' + i).join('\n')), /Höchstens 40/);
+  v = await (await api('POST', 'feier/rad/examples', {})).json();
+  assert.deepEqual(v.wheels.map((w) => w.name), ['Gebäudeart', 'Baustil', 'Community-Aktion']);
+  assert.equal(v.state.wheelId, v.wheels[0].id, 'erstes Rad ist gewählt');
+  assert.equal((await (await radFn(new Request(BASE + '/api/rad'))).json()).show, false);
+
+  // Gewicht: ein Feld mit 99 gegen eins trifft fast immer
+  const heavy = rad.parseSegments('Selten\nOft ; 99');
+  let often = 0; for (let i = 0; i < 400; i++) if (rad.pick(heavy).label === 'Oft') often++;
+  assert.ok(often > 360, `Gewicht wirkt (${often}/400)`);
+  assert.equal(rad.pick(heavy.map((x) => ({ ...x, used: true }))), null);
+
+  // Drehen: Ergebnis steht fest, zweiter Dreh währenddessen wird abgelehnt, Ergebnis kommt in den Chat, Rad ist sichtbar
+  await api('PUT', 'settings', { chatEnabled: true, radChatEnabled: true, radTemplate: '🎡 {wheel}: {result}!' });
+  const wheel = v.wheels[0];
+  v = await (await api('PUT', `feier/rad/wheel/${wheel.id}`, { removeWon: true, segments: 'Eins\nZwei' })).json();
+  const chatsBefore = chats().length;
+  v = await (await api('POST', 'feier/rad/spin', {})).json();
+  assert.ok(['Eins', 'Zwei'].includes(v.state.spin.label)); assert.equal(v.state.show, true);
+  assert.equal((await api('POST', 'feier/rad/spin', {})).status, 409, 'dreht noch');
+  const pubRad = await (await radFn(new Request(BASE + '/api/rad'))).json();
+  assert.equal(pubRad.show, true); assert.equal(pubRad.wheel.segments.length, 2); assert.ok(pubRad.wheel.segments.every((x) => /^#[0-9a-f]{6}$/.test(x.color)), 'Farben aus der Palette');
+  assert.equal(pubRad.wheel.segments.filter((x) => x.used).length, 1, 'gedrehtes Feld ist ausgegraut');
+  assert.equal(pubRad.spin.index, pubRad.wheel.segments.findIndex((x) => x.label === v.state.spin.label));
+  // zweiter und dritter Dreh nach der Drehzeit: jedes Feld nur einmal, danach „alle dran“, Zurücksetzen hilft
+  const later = Date.now() + 20_000;
+  assert.equal((await rad.spin(await getSettings(), { now: later, announce: false })).ok, true);
+  assert.equal((await rad.spin(await getSettings(), { now: later + 20_000, announce: false })).status, 409);
+  v = await (await api('POST', `feier/rad/wheel/${wheel.id}/reset`, {})).json();
+  assert.ok(v.wheels[0].segments.every((x) => !x.used));
+  assert.equal(chats().length, chatsBefore, 'Chat-Ergebnis kommt erst nach der Drehzeit');
+  assert.equal(v.state.history.length, 2);
+  // Rad wechseln setzt den Dreh zurück, Löschen räumt auf
+  v = await (await api('PUT', 'feier/rad/state', { wheelId: v.wheels[1].id })).json();
+  assert.equal(v.state.spin, null);
+  assert.equal((await api('PUT', 'feier/rad/state', { wheelId: 'ffffffff' })).status, 400);
+  v = await (await api('DELETE', `feier/rad/wheel/${v.wheels[1].id}`)).json();
+  assert.equal(v.wheels.length, 2); assert.equal(v.state.wheelId, v.wheels[0].id);
+  assert.equal((await api('DELETE', 'feier/rad/wheel/ffffffff')).status, 404);
+  await api('PUT', 'settings', { radChatEnabled: false });
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

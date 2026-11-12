@@ -41,6 +41,16 @@
   status = 200
 
 [[redirects]]
+  from = "/countdown"
+  to = "/countdown.html"
+  status = 200
+
+[[redirects]]
+  from = "/rad"
+  to = "/rad.html"
+  status = 200
+
+[[redirects]]
   from = "/sport"
   to = "/sport.html"
   status = 200

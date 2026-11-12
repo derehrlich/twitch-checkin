@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Countdown</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Countdown als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Ziel, Titel und Ein-/Ausblenden stellst du im Admin ein (Reiter „Geburtstagswoche“).
+     ?pos=top (Standard) | bottom | center | top-left | top-right | bottom-left | bottom-right   Platz auf dem Bild
+     ?size=0.6 … 2   Größe (Standard 1)    ?demo   Beispiel mit 3 Minuten, immer sichtbar    ?confetti=0   ohne Konfetti am Ende */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #box { position: fixed; padding: 16px 30px 20px; box-sizing: border-box; text-align: center; opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; --s: 1; min-width: calc(420px * var(--s)); }
+  #box.on { opacity: 1; transform: var(--in) scale(var(--s)); }
+  #box { transform: var(--out) scale(var(--s)); }
+  .title { font: 700 calc(26px) / 1.1 var(--wordmark); letter-spacing: 3px; text-transform: uppercase; color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .75); margin-bottom: 10px; }
+  .time { display: flex; justify-content: center; gap: 12px; }
+  .unit { min-width: 92px; padding: 8px 12px 10px; border-radius: 12px; background: rgba(20, 10, 4, .55); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 1px 0 rgba(255, 214, 160, .18); }
+  .unit b { display: block; font-size: 64px; line-height: 1.05; font-weight: 700; color: #fff3da; text-shadow: 0 3px 0 rgba(43, 24, 12, .75), 0 6px 10px rgba(0, 0, 0, .35); font-variant-numeric: tabular-nums; }
+  .unit small { display: block; font-size: 14px; font-weight: 600; letter-spacing: 2.4px; text-transform: uppercase; color: #e9d3ae; }
+  .unit.hide { display: none; }
+  .end { display: none; font: 700 52px/1.15 var(--wordmark); color: #ffd45e; text-shadow: 3px 3px 0 rgba(43, 24, 12, .8); padding: 8px 6px; }
+  #box.done .time { display: none; }
+  #box.done .end { display: block; animation: pop .6s steps(7) both; }
+  #box.last .unit b { color: #ff9a7a; animation: beat 1s ease-in-out infinite; }
+  @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+  @keyframes beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.12); } }
+  #fx { position: fixed; inset: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="box" class="panel" aria-live="off">
+  <div class="title" id="title">Countdown</div>
+  <div class="time">
+    <div class="unit" id="uD"><b id="d">0</b><small>Tage</small></div>
+    <div class="unit" id="uH"><b id="h">00</b><small>Std</small></div>
+    <div class="unit" id="uM"><b id="m">00</b><small>Min</small></div>
+    <div class="unit" id="uS"><b id="s">00</b><small>Sek</small></div>
+  </div>
+  <div class="end" id="end"></div>
+</div>
+<canvas id="fx"></canvas>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const box = $('box');
+const POS = { // [Ankerstyle, eingeblendet, ausgeblendet]
+  top: ['top:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,-160%)'],
+  bottom: ['bottom:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,160%)'],
+  center: ['top:50%;left:50%', 'translate(-50%,-50%)', 'translate(-50%,-30%)'],
+  'top-left': ['top:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'top-right': ['top:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+  'bottom-left': ['bottom:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'bottom-right': ['bottom:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+};
+const [anchor, tin, tout] = POS[params.get('pos')] ?? POS.top;
+box.style.cssText += anchor + `;--in:${tin};--out:${tout};`;
+const size = Number(params.get('size')); if (size >= 0.3 && size <= 3) box.style.setProperty('--s', size);
+// Transform-Ursprung passend zur Ecke, damit sich die Größe nicht aus dem Bild schiebt
+box.style.transformOrigin = { top: '50% 0', bottom: '50% 100%', center: '50% 50%', 'top-left': '0 0', 'top-right': '100% 0', 'bottom-left': '0 100%', 'bottom-right': '100% 100%' }[params.get('pos')] ?? '50% 0';
+
+let cfg = null, offset = 0, ended = false, endedAt = 0;
+const demoTarget = Date.now() + 3 * 60_000;
+const DEMO = { show: true, title: 'Noch bis Mitternacht', target: demoTarget, endText: 'Alles Gute zum Geburtstag! 🎂', holdMinutes: 15, now: Date.now() };
+
+async function poll() {
+  try {
+    const v = params.has('demo') ? DEMO : await (await fetch('/api/countdown', { cache: 'no-store' })).json();
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    if (!cfg || cfg.target !== v.target) { ended = false; endedAt = 0; }
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+const two = (n) => String(n).padStart(2, '0');
+function frame() {
+  requestAnimationFrame(frame);
+  if (!cfg || !cfg.show || !cfg.target) { box.classList.remove('on'); return; }
+  const now = Date.now() + offset, left = cfg.target - now;
+  $('title').textContent = cfg.title;
+  if (left <= 0) {
+    if (!ended) { ended = true; endedAt = now; $('end').textContent = cfg.endText; box.classList.add('done'); if (params.get('confetti') !== '0') burst(); }
+    const hold = cfg.holdMinutes * 60_000;
+    box.classList.toggle('on', !hold || now - endedAt < hold); // 0 = bleibt stehen
+    return;
+  }
+  ended = false; box.classList.remove('done'); box.classList.add('on');
+  const s = Math.floor(left / 1000), d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  $('d').textContent = d; $('h').textContent = two(h); $('m').textContent = two(m); $('s').textContent = two(s % 60);
+  $('uD').classList.toggle('hide', d === 0);
+  $('uH').classList.toggle('hide', d === 0 && h === 0);
+  box.classList.toggle('last', s < 11);
+}
+
+// Konfetti am Ende: Canvas, einfache Teilchen mit Schwerkraft
+const cv = $('fx'), ctx = cv.getContext('2d');
+let parts = [];
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+addEventListener('resize', resize); resize();
+const COLORS = ['#f6b82e', '#4fb8c4', '#e5533d', '#58a84a', '#9146ff', '#f08a24', '#ff8fc0', '#fff3da'];
+function burst() {
+  for (let k = 0; k < 3; k++) setTimeout(() => {
+    for (let i = 0; i < 140; i++) parts.push({ x: Math.random() * cv.width, y: -20 - Math.random() * 120, vx: (Math.random() - .5) * 5, vy: 2 + Math.random() * 5, w: 8 + Math.random() * 8, h: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: COLORS[i % COLORS.length] });
+  }, k * 900);
+}
+(function draw() {
+  requestAnimationFrame(draw);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  parts = parts.filter((p) => p.y < cv.height + 30);
+  for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += .06; p.r += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); }
+})();
+
+poll(); setInterval(poll, 5000); frame();
+</script>
+</body>
+</html>
