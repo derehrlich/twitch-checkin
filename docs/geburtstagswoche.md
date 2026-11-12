@@ -18,6 +18,12 @@ Admin-Reiter **Geburtstagswoche**. Alles läuft auf der Stadtwache, die OBS-Seit
 ## Befehl `!geburtstag`
 Zeigt im Chat die Restzeit bis zur Zielzeit des Countdowns und den Wochenplan. Standardmäßig **aus**. Einschalten und den **Plan** eintragen: Reiter Geburtstagswoche, Karte „Geburtstags-Befehl“ (ein Eintrag pro Zeile, im Chat mit · verbunden). Vorbelegt ist dein Entwurf, bitte prüfen. Nach der Zielzeit kommt der zweite Text („Marcel hat Geburtstag!“).
 
+## Adventure-Einreichung (Community-Tage)
+- Admin → Geburtstagswoche → „Adventure-Einreichungen“. Einschalten und Texte: Karte darunter (standardmäßig **aus**).
+- Zuschauer reichen im Twitch-Chat mit `!adventure Name oder Link` ein, im Discord über den VerwirrBot (Schnittstelle `POST /api/community/adventure`, **die Discord-Seite im VerwirrBot ist noch nicht gebaut**). Alles landet in einer Liste. Höchstens 2 je Person (Twitch und Discord zusammen, wenn das Konto verknüpft ist), gleiche Namen nur einmal.
+- „Offene aufs Glücksrad übertragen“ macht daraus ein Rad (oder ersetzt die Felder eines vorhandenen). Jedes Feld kommt nur einmal dran, im Ergebnis steht „eingereicht von …“. Ein gedrehtes Adventure steht in der Liste als „vom Rad gewählt“.
+- Von Hand ergänzen geht auch, falls jemand es woanders postet.
+
 ## Mitternachts-Los
 Siehe `docs/gewinnspiel.md`, Punkt 3b.
 

@@ -63,9 +63,10 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Reiter „Geburtstagswoche“ (`public/admin/js/feier.js`, Route `netlify/lib/admin/feier.mjs`). Doku für Marcel: `docs/geburtstagswoche.md`.
 - Countdown: `netlify/lib/overlays/countdown.mjs`, Schlüssel `countdown/config`, Seite `public/countdown.html`, öffentlich `GET /api/countdown` (mit Serverzeit). `birthdayReply` (Befehl `!geburtstag`, Einstellungen `bday…`, Plan in `bdayPlan`) nutzt dieselbe Zielzeit.
 - Glücksrad: `netlify/lib/overlays/gluecksrad.mjs`, Schlüssel `rad/wheel/<id>`, `rad/state`, Seite `public/rad.html`, öffentlich `GET /api/rad`. Das Ergebnis würfelt der Server (`pick`, crypto, nach Gewicht), das Overlay dreht nur dorthin. Felder aus Text `Name ; Gewicht ; #Farbe`.
+- Adventure-Einreichung: `netlify/lib/belohnungen/adventures.mjs` (`adv/entry/<id>`, `adv/title/<sha>` gegen Doppelte), Chat-Befehl `advCommand`, Admin `netlify/lib/admin/adventure.mjs`, Bot-Schnittstelle `GET/POST /api/community/adventure` (Discord-Seite im VerwirrBot offen). `toWheel` macht aus offenen Einträgen ein Rad (Feld-Verweis `ref`, `spin` setzt den Eintrag auf `gedreht`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 128 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 129 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen

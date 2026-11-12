@@ -19,7 +19,7 @@ const HIDDEN = {
 export const DEFAULTS = { ...Object.fromEntries(ITEMS.map((i) => [i.id, i.def])), ...HIDDEN };
 
 // Braucht der Bot den Chat-Webhook? Für Befehle, Abspann und Chat-Zähler.
-export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.alpacaEnabled || s.chatOverlayEnabled || s.modEnabled || s.gwEnabled || s.bdayEnabled);
+export const needsChat = (s) => Boolean(s.chatCommands || s.creditsEnabled || s.chatStats || s.communityEnabled || s.alpacaEnabled || s.chatOverlayEnabled || s.modEnabled || s.gwEnabled || s.bdayEnabled || s.advEnabled);
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 

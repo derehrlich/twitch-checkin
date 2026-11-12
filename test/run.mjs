@@ -2212,7 +2212,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -3070,6 +3070,83 @@ await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gew
   assert.equal(v.wheels.length, 2); assert.equal(v.state.wheelId, v.wheels[0].id);
   assert.equal((await api('DELETE', 'feier/rad/wheel/ffffffff')).status, 404);
   await api('PUT', 'settings', { radChatEnabled: false });
+});
+
+await test('Adventure-Einreichung: Twitch und Discord in einer Liste, Duplikate, Limit, verknüpfte Konten, aufs Glücksrad', async () => {
+  const adv = await import('../netlify/lib/belohnungen/adventures.mjs');
+  const rad = await import('../netlify/lib/overlays/gluecksrad.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
+  const community = (await import('../netlify/functions/community.mjs')).default;
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const bot = (m, p, b) => community(new Request(BASE + '/api/community/' + p, { method: m, headers: { 'content-type': 'application/json', authorization: 'Bearer geheimwort-12345' }, body: b ? JSON.stringify(b) : undefined }));
+  assert.equal((await admin(adminReq('GET', 'adventure'))).status, 401);
+
+  // Ausgeschaltet: der Befehl reagiert nicht, Discord bekommt „geschlossen“
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, advEnabled: false });
+  assert.deepEqual(await chatMsg('!adventure Lamas Rache', 'a1', 'Anna'), []);
+  assert.equal((await (await bot('POST', 'adventure', { discordId: '700000001', discordName: 'Zed', text: 'X' })).json()).reason, 'closed');
+  await api('PUT', 'settings', { advEnabled: true, advOpen: true, advMaxPerPerson: 2 });
+
+  // Twitch: angenommen, ohne Text gibt es einen Hinweis, doppelt wird abgelehnt (auch anders geschrieben), Limit 2 je Person
+  assert.match((await chatMsg('!adventure Lamas Rache', 'a1', 'Anna'))[0], /Anna, dein Adventure „Lamas Rache“ ist in der Liste \(Nr\. 1\)/);
+  assert.match((await chatMsg('!adventure', 'a1', 'Anna'))[0], /schreib den Namen oder den Link/);
+  assert.match((await chatMsg('!adventure  lamas   RACHE ', 'a2', 'Ben'))[0], /schon in der Liste/);
+  assert.match((await chatMsg('!adventure Die Mine https://example.com/mine javascript:alert(1)', 'a1', 'Anna'))[0], /Nr\. 2/);
+  assert.match((await chatMsg('!adventure Dritte Karte', 'a1', 'Anna'))[0], /schon 2 Adventures eingereicht/);
+  let list = (await adv.listEntries());
+  assert.deepEqual(list.map((e) => [e.title, e.link, e.name, e.source]), [['Lamas Rache', '', 'Anna', 'twitch'], ['Die Mine javascript:alert(1)', 'https://example.com/mine', 'Anna', 'twitch']]);
+  assert.deepEqual(adv.parseSubmission('https://www.beispiel.de/x?y=1'), { title: 'beispiel.de', link: 'https://www.beispiel.de/x?y=1' });
+  assert.deepEqual(adv.parseSubmission('ftp://nein'), { title: 'ftp://nein', link: '' }, 'nur http(s) wird zum Link');
+
+  // Discord (verknüpft: zählt mit den Twitch-Einreichungen derselben Person; unverknüpft: eigene Person)
+  await com.saveLink({ discordId: '700000002', discordName: 'AnnaDC', twitchId: 'a1', twitchName: 'Anna' });
+  const viaBot = async (id, name, text) => (await (await bot('POST', 'adventure', { discordId: id, discordName: name, text })).json());
+  assert.equal((await viaBot('700000002', 'AnnaDC', 'Noch eins')).reason, 'limit', 'Anna hat über Twitch schon 2');
+  const z1 = await viaBot('700000001', 'Zed', 'Burgbau');
+  assert.equal(z1.ok, true); assert.match(z1.reply, /Zed, dein Adventure „Burgbau“/);
+  assert.equal((await viaBot('700000001', 'Zed', 'Burgbau')).reason, 'duplicate');
+  assert.equal((await bot('POST', 'adventure', { discordId: 'abc', text: 'x' })).status, 400);
+  const view = await (await bot('GET', 'adventure')).json();
+  assert.equal(view.count, 3); assert.ok(!JSON.stringify(view).includes('example.com'), 'Bot bekommt keine Links');
+
+  // Geschlossen: nichts mehr, Admin kann trotzdem von Hand ergänzen
+  await api('PUT', 'settings', { advOpen: false });
+  assert.match((await chatMsg('!adventure Spät dran', 'a3', 'Cleo'))[0], /geschlossen/);
+  let v = await (await api('POST', 'adventure/entry', { text: 'Vom Admin', name: 'Dora' })).json();
+  assert.equal(v.counts.all, 4);
+  assert.equal((await api('POST', 'adventure/entry', { text: '   ' })).status, 400);
+
+  // Aufs Glücksrad: neues Rad mit Zusatzzeile und Verweis, nur offene Einträge
+  const doraId = v.entries.find((e) => e.name === 'Dora').id;
+  await api('PUT', `adventure/entry/${doraId}`, { status: 'gespielt' });
+  v = await (await api('POST', 'adventure/to-wheel', { name: 'Adventures Freitag' })).json();
+  assert.equal(v.used, 3); assert.equal(v.wheel.name, 'Adventures Freitag');
+  const wheel = await rad.getWheel(v.wheel.id);
+  assert.equal(wheel.removeWon, true);
+  assert.deepEqual(wheel.segments.map((x) => [x.label, x.note]).sort(), [['Burgbau', 'eingereicht von Zed'], ['Die Mine javascript:alert(1)', 'eingereicht von Anna'], ['Lamas Rache', 'eingereicht von Anna']]);
+  assert.ok(wheel.segments.every((x) => x.ref));
+  // Text-Bearbeitung des Rads behält Zusatzzeile und Verweis bei gleichem Namen
+  const edited = await rad.updateWheel(wheel.id, { segments: rad.segmentsText(wheel) + '\nNeu von Hand' });
+  assert.equal(edited.segments.find((x) => x.label === 'Burgbau').note, 'eingereicht von Zed');
+  assert.equal(edited.segments.length, 4);
+  await rad.updateWheel(wheel.id, { segments: rad.segmentsText(wheel) }); // Zusatzfeld wieder weg
+  // Drehen markiert den Eintrag als „vom Rad gewählt“ und liefert die Zusatzzeile
+  await rad.updateState({ wheelId: wheel.id });
+  const r = await rad.spin(await getSettings(), { announce: false });
+  assert.ok(r.ok && r.spin.note.startsWith('eingereicht von '));
+  const picked = (await adv.listEntries()).filter((e) => e.status === 'gedreht');
+  assert.equal(picked.length, 1);
+  // Löschen räumt auch die Doppel-Sperre auf; nur 1 Eintrag reicht nicht für ein Rad
+  assert.equal((await api('DELETE', `adventure/entry/${doraId}`)).status, 200);
+  assert.equal((await viaBot('700000009', 'Neu', 'Vom Admin')).ok, false, 'Einreichung ist noch geschlossen');
+  await api('PUT', 'settings', { advOpen: true });
+  assert.equal((await viaBot('700000009', 'Neu', 'Vom Admin')).ok, true, 'Titel ist nach dem Löschen wieder frei');
+  await api('POST', 'adventure/clear', {});
+  assert.equal((await adv.listEntries()).length, 0);
+  assert.equal((await api('POST', 'adventure/to-wheel', {})).status, 400);
+  await api('PUT', 'settings', { advEnabled: false });
+  delete process.env.LINK_SECRET;
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

@@ -1,5 +1,5 @@
 // Glücksrad-Overlay (/rad): beliebig viele Räder mit eigenen Feldern (Gebäudeart, Baustil, Spiel, Community-Aktion …).
-//   rad/wheel/<id>   { id, name, removeWon, segments: [{ id, label, weight, color, used }], createdAt }
+//   rad/wheel/<id>   { id, name, removeWon, segments: [{ id, label, weight, color, used, note, ref }], createdAt }   note = Zusatzzeile im Ergebnis (z. B. „eingereicht von Max“), ref = Eintrag in der Adventure-Liste
 //   rad/state        { show, wheelId, spin: { id, wheelId, startedAt, durationMs, index, segmentId, label, turns } | null, history: [{ at, wheel, label }] }
 // Das Ergebnis würfelt der Server (crypto, nach Gewicht). Das Overlay dreht nur, bis das Rad auf dem Ergebnis steht.
 import crypto from 'node:crypto';
@@ -29,7 +29,7 @@ export function parseSegments(text, old = []) {
     if (!label) continue;
     const weight = Math.min(100, Math.max(1, Math.round(Number(String(w ?? '').replace(',', '.'))) || 1));
     const prev = known.get(label.slice(0, 40).toLowerCase());
-    out.push({ id: prev?.id ?? nid(), label: label.slice(0, 40), weight, color: HEX.test(c ?? '') ? c.toLowerCase() : '', used: prev?.used ?? false });
+    out.push({ id: prev?.id ?? nid(), label: label.slice(0, 40), weight, color: HEX.test(c ?? '') ? c.toLowerCase() : '', used: prev?.used ?? false, note: prev?.note ?? '', ref: prev?.ref ?? null });
   }
   if (out.length > MAX_SEGMENTS) throw new Error(`Höchstens ${MAX_SEGMENTS} Felder pro Rad`);
   return out;
@@ -49,9 +49,12 @@ export async function getState() {
 }
 const saveState = (s) => db.set(STATE_KEY, s);
 
-export async function createWheel({ name, segmentsText: text } = {}, now = Date.now()) {
+/** Fertige Felder von außen (z. B. aus der Adventure-Liste): Name, Zusatzzeile und Verweis, Farbe leer = Palette. */
+export const rawSegments = (list) => (list ?? []).slice(0, MAX_SEGMENTS).map((s) => ({ id: nid(), label: str(s.label, 40) || 'Feld', weight: 1, color: '', used: false, note: str(s.note, 80), ref: s.ref ? str(s.ref, 40) : null }));
+
+export async function createWheel({ name, segmentsText: text, segments, removeWon = false } = {}, now = Date.now()) {
   if ((await db.list('rad/wheel/')).length >= MAX_WHEELS) throw new Error(`Höchstens ${MAX_WHEELS} Räder`);
-  const w = { id: nid(), name: str(name, 40) || 'Neues Rad', removeWon: false, segments: parseSegments(text ?? 'Feld 1\nFeld 2\nFeld 3'), createdAt: new Date(now).toISOString() };
+  const w = { id: nid(), name: str(name, 40) || 'Neues Rad', removeWon: Boolean(removeWon), segments: Array.isArray(segments) ? rawSegments(segments) : parseSegments(text ?? 'Feld 1\nFeld 2\nFeld 3'), createdAt: new Date(now).toISOString() };
   if (w.segments.length < 2) throw new Error('Ein Rad braucht mindestens 2 Felder');
   await saveWheel(w);
   const st = await getState();
@@ -65,8 +68,8 @@ export async function updateWheel(id, input) {
   const i = input ?? {};
   if ('name' in i) w.name = str(i.name, 40) || w.name;
   if (typeof i.removeWon === 'boolean') w.removeWon = i.removeWon;
-  if ('segments' in i) {
-    const segs = parseSegments(i.segments, w.segments);
+  if ('segments' in i || 'rawSegments' in i) {
+    const segs = 'rawSegments' in i ? rawSegments(i.rawSegments) : parseSegments(i.segments, w.segments);
     if (segs.length < 2) throw new Error('Ein Rad braucht mindestens 2 Felder');
     w.segments = segs;
   }
@@ -111,11 +114,12 @@ export async function spin(settings, { now = Date.now(), announce = true } = {})
   const seg = pick(w.segments);
   if (!seg) return { error: 'Alle Felder sind schon dran. Setze das Rad zurück.', status: 409 };
   const index = w.segments.findIndex((s) => s.id === seg.id);
-  st.spin = { id: nid(), wheelId: w.id, startedAt: now, durationMs: SPIN_MS, index, segmentId: seg.id, label: seg.label, turns: 5 + crypto.randomInt(0, 3), land: crypto.randomInt(10, 91) / 100 };
+  st.spin = { id: nid(), wheelId: w.id, startedAt: now, durationMs: SPIN_MS, index, segmentId: seg.id, label: seg.label, note: seg.note ?? '', turns: 5 + crypto.randomInt(0, 3), land: crypto.randomInt(10, 91) / 100 };
   st.history = [{ at: new Date(now).toISOString(), wheel: w.name, label: seg.label }, ...st.history].slice(0, 50);
   st.show = true; // ein Dreh macht das Rad sichtbar
   await saveState(st);
   if (w.removeWon) { seg.used = true; await saveWheel(w); }
+  if (seg.ref) { const e = await db.get(`adv/entry/${seg.ref}`); if (e && e.status === 'offen') await db.set(`adv/entry/${seg.ref}`, { ...e, status: 'gedreht' }); } // Adventure-Liste: vom Rad gewählt
   if (announce && settings.radChatEnabled && settings.chatEnabled) {
     setTimeout(() => sendChat(fill(settings.radTemplate, { wheel: w.name, result: seg.label })).catch((e) => console.warn('Chat fehlgeschlagen:', e.message)), SPIN_MS + 500).unref?.();
   }
@@ -145,7 +149,7 @@ export async function publicView(now = Date.now()) {
   const w = await getWheel(st.wheelId);
   if (!w) return { show: false, now };
   return {
-    show: st.show, now, wheel: { id: w.id, name: w.name, removeWon: w.removeWon, segments: colored(w.segments).map((s) => ({ id: s.id, label: s.label, weight: s.weight, color: s.color, used: s.used })) },
+    show: st.show, now, wheel: { id: w.id, name: w.name, removeWon: w.removeWon, segments: colored(w.segments).map((s) => ({ id: s.id, label: s.label, weight: s.weight, color: s.color, used: s.used, note: s.note ?? '' })) },
     spin: st.spin && st.spin.wheelId === w.id ? st.spin : null,
   };
 }

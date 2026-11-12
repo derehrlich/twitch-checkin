@@ -410,6 +410,25 @@
           <button id="radExamples" class="ghost">Beispielräder anlegen (Gebäudeart, Baustil, Community-Aktion)</button>
         </div>
       </section>
+      <section class="card">
+        <h2>Adventure-Einreichungen</h2>
+        <p class="muted" id="advInfo"></p>
+        <p class="muted">Eingereicht wird im Twitch-Chat mit <code id="advCmd"></code> (zum Beispiel „!adventure Lamas Rache“) und im Discord über den VerwirrBot. Beides landet hier in derselben Liste. Mit „Aufs Glücksrad übertragen“ wird aus den offenen Einträgen ein Rad (jedes Feld kommt nur einmal dran, im Ergebnis steht, wer es eingereicht hat). Ein gedrehtes Adventure wird hier als „vom Rad gewählt“ markiert. Ein-/Ausschalten, Schließen und Texte stehen ganz unten.</p>
+        <div class="row">
+          <div><label for="advText">Von Hand ergänzen (Name, gern mit Link)</label><input id="advText" maxlength="400" placeholder="Lamas Rache https://…"></div>
+          <div><label for="advWho">Eingereicht von</label><input id="advWho" maxlength="40" placeholder="z. B. Max"></div>
+          <button id="advAdd" class="ghost">Hinzufügen</button>
+        </div>
+        <div id="advList"></div>
+        <div class="row" style="margin-top:14px">
+          <div><label for="advWheel">Übertragen auf</label><select id="advWheel"></select></div>
+          <div><label for="advWheelName">Name des neuen Rads</label><input id="advWheelName" maxlength="40" placeholder="Adventures Freitag"></div>
+          <button id="advToWheel">🎡 Offene aufs Glücksrad übertragen</button>
+          <button id="advClearDone" class="ghost">Gedrehte und gespielte entfernen</button>
+          <button id="advClearAll" class="danger">Liste leeren</button>
+        </div>
+      </section>
+      <div data-schema="adventure" style="display:grid; gap:22px;"></div>
       <div data-schema="feier" style="display:grid; gap:22px;"></div>
     </div>
 

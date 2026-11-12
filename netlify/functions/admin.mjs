@@ -20,6 +20,7 @@ import { gewinn } from '../lib/admin/gewinn.mjs';
 import { health } from '../lib/admin/gesundheit.mjs';
 import { tickets } from '../lib/admin/tickets.mjs';
 import { feier } from '../lib/admin/feier.mjs';
+import { adventure } from '../lib/admin/adventure.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -47,6 +48,7 @@ const ROUTES = {
   gewinn,
   tickets,
   feier,
+  adventure,
 };
 
 export default async (req) => {

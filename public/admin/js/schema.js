@@ -263,6 +263,20 @@ export const SCHEMA = {
     ] },
   ],
 
+  adventure: [
+    { title: 'Adventure-Einreichung: Befehl und Texte', hint: `Zuschauer reichen im Chat mit dem Befehl ein, zum Beispiel <code>!adventure Name oder Link</code>. Im Discord geht es über den VerwirrBot in dieselbe Liste. Die Liste und die Übertragung aufs Glücksrad findest du oben in der Karte „Adventure-Einreichungen“. Platzhalter: ${code('user')} ${code('title')} ${code('count')} Einreichungen insgesamt, ${code('max')} Einreichungen je Person.`, items: [
+      c('advEnabled', false, 'Adventure-Einreichung einschalten (Chat-Befehl und Discord, braucht den Chat-Webhook)'),
+      c('advOpen', true, 'Einreichung ist offen (zum Schließen abhaken, die Liste bleibt)'),
+      t('advCommand', '!adventure', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!adventure' }),
+      n('advMaxPerPerson', 2, 'So viele Adventures darf jede Person einreichen (Twitch und Discord zusammen)', { min: 1, max: 20 }),
+      a('advAddedTemplate', '🗺️ {user}, dein Adventure „{title}“ ist in der Liste (Nr. {count}). Danke!', 'Adventure angenommen', { user: 'Max', title: 'Lamas Rache', count: 4 }),
+      a('advDuplicateTemplate', '{user}, „{title}“ ist schon in der Liste ✅', 'Adventure schon eingereicht', { user: 'Max', title: 'Lamas Rache' }),
+      a('advLimitTemplate', '{user}, du hast schon {max} Adventures eingereicht. Mehr gehen leider nicht.', 'Zu viele Einreichungen', { user: 'Max', max: 2 }),
+      a('advNoTextTemplate', '{user}, schreib den Namen oder den Link hinter den Befehl, zum Beispiel !adventure Lamas Rache', 'Nichts dahinter geschrieben', { user: 'Max' }),
+      a('advClosedTemplate', '{user}, die Adventure-Einreichung ist gerade geschlossen.', 'Einreichung geschlossen', { user: 'Max' }),
+    ] },
+  ],
+
   tickets: [
     { title: 'Ticket-System', hint: `Die Events (Name, Datum, Plätze, Preis) legst du unten in der Eventliste an. Hier stehen nur Schalter, Chat-Befehle und Texte. Ausgeschaltet nimmt das Ticket-System keine Einlösungen an (die Punkte gehen zurück). Platzhalter in den Texten: ${code('user')} Name, ${code('event')} Eventname, ${code('seat')} Platznummer, ${code('max')} Plätze insgesamt, ${code('free')} freie Plätze, ${code('pos')} Wartelisten-Position, ${code('minutes')} Frist zum Melden.`, items: [
       c('ticketsEnabled', false, 'Ticket-System einschalten'),
