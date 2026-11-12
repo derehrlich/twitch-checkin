@@ -649,14 +649,16 @@ export const redrawLog = async (did) => (await readAll(`gw/${did}/redraw/`)).map
 export async function pendingDms() {
   return (await readAll('gwdm/')).map(([, v]) => v).filter(Boolean);
 }
-export async function ackDm(winnerId, now = Date.now()) {
+/** Der VerwirrBot meldet zurück: DM verschickt (ok) oder nicht zustellbar (failed, z. B. DMs gesperrt). Dann bleibt nur der Link von Hand. */
+export async function ackDm(winnerId, { failed = false } = {}, now = Date.now()) {
   if (!isId(winnerId)) return false;
   const dm = await db.get(`gwdm/${winnerId}`);
   if (!dm) return false;
   const w = await getWinner(dm.drawId, winnerId);
   if (w && w.status !== 'verfallen') {
-    if (w.status === 'gezogen') w.status = 'link_verschickt';
-    w.sentVia = 'discord'; w.dmQueued = false; note(w, 'Link per Discord-DM geschickt', now);
+    w.dmQueued = false;
+    if (failed) { w.sendError = 'Discord-DM nicht zustellbar'; note(w, 'Discord-DM nicht zustellbar, Link bitte von Hand schicken', now); }
+    else { if (w.status === 'gezogen') w.status = 'link_verschickt'; w.sentVia = 'discord'; note(w, 'Link per Discord-DM geschickt', now); }
     await saveWinner(w);
   }
   await db.delete(`gwdm/${winnerId}`);
