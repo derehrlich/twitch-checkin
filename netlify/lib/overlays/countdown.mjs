@@ -47,12 +47,21 @@ export function fmtRemaining(ms) {
   return `${m} Min ${s % 60} Sek`;
 }
 
-/** Antwort auf den Geburtstags-Befehl: Restzeit bis zum Countdown-Ziel plus Wochenplan (eine Zeile pro Eintrag, im Chat mit · verbunden). */
+/** Antwort auf den Geburtstags-Befehl: Restzeit bis zum Countdown-Ziel plus Wochenplan (eine Zeile pro Eintrag).
+ *  Der Twitch-Chat kennt keine Zeilenumbrüche. Mit `bdayEachLine` kommt deshalb erst der Satz mit der Restzeit (ohne {plan}),
+ *  dann jeder Planeintrag als eigene Nachricht (höchstens 12). Ohne den Haken: eine Nachricht, Einträge mit · verbunden.
+ *  Gibt eine Liste von Nachrichten zurück. */
 export async function birthdayReply(settings, now = Date.now()) {
   const c = await getConfig();
-  const plan = String(settings.bdayPlan ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' · ');
+  const lines = String(settings.bdayPlan ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const over = c.target && now >= Date.parse(c.target);
-  return fill(over ? settings.bdayDoneTemplate : settings.bdayTemplate, { countdown: c.target && !over ? fmtRemaining(Date.parse(c.target) - now) : 'ein bisschen', plan: plan || 'Der Plan kommt gleich.' });
+  const template = over ? settings.bdayDoneTemplate : settings.bdayTemplate;
+  const countdown = c.target && !over ? fmtRemaining(Date.parse(c.target) - now) : 'ein bisschen';
+  if (settings.bdayEachLine && lines.length) {
+    const head = fill(template, { countdown, plan: '' }).replace(/\s+/g, ' ').trim();
+    return [head, ...lines.slice(0, 12)];
+  }
+  return [fill(template, { countdown, plan: lines.join(' · ') || 'Der Plan kommt gleich.' })];
 }
 
 export async function adminView(settings, now = Date.now()) {

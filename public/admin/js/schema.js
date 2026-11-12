@@ -250,8 +250,9 @@ export const SCHEMA = {
   ],
 
   feier: [
-    { title: 'Geburtstags-Befehl', hint: `Der Befehl zeigt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Wochenplan. Platzhalter: ${code('countdown')} Restzeit, ${code('plan')} der Plan. Im Plan steht ein Eintrag pro Zeile, im Chat werden sie mit · verbunden (zusammen höchstens 400 Zeichen, der Chat nimmt 500).`, items: [
+    { title: 'Geburtstags-Befehl', hint: `Der Befehl zeigt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Wochenplan. Platzhalter: ${code('countdown')} Restzeit, ${code('plan')} der Plan. Im Plan steht ein Eintrag pro Zeile (zusammen höchstens 400 Zeichen). Der Chat kennt keine Zeilenumbrüche: Entweder kommt jeder Eintrag als eigene Nachricht (Haken unten) oder alles in einer Nachricht (höchstens 500 Zeichen), mit · verbunden.`, items: [
       c('bdayEnabled', false, 'Geburtstags-Befehl einschalten (braucht den Chat-Webhook)'),
+      c('bdayEachLine', true, 'Jeden Planeintrag als eigene Chat-Nachricht senden (der Twitch-Chat kennt keine Zeilenumbrüche, so bleibt der Plan lesbar; zuerst kommt der Satz mit der Restzeit ohne {plan}). Ohne Haken kommt alles in einer Nachricht, die Einträge mit · verbunden'),
       t('bdayCommand', '!geburtstag', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!geburtstag' }),
       a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das Programm: {plan}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),
       a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {plan}', 'Antwort nach der Zielzeit', { plan: 'Mo 19:00 Wie alles begann · Di 20:30 Bau-Abend' }),

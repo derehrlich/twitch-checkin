@@ -50,6 +50,9 @@ export async function cooling(cmd, seconds) {
   return false;
 }
 
+/** Pause zwischen mehreren Nachrichten einer Antwort (Millisekunden). Die Tests stellen sie auf 0. */
+export const SENDE_PAUSE = { ms: 800 };
+
 export const BEFEHLE = [
   { id: 'streak', wort: (s) => s.streakCommand, run: async ({ e, settings }) => streakReply(e.chatter_user_id, e.chatter_user_name, settings, await allUsers()) },
   { id: 'top', wort: (s) => s.topCommand, run: async ({ settings }) => topReply(settings, await allUsers()) },
@@ -122,6 +125,11 @@ export async function fuehreAus(e, text, settings) {
   const args = text.split(/\s+/).slice(1).join(' ').trim();
   let reply = null;
   try { reply = await befehl.run({ e, args, settings }); } catch (err) { console.warn(`Befehl ${befehl.id} fehlgeschlagen:`, err.message); }
-  if (reply) await sendChat(reply);
-  return { ok: true, reply };
+  // Eine Antwort darf aus mehreren Nachrichten bestehen (der Chat kennt keine Zeilenumbrüche), mit kurzer Pause, damit die Reihenfolge stimmt
+  const nachrichten = (Array.isArray(reply) ? reply : [reply]).filter(Boolean);
+  for (const [i, text] of nachrichten.entries()) {
+    if (i) await new Promise((r) => setTimeout(r, SENDE_PAUSE.ms));
+    await sendChat(text);
+  }
+  return { ok: true, reply: Array.isArray(reply) ? nachrichten.join('\n') : reply };
 }

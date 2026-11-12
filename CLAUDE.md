@@ -66,7 +66,7 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Adventure-Einreichung: `netlify/lib/belohnungen/adventures.mjs` (`adv/entry/<id>`, `adv/title/<sha>` gegen Doppelte), Chat-Befehl `advCommand`, Admin `netlify/lib/admin/adventure.mjs`, Bot-Schnittstelle `GET/POST /api/community/adventure` (Discord: `/adventure einreichen` und `/adventure liste` im VerwirrBot). `toWheel` macht aus offenen Einträgen ein Rad (Feld-Verweis `ref`, `spin` setzt den Eintrag auf `gedreht`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 129 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 130 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
