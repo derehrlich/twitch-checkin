@@ -9,7 +9,8 @@ export async function commands({ route, method, body }) {
   const list = await getCommands();
   if (route.length === 1 && method === 'GET') {
     const sounds = (await getBoard()).filter((e) => isActive({ ...e, enabled: true })).map((e) => ({ id: e.id, title: e.title }));
-    return json({ commands: list, sounds });
+    const counts = Object.fromEntries(await Promise.all(list.map(async (c) => [c.id, (await db.get(`counter/${c.id}`)) ?? 0]))); // Stand von {count}
+    return json({ commands: list, sounds, counts });
   }
   if (route.length === 1 && method === 'POST') {
     if (list.length >= MAX_COMMANDS) return json({ error: `Höchstens ${MAX_COMMANDS} Commands` }, 400);
@@ -34,9 +35,14 @@ export async function commands({ route, method, body }) {
     await runActions(cmd, { user: String(body.user || 'TestUser').slice(0, 40), args: 'Beispiel', channel: 'Kanal', dry: true }, await getSettings());
     return json({ ok: true });
   }
+  if (route[2] === 'counter' && method === 'POST') { // Zähler für {count} auf eine Zahl setzen (Standard 0)
+    const n = Math.min(1_000_000_000, Math.max(0, Math.round(Number(body.value ?? 0)) || 0));
+    await db.set(`counter/${cmd.id}`, n);
+    return json({ ok: true, count: n });
+  }
   if (route.length === 2 && method === 'DELETE') {
     await saveCommands(list.filter((c) => c.id !== cmd.id));
-    await db.delete(`cooldown/cmd-${cmd.id}`); await db.delete(`cooldown/timer-${cmd.id}`);
+    await db.delete(`cooldown/cmd-${cmd.id}`); await db.delete(`cooldown/timer-${cmd.id}`); await db.delete(`counter/${cmd.id}`);
     return json({ ok: true });
   }
 }

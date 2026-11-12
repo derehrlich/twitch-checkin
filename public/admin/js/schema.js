@@ -241,6 +241,10 @@ export const SCHEMA = {
       n('backupKeep', 7, 'So viele Sicherungen aufheben', { min: 1, max: 90 }),
       c('backupMedia', true, 'Mit Tönen und Bildern sichern'),
     ] },
+    { title: 'Störungen an Discord melden', hint: `Die Stadtwache prüft alle paar Minuten, ob alles läuft, und schreibt dir bei Problemen in einen Discord-Kanal: Twitch hat Webhooks widerrufen, die Twitch-Verbindung ist ungültig, Webhooks fehlen oder die nächtliche Sicherung ist fehlgeschlagen. Eine Meldung kommt, wenn ein Problem bei zwei Prüfungen hintereinander da war, danach höchstens einmal am Tag erneut, und eine Nachricht, wenn alles wieder in Ordnung ist. <b>So bekommst du die Adresse:</b> In Discord auf den Kanal gehen → Kanal bearbeiten (Zahnrad) → Integrationen → Webhooks → Neuer Webhook → „Webhook-URL kopieren“ und hier einfügen. Die Adresse ist wie ein Passwort: Wer sie hat, kann in den Kanal schreiben. Nach dem Speichern mit dem Knopf unten testen.`, items: [
+      c('healthEnabled', false, 'Störungen an Discord melden'),
+      t('healthDiscordWebhook', '', 'Discord-Webhook-Adresse', { maxlength: 200, kind: 'discordhook', empty: true, placeholder: 'https://discord.com/api/webhooks/…' }),
+    ] },
   ],
 };
 

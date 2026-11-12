@@ -18,6 +18,6 @@ export async function setup({ req, method }) {
   await saveBoard(synced);
   const boardIds = synced.filter((e) => isActive(e) && e.rewardId).map((e) => e.rewardId);
   const { warnings, notes } = await subscribe(`${siteUrl(req)}/api/twitch-webhook`, [checkin.id, ...(checkout ? [checkout.id] : []), ...(streak ? [streak.id] : []), ...(entryBuy ? [entryBuy.id, entryExtend.id] : []), ...(alpaca ? [alpaca.id] : []), ...(glitter ? [glitter.id] : []), ...(gradient ? [gradient.id] : []), ...boardIds], { raids: settings.raidEnabled || settings.creditsEnabled, alerts: settings.alertsEnabled || settings.creditsEnabled, chat: needsChat(settings) });
-  await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null });
+  await db.set('config/state', { ...((await db.get('config/state')) ?? {}), revoked: null, webhookUrl: `${siteUrl(req)}/api/twitch-webhook` }); // Adresse merken, damit die Störungs-Prüfung ohne Anfrage weiß, wo sie nachsehen muss
   return json({ ok: true, reward: checkin.title, checkout: checkout?.title ?? null, streak: streak?.title ?? null, ...(entryBuy ? { entrySound: [entryBuy.title, entryExtend.title] } : {}), ...(alpaca ? { alpaca: alpaca.title } : {}), ...(glitter ? { glitter: glitter.title } : {}), ...(gradient ? { gradient: gradient.title } : {}), soundboard: boardIds.length, ...(warnings.length ? { warnings } : {}), ...(notes.length ? { notes: [...new Set(notes)] } : {}) });
 }

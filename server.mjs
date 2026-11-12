@@ -195,5 +195,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const tick = () => backupTick().then((r) => { if (r) console.log(r.ok ? `Sicherung angelegt: ${r.name}` : r.error); }).catch((e) => console.error('Sicherung:', e.message));
   setTimeout(tick, 60_000).unref();
   setInterval(tick, 10 * 60_000).unref();
+  // Störungs-Meldungen an Discord: alle 5 Minuten prüfen (nur aktiv, wenn im Admin eingeschaltet)
+  const { healthTick } = await import('./netlify/lib/system/gesundheit.mjs');
+  const health = () => healthTick().then((r) => { if (r?.length) console.log('Störungs-Meldung gesendet'); }).catch((e) => console.error('Störungs-Prüfung:', e.message));
+  setTimeout(health, 2 * 60_000).unref();
+  setInterval(health, 5 * 60_000).unref();
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
 }

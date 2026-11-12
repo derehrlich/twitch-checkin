@@ -7,12 +7,8 @@ import { json } from '../kern/http.mjs';
 import { listSubscriptions, SCOPES, siteUrl } from '../kern/twitch.mjs';
 import { allUsers } from './common.mjs';
 
-export async function status({ req, route, method }) {
-  if (route[0] !== 'state' || method !== 'GET') return;
-  const settings = await getSettings();
-  const tokens = await db.get('config/tokens');
-  const state = (await db.get('config/state')) ?? {};
-  const webhookUrl = `${siteUrl(req)}/api/twitch-webhook`;
+/** Zustand der Twitch-Webhooks: 'enabled', 'keine', 'unvollständig …' oder der Twitch-Status; null, wenn noch nicht verbunden. */
+export async function subscriptionState(webhookUrl, settings, state, tokens) {
   let subscription = null;
   let subscriptionError = null;
   if (tokens && process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
@@ -24,6 +20,16 @@ export async function status({ req, route, method }) {
       subscription = !subs.length ? 'keine' : notReady ? notReady.status : subs.length < expected ? 'unvollständig – bitte neu einrichten' : 'enabled';
     } catch (e) { subscriptionError = e.message; }
   }
+  return { subscription, subscriptionError };
+}
+
+export async function status({ req, route, method }) {
+  if (route[0] !== 'state' || method !== 'GET') return;
+  const settings = await getSettings();
+  const tokens = await db.get('config/tokens');
+  const state = (await db.get('config/state')) ?? {};
+  const webhookUrl = `${siteUrl(req)}/api/twitch-webhook`;
+  const { subscription, subscriptionError } = await subscriptionState(webhookUrl, settings, state, tokens);
   const users = await allUsers();
   const today = streamDay(settings);
   return json({
