@@ -15,6 +15,7 @@ Object.assign(process.env, {
 const calls = [];
 const rewards = []; // vom Mock angelegte Rewards
 let shoutoutFails = false;
+let discordFails = false; // simulierter Discord-Webhook antwortet mit einem Fehler
 let modFails = false; // simulierter Twitch lehnt das Löschen ab (Berechtigung fehlt)
 let deletedRewards = 0; // damit neue Reward-IDs nie mit gelöschten kollidieren
 let clipsFail = false, channelsFail = false;
@@ -37,6 +38,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (entry.headers?.authorization !== 'Bearer wt-geheim') return ok({ error: 'nein' }, 401);
     return wtMode === 'empty' ? ok({ summary: { scanned: 0, updated: 0, failed: 0 } }) : ok({});
   }
+  if (u.hostname === 'discord.com') return discordFails ? ok({ message: 'kaputt' }, 500) : new Response(null, { status: 204 });
   if (u.host === 'id.twitch.tv') {
     if (u.pathname.endsWith('/validate')) return ok({ user_id: '999', login: 'streamerin' });
     return ok({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 });
@@ -2532,6 +2534,97 @@ await test('Verlauf-Reward: wie Glitzer, aber getrennt (eigene Dauer, !verlauf, 
   await admin(adminReq('POST', 'setup', {}, cookie));
   const after = await db.get('config/state');
   assert.equal(after.gradientRewardId, undefined); assert.equal(rewards.find((r) => r.id === state.gradientRewardId).is_enabled, false);
+});
+
+await test('Commands: Zähler {count} im Admin sehen, setzen und zurücksetzen', async () => {
+  const { runActions } = await import('../netlify/lib/chat/commands.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const cmd = await (await api('POST', 'commands', { trigger: { type: 'command', word: '!zaehler' }, actions: [{ type: 'chat', text: 'Das war Tod Nummer {count}' }] })).json();
+  assert.equal((await (await api('GET', 'commands')).json()).counts[cmd.id], 0);
+  const settings = await getSettings();
+  await runActions(cmd, { user: 'Max' }, settings); await runActions(cmd, { user: 'Max' }, settings);
+  assert.equal((await (await api('GET', 'commands')).json()).counts[cmd.id], 2);
+  assert.equal((await (await api('POST', `commands/${cmd.id}/counter`, { value: 41 })).json()).count, 41, 'auf eine Zahl setzen');
+  await runActions(cmd, { user: 'Max' }, settings); assert.match(chats().at(-1), /Nummer 42$/);
+  assert.equal((await (await api('POST', `commands/${cmd.id}/counter`, { value: 0 })).json()).count, 0, 'zurücksetzen');
+  await runActions(cmd, { user: 'Max' }, settings); assert.match(chats().at(-1), /Nummer 1$/);
+  assert.equal((await (await api('POST', `commands/${cmd.id}/counter`, { value: 'abc' })).json()).count, 0, 'Unsinn wird 0');
+  assert.equal((await (await api('POST', `commands/${cmd.id}/counter`, { value: -5 })).json()).count, 0);
+  assert.equal((await api('POST', 'commands/zzzzzzzz/counter', { value: 1 })).status, 404);
+  assert.equal((await admin(adminReq('POST', `commands/${cmd.id}/counter`, { value: 1 }))).status, 401, 'ohne Login');
+  await api('DELETE', `commands/${cmd.id}`); assert.equal(await db.get(`counter/${cmd.id}`), null, 'Zähler wird mit gelöscht');
+});
+
+await test('Störungs-Meldungen: Probleme erkennen, erst beim zweiten Mal melden, nicht wiederholen, Entwarnung, Senden wiederholen', async () => {
+  const gh = await import('../netlify/lib/system/gesundheit.mjs');
+  const put = (b) => admin(adminReq('PUT', 'settings', b, cookie));
+  const HOOK = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789';
+  // Adresse wird geprüft
+  assert.deepEqual((await put({ healthDiscordWebhook: 'http://evil.example/hook' })).status, 200);
+  assert.equal((await getSettings()).healthDiscordWebhook, '', 'fremde Adresse wird nicht gespeichert');
+  await put({ healthDiscordWebhook: HOOK, healthEnabled: true });
+  assert.equal((await getSettings()).healthDiscordWebhook, HOOK);
+  assert.equal(gh.validHook(HOOK), true); assert.equal(gh.validHook('https://discord.com/api/webhooks/x/y'), false);
+
+  // sauberer Ausgangszustand: alles eingerichtet
+  await put({ chatOverlayEnabled: false, glitterEnabled: false, gradientEnabled: false, alpacaEnabled: false, modEnabled: false });
+  assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 200);
+  for (const x of subs) x.status = 'enabled'; // Twitch bestätigt neue Anmeldungen nach wenigen Sekunden
+  await db.delete('health/state'); await db.delete('config/backup-state');
+  const sent = () => calls.filter((c) => c.path.startsWith('/api/webhooks/')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).content);
+  const T = Date.now();
+  let n0 = sent().length;
+  assert.deepEqual(await gh.healthTick(T), [], 'alles in Ordnung: nichts gemeldet');
+  assert.equal(sent().length, n0);
+
+  // Webhooks von Twitch widerrufen: erst beim zweiten Mal melden, dann nicht wiederholen
+  await db.set('config/state', { ...(await db.get('config/state')), revoked: 'authorization_revoked' });
+  assert.deepEqual(await gh.healthTick(T + 1000), [], 'beim ersten Mal still');
+  assert.equal(sent().length, n0);
+  const second = await gh.healthTick(T + 2000);
+  assert.equal(second.length, 1); assert.match(sent().at(-1), /^⚠️ \*\*Stadtwache:\*\* Twitch hat die Webhooks widerrufen \(authorization_revoked\)/);
+  assert.equal(sent().length, n0 + 1);
+  assert.deepEqual(await gh.healthTick(T + 3000), [], 'nicht noch einmal'); assert.equal(sent().length, n0 + 1);
+  assert.equal((await gh.healthTick(T + 25 * 3_600_000)).length, 1, 'nach einem Tag eine Erinnerung');
+  await db.set('config/state', { ...(await db.get('config/state')), revoked: null });
+  assert.match((await gh.healthTick(T + 25 * 3_600_000 + 1000))[0], /^✅ \*\*Stadtwache:\*\* Twitch-Webhooks \(widerrufen\) ist wieder in Ordnung\./);
+  assert.deepEqual(await gh.healthTick(T + 26 * 3_600_000), [], 'danach wieder still');
+
+  // Webhook-Anmeldungen fehlen
+  const savedSubs = subs; subs = [];
+  await gh.healthTick(T + 27 * 3_600_000);
+  assert.match((await gh.healthTick(T + 27 * 3_600_000 + 1000))[0], /Twitch-Webhooks sind nicht in Ordnung \(„keine“\)/);
+  subs = savedSubs;
+  assert.match((await gh.healthTick(T + 27 * 3_600_000 + 2000))[0], /wieder in Ordnung/);
+
+  // Sicherung fehlgeschlagen; Discord ist gerade nicht erreichbar: beim nächsten Mal noch einmal versuchen
+  await db.set('config/backup-state', { lastOk: null, lastError: 'Platte voll', lastErrorAt: new Date().toISOString() });
+  discordFails = true;
+  await gh.healthTick(T + 28 * 3_600_000);
+  assert.deepEqual(await gh.healthTick(T + 28 * 3_600_000 + 1000), [], 'Senden schlägt fehl, nichts als gemeldet gemerkt');
+  discordFails = false;
+  const retry = await gh.healthTick(T + 28 * 3_600_000 + 2000);
+  assert.equal(retry.length, 1); assert.match(retry[0], /Die nächtliche Sicherung ist fehlgeschlagen: Platte voll/);
+  await db.delete('config/backup-state');
+  await gh.healthTick(T + 29 * 3_600_000);
+
+  // Admin: Stand ansehen, Test-Nachricht
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const st = await (await api('GET', 'health')).json();
+  assert.deepEqual([st.enabled, st.hasWebhook, st.problems], [true, true, []]);
+  n0 = sent().length;
+  assert.equal((await (await api('POST', 'health/test', {})).json()).ok, true);
+  assert.match(sent().at(-1), /Test erfolgreich/); assert.equal(sent().length, n0 + 1);
+  discordFails = true; assert.equal((await api('POST', 'health/test', {})).status, 502); discordFails = false;
+  assert.equal((await admin(adminReq('GET', 'health'))).status, 401, 'ohne Login');
+
+  // Ausgeschaltet oder ohne Adresse: nichts
+  await put({ healthEnabled: false });
+  assert.equal(await gh.healthTick(T + 40 * 3_600_000), null);
+  await put({ healthEnabled: true, healthDiscordWebhook: '' });
+  assert.equal(await gh.healthTick(T + 40 * 3_600_000), null);
+  assert.equal((await api('POST', 'health/test', {})).status, 400, 'ohne Adresse kein Test');
+  await put({ healthEnabled: false }); await db.delete('health/state');
 });
 
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });

@@ -337,6 +337,12 @@
         <p class="muted hidden" id="updSetup">Noch nicht eingerichtet: Dafür muss in CasaOS die App „Watchtower“ laufen und in der Stadtwache-App <code>WATCHTOWER_URL</code> und <code>WATCHTOWER_TOKEN</code> stehen (Anleitung: <code>docs/casaos.md</code>).</p>
       </section>
       <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
+      <section class="card" id="healthCard">
+        <h2>Störungs-Meldungen: Stand</h2>
+        <div id="healthInfo"></div>
+        <div class="row" style="margin-top:12px"><button id="healthCheck" class="ghost">Jetzt prüfen</button><button id="healthTest">Test-Nachricht an Discord senden</button></div>
+        <p class="muted">Der Test-Knopf nutzt die gespeicherte Adresse. Erst die Adresse oben eintragen und speichern.</p>
+      </section>
       <section class="card" id="backupCard">
         <h2>Backup &amp; Wiederherstellen</h2>
         <p class="muted">Die Sicherung enthält Besucher mit Streaks und Dauer, alle Einstellungen, das Soundboard, Raid-Zähler und Reward-IDs. Die Twitch-Verbindung ist bewusst nicht dabei, nach dem Wiederherstellen einmal „Mit Twitch verbinden“ und „Rewards &amp; Webhooks abgleichen“ klicken. Praktisch auch für den Umzug auf einen anderen Server.</p>

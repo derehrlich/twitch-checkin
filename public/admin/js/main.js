@@ -15,6 +15,7 @@ import { initBackup, loadAutoBackup } from './backup.js';
 import { initUpdate, loadUpdate } from './update.js';
 import { initSport, loadSport } from './sport.js';
 import { initModeration, loadModeration } from './moderation.js';
+import { initHealth, loadHealth } from './health.js';
 
 const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'overlays', 'medien', 'system'];
 // Alte Adressen (#abspann, #besucher …) führen weiter an die richtige Stelle
@@ -36,7 +37,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadUpdate(), loadAutoBackup()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadUpdate(), loadAutoBackup()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -46,7 +47,7 @@ async function init() {
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
-initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initUpdate();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 

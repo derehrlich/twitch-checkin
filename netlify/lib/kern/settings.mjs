@@ -38,6 +38,10 @@ function clean(rule, v) {
     const w = v.trim().toLowerCase().replace(/\s+/g, '');
     return /^!\w{1,25}$/.test(w) ? w : undefined;
   }
+  if (attrs.kind === 'discordhook') { // Discord-Webhook: leer (aus) oder genau so eine Adresse
+    const url = v.trim();
+    return url === '' || /^https:\/\/(?:discord|discordapp)\.com\/api\/webhooks\/\d{5,25}\/[\w-]{20,100}$/.test(url) ? url : undefined;
+  }
   if (attrs.kind === 'timezone') {
     try { new Intl.DateTimeFormat('en-CA', { timeZone: v }); return v; } catch { return undefined; }
   }

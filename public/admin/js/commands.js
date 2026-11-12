@@ -1,8 +1,8 @@
 // Commands-Reiter: eigene Chat-Befehle, Stichwörter und zeitgesteuerte Regeln mit mehreren Aktionen nacheinander.
 import { $, api, esc, onAct, run, toast } from './core.js';
 
-let list = [], sounds = [];
-export async function loadCommands() { ({ commands: list, sounds } = await api('GET', 'commands')); render(); }
+let list = [], sounds = [], counts = {};
+export async function loadCommands() { ({ commands: list, sounds, counts = {} } = await api('GET', 'commands')); render(); }
 
 const TRIGGERS = { command: 'Chat-Befehl (!ant)', keyword: 'Stichwort im Chat', timer: 'Zeitgesteuert (nur bei Chat-Aktivität)' };
 const ROLES = { all: 'Alle', sub: 'Abonnenten und höher', vip: 'VIPs und höher', mod: 'Moderatoren und höher', owner: 'Nur ich' };
@@ -14,6 +14,9 @@ function actionHtml(a) {
   const choices = sounds.map((s) => `<option value="${s.id}"${s.id === a.soundId ? ' selected' : ''}>${esc(s.title)}</option>`).join('');
   return `<div class="act" data-type="sound"><label>🔊 Sound aus dem Soundboard</label><select data-a="soundId"><option value="">– wählen –</option>${choices}</select></div>`;
 }
+
+// Zeigt den Zähler-Bereich nur bei Commands, die {count} benutzen
+const usesCount = (c) => c.actions.some((a) => `${a.text ?? ''} ${a.title ?? ''} ${a.message ?? ''}`.includes('{count}'));
 
 function cmdHtml(c) {
   const t = c.trigger;
@@ -34,6 +37,7 @@ function cmdHtml(c) {
       <button class="ghost" data-act="add-chat">+ Chat-Text</button><button class="ghost" data-act="add-alert">+ Alert</button><button class="ghost" data-act="add-sound">+ Sound</button>
       <button class="ghost" data-act="rm-last">Letzte Aktion entfernen</button>
     </div>
+    ${usesCount(c) ? `<div class="row" style="margin-top:8px;align-items:end"><div style="flex:0 1 180px"><label>Zähler {count} steht bei</label><input data-f="counter" type="number" min="0" max="1000000000" value="${counts[c.id] ?? 0}"></div><button class="ghost" data-act="counter">Zähler setzen</button></div>` : ''}
     <label class="check big"><input data-f="enabled" type="checkbox" ${c.enabled ? 'checked' : ''}> Aktiv</label>
     <div class="row"><button data-act="save">Speichern</button><button class="ghost" data-act="test">Testen</button><button class="danger" data-act="del">Löschen</button></div>
   </div>`;
@@ -89,6 +93,11 @@ export function initCommands() {
     } else if (act === 'save') {
       await api('PUT', `commands/${id}`, read(row));
       await loadCommands(); toast('Gespeichert ✓');
+    } else if (act === 'counter') {
+      const value = row.querySelector('[data-f=counter]').value;
+      if (Number(value) === 0 && !confirm('Den Zähler auf 0 zurücksetzen?')) return;
+      await api('POST', `commands/${id}/counter`, { value });
+      await loadCommands(); toast('Zähler gesetzt ✓');
     } else if (act === 'test') {
       await api('PUT', `commands/${id}`, read(row)); // erst speichern, damit der Test den sichtbaren Stand zeigt
       await api('POST', `commands/${id}/test`, { user: $('testUser')?.value || 'TestUser' });

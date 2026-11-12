@@ -171,7 +171,7 @@ Der Admin unter `/admin/` ist in Reiter gegliedert. Änderungen an Einstellungen
 | **Belohnungen** | Soundboard, Einlaufsound mit Prüfung, Katalog und Top des Monats, Alpakas, Community-Rangliste und verknüpfte Konten |
 | **Overlays** | Abspann, Rangliste und Twitch-Panel, Sport-Scoreboard |
 | **Medien** | Töne und Bilder/GIFs je Alert |
-| **System** | Updates, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, automatische Sicherung, Backup & Wiederherstellen, Tests |
+| **System** | Updates, Störungs-Meldungen an Discord, Lautstärke, Anzeigedauer, Zeitzone, Tageswechsel, Chat an/aus, automatische Sicherung, Backup & Wiederherstellen, Tests |
 
 Alte Adressen wie `/admin/#abspann` oder `#besucher` führen automatisch zum neuen Reiter.
 
@@ -185,6 +185,16 @@ Im Admin unter *Chat → Moderation*. Standardmäßig **aus** und im **Testmodus
 - **Folgen:** Nachricht löschen und im Chat warnen. Optional Timeout ab dem x-ten Verstoß (verdoppelt sich, höchstens 600 Sekunden).
 - **`!permit name`** (Mods): erlaubt jemandem 60 Sekunden lang einen Link.
 - **Berechtigungen:** Einmal im Admin auf Start → „Mit Twitch verbinden“ klicken, damit der Bot löschen und stummschalten darf.
+
+## Störungs-Meldungen an Discord
+
+Im Admin unter *System → Störungen an Discord melden*. Standardmäßig **aus**. Die Stadtwache prüft alle 5 Minuten, ob alles läuft (Twitch-Webhooks, Twitch-Verbindung, nächtliche Sicherung) und schreibt Probleme in einen Discord-Kanal.
+
+1. In Discord: Kanal → Kanal bearbeiten → Integrationen → Webhooks → Neuer Webhook → **Webhook-URL kopieren**.
+2. Im Admin die Adresse einfügen, „Störungen an Discord melden“ anhaken, speichern.
+3. Mit **Test-Nachricht an Discord senden** prüfen.
+
+Gemeldet wird erst, wenn ein Problem bei zwei Prüfungen hintereinander da war (kurze Aussetzer bleiben still), danach höchstens einmal am Tag erneut, und es kommt eine Entwarnung, wenn alles wieder läuft. Die Adresse ist wie ein Passwort (wer sie hat, kann in den Kanal schreiben) und steht auch in den Sicherungen.
 
 ## Backup & Wiederherstellen
 

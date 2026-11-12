@@ -36,20 +36,21 @@ netlify/lib/         Logik, ein Ordner je Admin-Reiter:
   belohnungen/         soundboard, playlock, entrysound, award (Top des Monats), community, alpaca
   overlays/            credits (Abspann), sport
   medien/              images, sounds
-  system/              autobackup
+  system/              autobackup, gesundheit (Störungs-Meldungen an Discord)
 netlify/lib/admin/   Admin-Routen je Reiter
 public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html), Alpaka-Leiste (alpakas.html), waagerechter Chat (chat.html, Daten aus `netlify/lib/chatlog.mjs`, Schlüssel `chatlog`)
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
 ```
 - Einstellungen: **eine Stelle** – `public/admin/js/schema.js`. Je Einstellung eine Zeile mit Name, Standardwert, Beschriftung und Grenzen (`t`/`a`/`n`/`c`, Erklärung am Dateikopf). Daraus entstehen Formular, Standardwerte (`DEFAULTS`) und Prüfung (`sanitize` in `netlify/lib/kern/settings.mjs`, liest die Schema-Datei). Neue Einstellung = nur eine Zeile im Schema. Neuer fester Chat-Befehl = nur eine Zeile in `BEFEHLE` (`netlify/lib/chat/befehle.mjs`). Nur Rewards/Webhooks-Änderungen kommen zusätzlich in `SYNC_KEYS`; Werte ohne Formular (Töne, Bilder) stehen in `HIDDEN` in `settings.mjs`.
 - Admin-Reiter (nach Aufgabe sortiert): Start · Zuschauer · Twitch-Ereignisse · Chat · Belohnungen · Overlays · Medien · System. Die Formulare hängen an `<div data-schema="…">` in `public/admin/index.html`, der Schlüssel steht in `schema.js`. Alte Links (`#abspann` …) übersetzt `OLD_TABS` in `main.js`.
-- Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `modlog/<zeit>`, `modstrike/<id>`, `modlast/<id>`, `modpermit/<login>`, `chatstyle/<id>` (Farbe, Glitzer, `glitterUntil`), `alpaca-active`, `alpaca-color/<id>`).
+- Speicher: `netlify/lib/kern/store.mjs` (`db.get/set/list/setIfNew`), Schlüssel stehen am Kopf der jeweiligen Datei (z. B. `award/<YYYY-MM>`, `entrysound/<id>`, `sport/config`, `sport/log/<id>`, `quote/<n>`, `counter/<commandId>`, `modlog/<zeit>`, `modstrike/<id>`, `modlast/<id>`, `modpermit/<login>`, `chatstyle/<id>` (Farbe, Glitzer, `glitterUntil`), `health/state`, `alpaca-active`, `alpaca-color/<id>`).
 
 ## Tests
-- `npm ci && npm test` (aktuell 120 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 122 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
+- Störungs-Meldungen (`netlify/lib/system/gesundheit.mjs`, Timer alle 5 Minuten in `server.mjs`): meldet per **Discord-Webhook** (Einstellungen `healthEnabled`, `healthDiscordWebhook`, Admin → System), nicht über den VerwirrBot. Geprüft: widerrufene Webhooks (`config/state.revoked`), Twitch-Token, Anmeldungen (`subscriptionState` aus `admin/status.mjs`, braucht `config/state.webhookUrl`, das `setup` speichert) und `config/backup-state`. Erst nach 2 Prüfungen in Folge melden, dann höchstens täglich erinnern, Entwarnung bei Behebung. Neue Prüfung = ein Eintrag in `collect()` plus Label.
 - Glitzer- und Verlauf-Reward (`glitterRewardId`/`gradientRewardId`, `handleStyleReward` in `netlify/lib/chat/chatlog.mjs`): Kauf setzt `chatstyle/<id>.glitterUntil` bzw. `gradientUntil` (FOREVER = Jahr 3000) und macht das Extra an; ab dann darf die Person `!glitter` bzw. `!verlauf` auch ohne Abo schalten. Abgelaufen: nur noch, wer Abo/VIP/Mod ist, sieht es. Beides kombinierbar. Beim Verlauf-Reward schreibt der Käufer 2–3 Farben dazu (`is_user_input_required`, `parseColors` in `belohnungen/alpaca.mjs`; leer oder „auto“ = automatischer Verlauf, unbekannt = Punkte zurück), speichert in `chatstyle/<id>.gradientColors`, ändern geht per `!verlauf rot blau`. Ohne eingeschaltete Chat-Leiste gibt es die Punkte zurück. Der Verlauf nutzt drei Farben (Farbton +70°/+140°, Mindest-Sättigung), sonst sieht man ihn bei blassen oder grauen Farben nicht (`public/chat.html`).
 - Neue Twitch-Berechtigungen (`SCOPES` in `netlify/lib/kern/twitch.mjs`) bekommt der Bot erst, wenn Marcel im Admin auf Start → „Mit Twitch verbinden“ klickt; der Status zeigt fehlende an (`missingScopes`). Die Moderation braucht `moderator:manage:chat_messages` und `moderator:manage:banned_users`.
 - Moderation: Broadcaster und Mods werden nie moderiert, VIPs/Abos/Stammgäste nur bei gesperrten Wörtern. Twitch-Clips sind immer erlaubt (`modAllowClips`), Marcel will, dass jeder Clips teilen darf. Neue Regeln zuerst im Testmodus (`modTestMode`, standardmäßig an).
