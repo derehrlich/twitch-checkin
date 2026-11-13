@@ -100,10 +100,21 @@ export function defaultDraw(settings, now = new Date()) {
 export const getDraw = (id) => (isId(id) ? db.get(drawKey(id)) : null);
 export const saveDraw = (draw) => db.set(drawKey(draw.id), draw);
 
-export async function createDraw(settings, now = new Date()) {
-  const draw = defaultDraw(settings, now);
+/** Einfache Verlosung (z. B. ein Mystery-Key): ein Preis, ein Los je Ticket, kein Mitternachts-Los. Tickets öffnen erst per Knopf. */
+export function simpleDraw(settings, now = new Date()) {
+  return {
+    ...defaultDraw(settings, now),
+    name: 'Verlosung',
+    pointsFrom: now.toISOString(), ticketOpen: null, bonusOpen: null, bonusClose: null, bonusLots: 0, maxLots: 1,
+    prizes: [{ id: rid(), name: 'Mystery-Key', kind: 'key', key: '' }],
+  };
+}
+
+/** Legt eine Ziehung an. Eine schon aktive Ziehung bleibt aktiv (sonst würden laufende Tickets umgelenkt); `activate` schaltet die neue sofort aktiv. */
+export async function createDraw(settings, { simple = false, activate = false } = {}, now = new Date()) {
+  const draw = simple ? simpleDraw(settings, now) : defaultDraw(settings, now);
   await saveDraw(draw);
-  await db.set('gw/current', { id: draw.id });
+  if (activate || !(await db.get('gw/current'))) await db.set('gw/current', { id: draw.id });
   forgetCache();
   return draw;
 }

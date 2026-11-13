@@ -7,13 +7,23 @@ const pct = (x) => `${(x * 100).toLocaleString('de-DE', { maximumFractionDigits:
 const WINDOW = { vorher: 'noch nicht offen', offen: 'offen', zu: 'geschlossen' };
 let prizes = [];
 
+function renderDraws() {
+  const d = data;
+  const cur = d.draw?.id;
+  const rows = (d.draws ?? []).map((x) => `<tr data-id="${esc(x.id)}"><td>${esc(x.name)}${x.id === cur ? ' <b>(aktiv)</b>' : ''}</td><td>${x.drawn ? 'gezogen' : 'offen'}</td><td>${x.id === cur ? '' : '<button data-act="select" class="ghost">Aktiv schalten</button>'}</td></tr>`).join('');
+  $('gwDraws').innerHTML = `<p class="muted">Es ist immer nur <b>eine</b> Ziehung aktiv: Für sie gelten das Ticket, der Chat und die Anzeige unten.</p>${rows ? `<table class="tk"><tbody>${rows}</tbody></table>` : ''}
+    <div class="row" style="margin:8px 0"><button id="gwNewSimple" class="ghost">Neue einfache Verlosung (1 Preis, 1 Los je Ticket)</button><button id="gwNewBday" class="ghost">Neue Geburtstags-Ziehung</button></div>`;
+  $('gwNewSimple').onclick = run(async () => { data = await api('POST', 'gewinn/new', { simple: true }); render(); toast('Angelegt ✓ (zum Benutzen „Aktiv schalten“)'); });
+  $('gwNewBday').onclick = run(async () => { data = await api('POST', 'gewinn/new', {}); render(); toast('Angelegt ✓ (zum Benutzen „Aktiv schalten“)'); });
+}
+
 function render() {
   const d = data;
+  renderDraws();
   $('gwHint').classList.toggle('hidden', d.enabled);
   $('gwOverlayUrl').textContent = location.origin + '/gewinn/overlay';
   if (!d.draw) {
-    $('gwStatus').innerHTML = `<p>Es gibt noch keine Ziehung.</p><div class="row"><button id="gwNew">Geburtstags-Ziehung anlegen</button></div>`;
-    $('gwNew').onclick = run(async () => { data = await api('POST', 'gewinn/new', {}); render(); });
+    $('gwStatus').innerHTML = '<p>Es gibt noch keine Ziehung. Lege oben eine an.</p>';
     return;
   }
   const dr = d.draw;
@@ -74,6 +84,7 @@ function config() {
 }
 
 export function initGewinn() {
+  onAct($('gwDraws'), '[data-id]', async (act, row) => { if (act === 'select') { apply(await api('POST', 'gewinn/select', { id: row.dataset.id })); toast('Aktiv ✓'); } });
   $('gwSave').addEventListener('click', run(async () => { apply(await api('PUT', 'gewinn/config', config())); toast('Gespeichert ✓'); }));
   $('gwSaveTerms').addEventListener('click', run(async () => { apply(await api('PUT', 'gewinn/config', { terms: $('gwTerms').value, termsPublished: $('gwTermsPub').checked })); toast('Gespeichert ✓'); }));
   $('gwOpen').addEventListener('click', run(async () => { apply(await api('POST', 'gewinn/window', { action: 'open' })); toast('Tickets sind offen ✓'); }));
