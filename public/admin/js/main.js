@@ -19,6 +19,7 @@ import { initHealth, loadHealth } from './health.js';
 import { initTickets, loadTickets } from './tickets.js';
 import { initGewinn, loadGewinn } from './gewinn.js';
 import { initFeier, loadFeier } from './feier.js';
+import { initPause, loadPause } from './pause.js';
 
 const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'tickets', 'gewinn', 'feier', 'overlays', 'medien', 'system'];
 // Alte Adressen (#abspann, #besucher …) führen weiter an die richtige Stelle
@@ -40,7 +41,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadUpdate(), loadAutoBackup()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadUpdate(), loadAutoBackup()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -50,7 +51,7 @@ async function init() {
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
-initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initFeier();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initFeier(); initPause();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 

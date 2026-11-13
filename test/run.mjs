@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -3040,6 +3040,42 @@ await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit 
 
 const { parseLocal: gwParseLocal } = await import('../netlify/lib/belohnungen/gewinn.mjs');
 const gwParse = (str) => gwParseLocal(str, 'Europe/Berlin');
+await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Seite, Admin-Knöpfe', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const pauseFn = (await import('../netlify/functions/pause.mjs')).default;
+  const pub = async () => (await pauseFn(new Request(BASE + '/api/pause'))).json();
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'pause'))).status, 401, 'Admin nur mit Login');
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, pauseEnabled: true, commandCooldown: 0 });
+  const s = await getSettings();
+  const msg = (text, mod = false) => ({ broadcaster_user_id: '999', chatter_user_id: mod ? 'm1' : 'v1', chatter_user_name: mod ? 'Moddi' : 'Viewer', badges: mod ? [{ set_id: 'moderator' }] : [], message_id: crypto.randomUUID(), message: { text } });
+  assert.equal((await pub()).show, false, 'Standard unsichtbar');
+  await handleChat(msg('!pause Kurz Trinkpause'), s);
+  assert.equal((await pub()).show, false, 'Zuschauer dürfen nicht');
+  await handleChat(msg('!pause Kurz Trinkpause', true), s);
+  let v = await pub();
+  assert.equal(v.show, true); assert.equal(v.text, 'Kurz Trinkpause'); assert.equal(v.until, null); assert.ok(v.now);
+  assert.match(chats().at(-1), /^⏸️ Kurz Trinkpause/);
+  await handleChat(msg('!pause 5 Essen holen', true), s);
+  v = await pub();
+  assert.equal(v.text, 'Essen holen'); assert.equal(v.until - v.startedAt, 5 * 60_000);
+  await handleChat(msg('!pause', true), s);
+  assert.equal((await pub()).text, s.pauseDefaultText, 'ohne Text kommt der Standardtext');
+  await handleChat(msg('!weiter'), s);
+  assert.equal((await pub()).show, true, 'Zuschauer dürfen nicht beenden');
+  await handleChat(msg('!weiter', true), s);
+  assert.equal((await pub()).show, false);
+  assert.match(chats().at(-1), /Weiter geht/);
+  // Admin von Hand, Text wird gekürzt
+  v = await (await api('POST', 'pause/start', { text: 'x'.repeat(200), minutes: 3 })).json();
+  assert.equal(v.state.active, true); assert.equal(v.state.text.length, 80);
+  v = await (await api('POST', 'pause/stop', {})).json();
+  assert.equal(v.state.active, false);
+  await api('PUT', 'settings', { pauseEnabled: false });
+  await handleChat(msg('!pause Test', true), await getSettings());
+  assert.equal((await pub()).show, false, 'ausgeschaltet: Befehl tut nichts');
+});
+
 await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gewicht, einmalig, Chat), !geburtstag', async () => {
   const cdFn = (await import('../netlify/functions/countdown.mjs')).default;
   const radFn = (await import('../netlify/functions/rad.mjs')).default;

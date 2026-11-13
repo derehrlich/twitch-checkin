@@ -16,6 +16,7 @@ import { allowed } from './commands.mjs';
 import { PERMIT_SECONDS, permit } from './moderation.mjs';
 import { submitFromTwitch } from '../belohnungen/adventures.mjs';
 import { birthdayReply } from '../overlays/countdown.mjs';
+import * as pause from '../overlays/pause.mjs';
 import { cancelByUser, confirmByUser, ingameByUser, modCommand, mySeat, sweepOffers, ticketsInfo } from '../belohnungen/tickets.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -95,6 +96,14 @@ export const BEFEHLE = [
     },
   },
   { id: 'geburtstag', wort: (s) => s.bdayCommand, aktiv: (s) => s.bdayEnabled, run: ({ settings }) => birthdayReply(settings) },
+  {
+    id: 'pause', wort: (s) => s.pauseCommand, aktiv: (s) => s.pauseEnabled, rolle: 'mod',
+    async run({ args, settings }) { const state = await pause.start(pause.parseArgs(args), settings); return settings.pauseChat ? pause.startReply(state, settings) : null; },
+  },
+  {
+    id: 'pauseende', wort: (s) => s.pauseEndCommand, aktiv: (s) => s.pauseEnabled, rolle: 'mod',
+    async run({ settings }) { const was = await pause.stop(); return was.active && settings.pauseChat ? pause.endReply(settings) : null; },
+  },
   { id: 'adventure', wort: (s) => s.advCommand, aktiv: (s) => s.advEnabled, run: async ({ e, args, settings }) => (await submitFromTwitch(settings, e, args)).reply },
   { id: 'tickets', wort: (s) => s.ticketsCommand, aktiv: (s) => s.ticketsEnabled, run: ({ settings }) => ticketsInfo(settings) },
   { id: 'platz', wort: (s) => s.ticketSeatCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return mySeat(e.chatter_user_id, e.chatter_user_name, settings); } },
