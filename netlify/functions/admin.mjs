@@ -21,6 +21,7 @@ import { health } from '../lib/admin/gesundheit.mjs';
 import { tickets } from '../lib/admin/tickets.mjs';
 import { feier } from '../lib/admin/feier.mjs';
 import { adventure } from '../lib/admin/adventure.mjs';
+import { pauseRoute } from '../lib/admin/pause.mjs';
 
 export const config = { path: '/api/admin/*' };
 
@@ -49,6 +50,7 @@ const ROUTES = {
   tickets,
   feier,
   adventure,
+  pause: pauseRoute,
 };
 
 export default async (req) => {

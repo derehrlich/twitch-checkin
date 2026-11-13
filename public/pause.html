@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Pause</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Pause als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Text starten und beenden: im Chat mit !pause Text und !weiter, oder im Admin (Reiter „Overlays“).
+     ?pos=center (Standard) | top | bottom | top-left | top-right | bottom-left | bottom-right   Platz auf dem Bild
+     ?size=0.6 … 2   Größe (Standard 1)    ?demo   Beispiel, immer sichtbar */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #box { position: fixed; padding: 22px 48px 26px; box-sizing: border-box; text-align: center; opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; --s: 1; min-width: calc(520px * var(--s)); max-width: 90vw; }
+  #box.on { opacity: 1; transform: var(--in) scale(var(--s)); }
+  #box { transform: var(--out) scale(var(--s)); }
+  .icon { font-size: 44px; line-height: 1; margin-bottom: 6px; animation: bob 2.4s ease-in-out infinite; }
+  .text { font: 700 54px/1.1 var(--wordmark); letter-spacing: 2px; color: #ffd45e; text-shadow: 3px 3px 0 rgba(43, 24, 12, .8); overflow-wrap: anywhere; }
+  .sub { margin-top: 10px; font-size: 24px; font-weight: 600; color: #fff3da; text-shadow: 0 2px 0 rgba(43, 24, 12, .75); }
+  .sub:empty { display: none; }
+  .time { margin-top: 10px; display: inline-block; padding: 4px 16px; border-radius: 10px; background: rgba(20, 10, 4, .55); font-size: 20px; font-weight: 600; letter-spacing: 1px; color: #e9d3ae; font-variant-numeric: tabular-nums; }
+  .time:empty { display: none; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+</style>
+</head>
+<body>
+<div id="box" class="panel" aria-live="off">
+  <div class="icon">☕</div>
+  <div class="text" id="text">Kurze Pause</div>
+  <div class="sub"><span id="sub"></span></div>
+  <div class="time" id="time"></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const box = $('box');
+const POS = { // [Ankerstyle, eingeblendet, ausgeblendet]
+  center: ['top:50%;left:50%', 'translate(-50%,-50%)', 'translate(-50%,-30%)'],
+  top: ['top:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,-160%)'],
+  bottom: ['bottom:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,160%)'],
+  'top-left': ['top:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'top-right': ['top:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+  'bottom-left': ['bottom:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'bottom-right': ['bottom:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+};
+const [anchor, tin, tout] = POS[params.get('pos')] ?? POS.center;
+box.style.cssText += anchor + `;--in:${tin};--out:${tout};`;
+const size = Number(params.get('size')); if (size >= 0.3 && size <= 3) box.style.setProperty('--s', size);
+box.style.transformOrigin = { top: '50% 0', bottom: '50% 100%', center: '50% 50%', 'top-left': '0 0', 'top-right': '100% 0', 'bottom-left': '0 100%', 'bottom-right': '100% 100%' }[params.get('pos')] ?? '50% 50%';
+
+let cfg = null, offset = 0;
+const DEMO = { show: true, text: 'Kurz Trinkpause', sub: 'Gleich geht es weiter!', startedAt: Date.now(), until: Date.now() + 5 * 60_000, now: Date.now() };
+
+async function poll() {
+  try {
+    const v = params.has('demo') ? DEMO : await (await fetch('/api/pause', { cache: 'no-store' })).json();
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+const two = (n) => String(n).padStart(2, '0');
+function frame() {
+  requestAnimationFrame(frame);
+  if (!cfg || !cfg.show) { box.classList.remove('on'); return; }
+  $('text').textContent = cfg.text;
+  const sub = $('sub'); sub.textContent = cfg.sub;
+  const now = Date.now() + offset;
+  if (cfg.until) {
+    const left = Math.max(0, cfg.until - now), s = Math.ceil(left / 1000);
+    $('time').textContent = left > 0 ? `Weiter in etwa ${Math.floor(s / 60)}:${two(s % 60)}` : 'Gleich geht es weiter';
+  } else $('time').textContent = '';
+  box.classList.add('on');
+}
+
+poll(); setInterval(poll, 4000); frame();
+</script>
+</body>
+</html>

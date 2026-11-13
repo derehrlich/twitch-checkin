@@ -46,6 +46,11 @@
   status = 200
 
 [[redirects]]
+  from = "/pause"
+  to = "/pause.html"
+  status = 200
+
+[[redirects]]
   from = "/countdown"
   to = "/countdown.html"
   status = 200

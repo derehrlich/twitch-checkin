@@ -214,6 +214,19 @@ export const SCHEMA = {
     ] },
   ],
 
+  pause: [
+    { title: 'Pause: Chat-Befehle', hint: `Das Overlay <code>/pause</code> erscheint, sobald du <code>!pause</code> schreibst, und verschwindet bei <code>!weiter</code>. Beides dürfen nur du und Mods. Beispiele: <code>!pause Kurz Trinkpause</code> oder mit Minuten <code>!pause 5 Kurz Trinkpause</code>. Ohne Text steht der Standardtext da. Platzhalter: ${code('text')} der Pausentext, ${code('minutes')} Minuten (leer, wenn du keine genannt hast).`, items: [
+      c('pauseEnabled', false, 'Pause-Befehle einschalten (braucht den Chat-Webhook)'),
+      t('pauseCommand', '!pause', 'Befehl zum Starten', { maxlength: 26, kind: 'command', placeholder: '!pause' }),
+      t('pauseEndCommand', '!weiter', 'Befehl zum Beenden', { maxlength: 26, kind: 'command', placeholder: '!weiter' }),
+      t('pauseDefaultText', 'Kurze Pause', 'Standardtext, wenn nach dem Befehl nichts steht', { maxlength: 80 }),
+      t('pauseSubtitle', 'Gleich geht es weiter!', 'Zeile unter dem Pausentext im Overlay', { maxlength: 80, empty: true }),
+      c('pauseChat', true, 'Im Chat ankündigen'),
+      a('pauseStartTemplate', '⏸️ {text} – gleich geht es weiter!', 'Chatnachricht beim Start', { text: 'Kurz Trinkpause', minutes: 5 }),
+      a('pauseEndTemplate', '▶️ Weiter geht’s!', 'Chatnachricht beim Ende', {}),
+    ] },
+  ],
+
   abspann: [
     { title: 'Abspann', hint: 'Der Abspann sammelt pro Stream-Tag automatisch, wer geschrieben, gefolgt, abonniert, Bits geschickt oder geraidet hat – auch wenn die Alerts ausgeschaltet sind. Nach dem Einschalten die Webhooks abgleichen, sonst werden keine Ereignisse empfangen. Bots stehen nicht im Abspann.', items: [
       c('creditsEnabled', true, 'Abspann-Daten sammeln'),

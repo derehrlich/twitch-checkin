@@ -453,6 +453,21 @@
           <a class="btn ghost" href="https://dev.twitch.tv/console/extensions" target="_blank" rel="noopener">Twitch-Entwicklerkonsole</a>
         </div>
       </section>
+      <section class="card">
+        <h2>Pause-Overlay</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="pauseUrl"></code> anlegen. Sie bleibt unsichtbar, bis eine Pause läuft. Mit <code>?pos=top</code>, <code>bottom</code> … hinter der Adresse änderst du den Platz (Standard: Mitte), mit <code>?size=0.7</code> die Größe. Im Chat startest du sie mit <code id="pauseCmd"></code> und beendest sie mit <code id="pauseEndCmd"></code> (Einstellungen unten, Befehle sind erst nach dem Einschalten aktiv).</p>
+        <div class="grid">
+          <div><label for="pauseText">Text</label><input id="pauseText" maxlength="80" placeholder="Kurze Pause"></div>
+          <div><label for="pauseMin">Dauer in Minuten (leer = ohne Angabe)</label><input id="pauseMin" type="number" min="1" max="240"></div>
+        </div>
+        <p class="muted" id="pauseInfo"></p>
+        <div class="row">
+          <button id="pauseStart">Pause starten</button>
+          <button id="pauseStop" class="ghost">Pause beenden</button>
+          <a class="btn ghost" href="/pause?demo" target="_blank" rel="noopener">Vorschau</a>
+        </div>
+      </section>
+      <div data-schema="pause" style="display:grid; gap:22px;"></div>
       <div data-schema="abspann" style="display:grid; gap:22px;"></div>
       <section class="card">
         <h2>Sport-Scoreboard</h2>
