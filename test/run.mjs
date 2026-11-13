@@ -2807,6 +2807,22 @@ await test('Gewinnspiel: Ticket, Wochenpunkte, Lose-Deckel, Sperrliste, Ziehung,
   let v = await (await api('POST', 'gewinn/new', {})).json();
   assert.equal(v.draw.prizes.length, 3);
   assert.equal(v.window, 'vorher', 'Standard: Fenster öffnet erst am 30.11.');
+  // Zweite, einfache Verlosung: bleibt zunächst inaktiv, Tickets erst per Knopf, ein Los je Ticket
+  const bdayId = v.draw.id;
+  let v2 = await (await api('POST', 'gewinn/new', { simple: true })).json();
+  assert.equal(v2.draw.id, bdayId, 'die laufende Ziehung bleibt aktiv');
+  assert.equal(v2.draws.length, 2);
+  const simple = v2.draws.find((x) => x.id !== bdayId);
+  v2 = await (await api('POST', 'gewinn/select', { id: simple.id })).json();
+  assert.equal(v2.draw.id, simple.id);
+  assert.equal(v2.draw.prizes.length, 1);
+  assert.equal(v2.draw.maxLots, 1);
+  assert.equal(v2.window, 'vorher', 'Tickets öffnen erst per Knopf');
+  assert.equal(v2.bonusWindow, 'zu');
+  v2 = await (await api('POST', 'gewinn/window', { action: 'open' })).json();
+  assert.equal(v2.window, 'offen');
+  v = await (await api('POST', 'gewinn/select', { id: bdayId })).json();
+  assert.equal(v.draw.id, bdayId);
   const keyPrize = v.draw.prizes[0];
   v = await (await api('PUT', 'gewinn/config', { pointsFrom: '2020-01-01T00:00', ticketOpen: '2020-01-01T00:00', prizes: [{ ...keyPrize, key: 'ABCD-1234' }, ...v.draw.prizes.slice(1)] }, )).json();
   assert.equal(v.window, 'offen');
@@ -2986,7 +3002,9 @@ await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit 
   assert.equal((await getSettings()).gwBonusRewardCost, 15, 'Preis 15 Kanalpunkte');
   const state = await db.get('config/state');
   assert.ok(state.gwBonusRewardId && subs.some((x) => x.condition.reward_id === state.gwBonusRewardId), 'Reward und Webhook');
-  const v = await (await api('POST', 'gewinn/new', {})).json();
+  const made = await (await api('POST', 'gewinn/new', {})).json();
+  const newId = made.draws.find((x) => x.id !== made.draw.id && !x.drawn)?.id ?? made.draw.id;
+  const v = await (await api('POST', 'gewinn/select', { id: newId })).json();
   const id = v.draw.id;
   assert.equal(v.draw.bonusOpen, '2026-11-29T00:00'); assert.equal(v.draw.bonusClose, '2026-11-29T00:30');
   const d = await gw.getDraw(id);

@@ -12,7 +12,7 @@ export async function gewinn({ route, method, body }) {
   const settings = await getSettings();
   const view = async () => json(await adminView(settings));
   if (route.length === 1 && method === 'GET') return view();
-  if (route[1] === 'new' && method === 'POST') { await createDraw(settings); return view(); }
+  if (route[1] === 'new' && method === 'POST') { await createDraw(settings, { simple: body?.simple === true }); return view(); }
   if (route[1] === 'select' && method === 'POST') { if (!(await setCurrent(String(body.id ?? '')))) return json({ error: 'Nicht gefunden' }, 404); return view(); }
 
   const draw = await currentDraw();
