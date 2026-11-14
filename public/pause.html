@@ -10,7 +10,9 @@
   /* Pause als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
      Text starten und beenden: im Chat mit !pause Text und !weiter, oder im Admin (Reiter „Overlays“).
      ?pos=center (Standard) | top | bottom | top-left | top-right | bottom-left | bottom-right   Platz auf dem Bild
-     ?size=0.6 … 2   Größe (Standard 1)    ?demo   Beispiel, immer sichtbar */
+     ?size=0.6 … 2   Größe (Standard 1)    ?demo   Beispiel, immer sichtbar
+     Ton: beim Start der Pause spielt /pause.mp3 (Dampfpfeife). ?volume=0.5 (0 … 1, Standard 0.8) macht ihn leiser, ?sound=0 ganz aus.
+     In OBS bei der Browserquelle „Audio über OBS steuern“ einschalten. */
   html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
   #box { position: fixed; padding: 22px 48px 26px; box-sizing: border-box; text-align: center; opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; --s: 1; min-width: calc(520px * var(--s)); max-width: 90vw; }
   #box.on { opacity: 1; transform: var(--in) scale(var(--s)); }
@@ -49,13 +51,22 @@ box.style.cssText += anchor + `;--in:${tin};--out:${tout};`;
 const size = Number(params.get('size')); if (size >= 0.3 && size <= 3) box.style.setProperty('--s', size);
 box.style.transformOrigin = { top: '50% 0', bottom: '50% 100%', center: '50% 50%', 'top-left': '0 0', 'top-right': '100% 0', 'bottom-left': '0 100%', 'bottom-right': '100% 100%' }[params.get('pos')] ?? '50% 50%';
 
-let cfg = null, offset = 0;
+let cfg = null, offset = 0, lastStart = null;
+const vol = Number(params.get('volume') ?? 0.8);
+function whistle() {
+  if (params.get('sound') === '0') return;
+  const a = new Audio('/pause.mp3'); a.volume = Math.min(1, Math.max(0, Number.isFinite(vol) ? vol : 0.8));
+  a.play().catch(() => { /* Browser erlaubt den Ton noch nicht, in OBS kein Problem */ });
+}
 const DEMO = { show: true, text: 'Kurz Trinkpause', sub: 'Gleich geht es weiter!', startedAt: Date.now(), until: Date.now() + 5 * 60_000, now: Date.now() };
 
 async function poll() {
   try {
     const v = params.has('demo') ? DEMO : await (await fetch('/api/pause', { cache: 'no-store' })).json();
     offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    // Pfeife nur beim Start einer (neuen) Pause. Beim ersten Laden nur, wenn sie ganz frisch ist (nicht bei jedem OBS-Neuladen)
+    if (v.show && v.startedAt !== lastStart && (lastStart !== null || v.now - v.startedAt < 10_000 || params.has('demo'))) whistle();
+    lastStart = v.show ? v.startedAt : 0;
     cfg = v;
   } catch { /* beim nächsten Mal wieder */ }
 }
