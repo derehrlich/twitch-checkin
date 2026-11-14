@@ -51,6 +51,7 @@ async function init() {
 renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
+$('chatHochUrl').textContent = location.origin + '/chat-hoch';
 initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initFeier(); initPause();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
