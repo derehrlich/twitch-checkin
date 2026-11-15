@@ -11,7 +11,8 @@ Admin → Reiter **Overlays** → Karte „Startbildschirm“. Die Seite bleibt 
 
 ## Was du einstellst
 - **Vorlauf** in Minuten (z. B. 10). „Starten“ beginnt den Countdown, „+5 Minuten“ verlängert, „Beenden“ blendet aus.
-- **Hintergrundbild** hochladen (PNG, JPG, GIF oder WebP, bis 3 MB, am besten 1920×1080). Ohne Bild gibt es einen Bauplan-Hintergrund.
+- **Animierter Hintergrund:** Du kannst auch eine **HTML-Datei** hochladen (eine einzelne Datei mit allem drin, bis 8 MB). Sie läuft abgeschottet hinter dem Startbildschirm und darf animiert sein. Bilder oder Skripte von anderen Webseiten lädt sie nach, dafür braucht der Rechner mit OBS Internet. Auf Admin oder Daten der Stadtwache hat sie keinen Zugriff. Dateien mit Bildern oder Schriften in Nachbarordnern funktionieren nicht, alles muss in der einen Datei stehen.
+- **Hintergrundbild** hochladen (PNG, JPG, GIF oder WebP, bis 8 MB, am besten 1920×1080; größere Bilder werden im Browser automatisch verkleinert). Der Upload startet gleich nach der Auswahl.. Ohne Bild gibt es einen Bauplan-Hintergrund.
 - **Überschrift, Zeile darunter, Text bei 0** (der Text steht, bis du „Beenden“ drückst).
 - **Baufortschritt-Balken:** läuft mit dem Countdown durch die Phasen Baugrube, Fundament, Rohbau, Dach, Innenausbau und Richtfest.
 - **Bauanekdoten:** eine pro Zeile, am schönsten als `Überschrift | Text`. Sie wechseln in zufälliger Reihenfolge alle X Sekunden. „Beispiel-Anekdoten laden“ füllt rund 30 witzige Sprüche ein, die du ändern kannst.

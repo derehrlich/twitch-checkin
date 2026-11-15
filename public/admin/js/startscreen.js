@@ -10,7 +10,7 @@ function render() {
   $('ssUrl2').textContent = location.origin + '/startscreen?rahmen&bg=0';
   set('ssMin', c.minutes); set('ssRot', c.rotateSeconds); set('ssTitle', c.title); set('ssSub', c.subtitle); set('ssEnd', c.endText); set('ssFacts', c.anecdotes);
   $('ssProg').checked = c.showProgress;
-  const bg = c.bgName ? `Hintergrund: ${esc(c.bgName)}` : 'Hintergrund: eingebauter Bauplan';
+  const bg = c.bgName ? `Hintergrund: ${esc(c.bgName)}${c.bgKind === 'html' ? ' (animierte HTML-Datei)' : ''}` : 'Hintergrund: eingebauter Bauplan';
   const left = s.active ? Math.round((s.until - Date.now()) / 60_000) : 0;
   $('ssInfo').innerHTML = `${bg}. ` + (s.active ? (left > 0 ? `<b>Läuft:</b> noch etwa ${left} Min bis ${new Date(s.until).toLocaleTimeString('de-DE', { timeStyle: 'short' })} Uhr.` : '<b>Läuft:</b> Zeit ist um, der Schlusstext steht. Beenden blendet ihn aus.') : 'Gerade ausgeblendet.');
   $('ssStart').textContent = s.active ? `Neu starten (${c.minutes} Min)` : `Startbildschirm starten (${c.minutes} Min)`;
@@ -29,10 +29,25 @@ export function initStartscreen() {
   $('ssPlus').addEventListener('click', run(async () => { v = await api('POST', 'startscreen/extend', { minutes: 5 }); render(); toast('5 Minuten dazu ✓'); }));
   $('ssStop').addEventListener('click', run(async () => { v = await api('POST', 'startscreen/stop', {}); render(); toast('Ausgeblendet ✓'); }));
   $('ssDefault').addEventListener('click', run(async () => { if (!confirm('Die Textliste durch die Beispiel-Anekdoten ersetzen? (Erst mit „Texte speichern“ gilt es.)')) return; $('ssFacts').value = v.defaultAnecdotes; }));
-  $('ssBgUp').addEventListener('click', run(async () => {
-    const file = $('ssBg').files[0];
-    const data = await readUpload(file, 3_000_000);
-    v = await api('POST', 'startscreen/bg', { name: file.name, data }); render(); toast('Hintergrund hochgeladen ✓');
-  }));
-  $('ssBgReset').addEventListener('click', run(async () => { if (!confirm('Eigenes Bild entfernen und wieder den Bauplan zeigen?')) return; v = await api('DELETE', 'startscreen/bg', {}); render(); toast('Bauplan aktiv ✓'); }));
+  // Auswählen lädt gleich hoch. Ist ein Bild zu groß (über 6 MB), wird es im Browser auf höchstens 1920 Pixel Breite verkleinert.
+  const upload = run(async () => {
+    const input = $('ssBg'); let file = input.files[0];
+    if (!file) throw new Error('Bitte zuerst eine Datei auswählen');
+    if (file.size > 6_000_000 && file.type.startsWith('image/') && file.type !== 'image/gif') file = await shrink(file);
+    const data = await readUpload(file, 8_000_000);
+    v = await api('POST', 'startscreen/bg', { name: file.name, data }); render(); input.value = ''; toast('Hintergrund hochgeladen ✓');
+  });
+  $('ssBg').addEventListener('change', upload);
+  $('ssBgUp').addEventListener('click', upload);
+  $('ssBgReset').addEventListener('click', run(async () => { if (!confirm('Eigenen Hintergrund entfernen und wieder den Bauplan zeigen?')) return; v = await api('DELETE', 'startscreen/bg', {}); render(); toast('Bauplan aktiv ✓'); }));
+}
+
+// Verkleinert ein zu großes Bild auf höchstens 1920 Pixel Breite und speichert es als JPG.
+async function shrink(file) {
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error('Das Bild ist zu groß und konnte nicht verkleinert werden. Bitte kleiner abspeichern (1920×1080 reicht).'); });
+  const k = Math.min(1, 1920 / bmp.width);
+  const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  const blob = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.9));
+  return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
 }

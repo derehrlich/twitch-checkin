@@ -29,6 +29,7 @@
       radial-gradient(ellipse at 50% 40%, #27415f 0%, #14202f 75%);
     background-size: 8rem 8rem, 8rem 8rem, 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
   }
+  #bg iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
   #shade { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(8, 12, 20, .35) 0%, rgba(8, 12, 20, .72) 100%); }
 
   /* Warnstreifen oben und unten */
@@ -131,7 +132,13 @@ function frame() {
     bgUrl = cfg.bg;
     const bg = $('bg');
     bg.classList.toggle('plain', !bgUrl);
-    bg.style.backgroundImage = bgUrl ? `url("${bgUrl}")` : '';
+    bg.replaceChildren();
+    bg.style.backgroundImage = '';
+    if (bgUrl && cfg.bgKind === 'html') { // eigene animierte HTML-Datei, abgeschottet in einem Rahmen
+      const f = document.createElement('iframe');
+      f.src = bgUrl; f.setAttribute('sandbox', 'allow-scripts'); f.setAttribute('scrolling', 'no'); f.tabIndex = -1;
+      bg.appendChild(f);
+    } else if (bgUrl) bg.style.backgroundImage = `url("${bgUrl}")`;
   }
   $('title').textContent = cfg.title;
   $('sub').textContent = cfg.subtitle;

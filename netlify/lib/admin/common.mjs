@@ -28,6 +28,13 @@ export const audioUpload = (body) => readUpload(body, { max: AUDIO_MAX, sniff: s
 export const audioUploadMax = (body, max) => readUpload(body, { max, sniff: sniffAudio, tooBig: `Die Datei ist zu groß (maximal ${Math.round(max / 1000)} KB)`, badType: 'Nur MP3-, WAV- oder OGG-Dateien sind erlaubt' });
 export const imageUpload = (body) => readUpload(body, { max: IMAGE_MAX, sniff: sniffImage, tooBig: 'Die Datei ist zu groß (maximal 3 MB)', badType: 'Nur GIF-, PNG-, JPG- oder WebP-Dateien sind erlaubt' });
 
+// Große Hintergrundbilder (Startbildschirm, ganze Bildschirmgröße)
+export const BG_MAX = 8_000_000;
+export const bgUpload = (body) => readUpload(body, { max: BG_MAX, sniff: sniffImage, tooBig: 'Die Datei ist zu groß (maximal 8 MB). Bitte das Bild kleiner abspeichern, 1920×1080 reicht.', badType: 'Nur GIF-, PNG-, JPG- oder WebP-Dateien sind erlaubt' });
+
+// Eine HTML-Datei erkennen (Anfang prüfen, nicht dem Dateinamen glauben)
+export const isHtml = (buf) => /^\uFEFF?\s*(<!doctype\s+html|<html|<head|<body|<!--)/i.test(buf.subarray(0, 2000).toString('utf8')) && /<(html|body|canvas|script|style|div|svg)\b/i.test(buf.subarray(0, 100_000).toString('utf8'));
+
 // Hochgeladene Datei so ablegen, wie die Auslieferungs-Functions sie lesen
 export const storeFile = (key, { buf, type }) => db.set(key, { type, data: buf.toString('base64') });
 

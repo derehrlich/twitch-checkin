@@ -3101,10 +3101,18 @@ await test('Startbildschirm: Vorlauf, Verlängern, Anekdoten, Hintergrundbild, �
   // Hintergrundbild: nur echte Bilder
   assert.equal((await bgFn(new Request(BASE + '/api/startscreen-bg'))).status, 404);
   const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(20)]).toString('base64');
+  // animierter Hintergrund als HTML-Datei: wird abgeschottet ausgeliefert
+  const htmlFile = '<!doctype html><html><body><canvas id=c></canvas><script>/* animation */</script></body></html>';
+  assert.equal((await api('POST', 'startscreen/bg', { name: 'wald.html', data: Buffer.from(htmlFile).toString('base64') })).status, 200);
+  v = await pub(); assert.equal(v.bgKind, 'html');
+  const hres = await bgFn(new Request(BASE + v.bg));
+  assert.match(hres.headers.get('content-type'), /^text\/html/); assert.match(hres.headers.get('content-security-policy'), /sandbox/); assert.equal(await hres.text(), htmlFile);
   assert.equal((await api('POST', 'startscreen/bg', { name: 'x.txt', data: Buffer.from('kein Bild').toString('base64') })).status, 400);
+  const big = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(5_000_000)]).toString('base64');
+  assert.equal((await api('POST', 'startscreen/bg', { name: 'gross.png', data: big })).status, 200, 'Hintergrund darf größer als 3 MB sein');
   await api('POST', 'startscreen/bg', { name: 'baustelle.png', data: png });
   v = await pub();
-  assert.match(v.bg, /^\/api\/startscreen-bg\?v=\d+$/);
+  assert.match(v.bg, /^\/api\/startscreen-bg\?v=\d+$/); assert.equal(v.bgKind, 'image', 'danach wieder ein Bild');
   const res = await bgFn(new Request(BASE + v.bg));
   assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/png');
   await api('DELETE', 'startscreen/bg', {});
