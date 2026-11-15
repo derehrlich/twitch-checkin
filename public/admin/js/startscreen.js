@@ -29,25 +29,37 @@ export function initStartscreen() {
   $('ssPlus').addEventListener('click', run(async () => { v = await api('POST', 'startscreen/extend', { minutes: 5 }); render(); toast('5 Minuten dazu ✓'); }));
   $('ssStop').addEventListener('click', run(async () => { v = await api('POST', 'startscreen/stop', {}); render(); toast('Ausgeblendet ✓'); }));
   $('ssDefault').addEventListener('click', run(async () => { if (!confirm('Die Textliste durch die Beispiel-Anekdoten ersetzen? (Erst mit „Texte speichern“ gilt es.)')) return; $('ssFacts').value = v.defaultAnecdotes; }));
-  // Auswählen lädt gleich hoch. Ist ein Bild zu groß (über 6 MB), wird es im Browser auf höchstens 1920 Pixel Breite verkleinert.
-  const upload = run(async () => {
+  // Auswählen lädt gleich hoch. Bilder über 800 KB werden vorher im Browser auf höchstens 1920 Pixel Breite verkleinert,
+  // damit auch Vermittler (Proxy, Tunnel) mit kleiner Größengrenze nichts abweisen. Fehler bleiben sichtbar stehen.
+  const upload = async () => {
     const input = $('ssBg'); let file = input.files[0];
-    if (!file) throw new Error('Bitte zuerst eine Datei auswählen');
-    if (file.size > 6_000_000 && file.type.startsWith('image/') && file.type !== 'image/gif') file = await shrink(file);
-    const data = await readUpload(file, 8_000_000);
-    v = await api('POST', 'startscreen/bg', { name: file.name, data }); render(); input.value = ''; toast('Hintergrund hochgeladen ✓');
-  });
+    const err = (msg) => { $('ssErr').textContent = msg ? '⚠️ ' + msg : ''; };
+    err('');
+    try {
+      if (!file) throw new Error('Bitte zuerst eine Datei auswählen');
+      const mb = (n) => (n / 1e6).toFixed(1).replace('.', ',') + ' MB';
+      $('ssErr').textContent = `Lade „${file.name}“ (${mb(file.size)}) hoch …`;
+      if (file.size > 800_000 && file.type.startsWith('image/') && file.type !== 'image/gif') file = await shrink(file);
+      const data = await readUpload(file, 8_000_000);
+      v = await api('POST', 'startscreen/bg', { name: file.name, data }); render(); input.value = ''; err('');
+      toast('Hintergrund hochgeladen ✓');
+    } catch (e) { err(`Hochladen von „${(input.files[0] ?? file)?.name ?? ''}“ hat nicht geklappt: ${e.message}`); toast(e.message, true); }
+  };
   $('ssBg').addEventListener('change', upload);
   $('ssBgUp').addEventListener('click', upload);
   $('ssBgReset').addEventListener('click', run(async () => { if (!confirm('Eigenen Hintergrund entfernen und wieder den Bauplan zeigen?')) return; v = await api('DELETE', 'startscreen/bg', {}); render(); toast('Bauplan aktiv ✓'); }));
 }
 
-// Verkleinert ein zu großes Bild auf höchstens 1920 Pixel Breite und speichert es als JPG.
+// Verkleinert ein Bild auf höchstens 1920 Pixel Breite: erst als PNG (Pixel-Art bleibt scharf), ist das noch über 1,2 MB, als JPG.
 async function shrink(file) {
-  const bmp = await createImageBitmap(file).catch(() => { throw new Error('Das Bild ist zu groß und konnte nicht verkleinert werden. Bitte kleiner abspeichern (1920×1080 reicht).'); });
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error('Das Bild konnte nicht gelesen werden. Bitte als PNG oder JPG neu abspeichern.'); });
   const k = Math.min(1, 1920 / bmp.width);
   const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
   cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
-  const blob = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.9));
-  return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+  const base = file.name.replace(/\.\w+$/, '');
+  const toBlob = (type, q) => new Promise((r) => cv.toBlob(r, type, q));
+  let blob = await toBlob('image/png'); let ext = 'png';
+  if (!blob || blob.size > 1_200_000) { blob = await toBlob('image/jpeg', 0.9); ext = 'jpg'; }
+  if (!blob) throw new Error('Das Bild konnte nicht verkleinert werden.');
+  return blob.size < file.size ? new File([blob], `${base}.${ext}`, { type: blob.type }) : file;
 }
