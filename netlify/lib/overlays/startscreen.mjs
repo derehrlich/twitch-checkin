@@ -2,7 +2,7 @@
 //   startscreen/config   { title, subtitle, endText, minutes (Vorlauf), rotateSeconds, showProgress, anecdotes (Text, eine je Zeile),
 //                          bgName, bgVersion }
 //   startscreen/state    { active, startedAt (ms), until (ms) }
-//   startbg/image        { type, data }  das Hintergrundbild (Base64, wie bei den Alert-Bildern)
+//   startbg/image        { type, data }  der Hintergrund (Base64): ein Bild oder eine HTML-Datei (type text/html, animiert)
 // Die Seite holt alles alle paar Sekunden samt Serverzeit und rechnet selbst weiter.
 import { db } from '../kern/store.mjs';
 
@@ -49,7 +49,7 @@ export const DEFAULT_CONFIG = {
   subtitle: 'Die Baustelle öffnet in Kürze',
   endText: 'Die Baustelle ist eröffnet! 🏗️',
   minutes: 10, rotateSeconds: 9, showProgress: true,
-  anecdotes: DEFAULT_ANECDOTES, bgName: null, bgVersion: null,
+  anecdotes: DEFAULT_ANECDOTES, bgName: null, bgVersion: null, bgKind: 'image',
 };
 const IDLE = { active: false, startedAt: 0, until: 0 };
 
@@ -73,7 +73,7 @@ export async function updateConfig(input) {
   if ('rotateSeconds' in i) cfg.rotateSeconds = num(i.rotateSeconds, 4, 60, cfg.rotateSeconds);
   if (typeof i.showProgress === 'boolean') cfg.showProgress = i.showProgress;
   if ('anecdotes' in i) cfg.anecdotes = parseAnecdotes(i.anecdotes).map((a) => (a.head ? `${a.head} | ${a.text}` : a.text)).join('\n');
-  if ('bgName' in i) { cfg.bgName = i.bgName ? str(i.bgName, 80) : null; cfg.bgVersion = i.bgName ? (i.bgVersion ?? Date.now()) : null; }
+  if ('bgName' in i) { cfg.bgName = i.bgName ? str(i.bgName, 80) : null; cfg.bgVersion = i.bgName ? (i.bgVersion ?? Date.now()) : null; cfg.bgKind = i.bgName && i.bgKind === 'html' ? 'html' : 'image'; }
   await db.set(CONFIG_KEY, cfg);
   return cfg;
 }
@@ -103,7 +103,7 @@ export async function publicView(now = Date.now()) {
   const [c, s] = await Promise.all([getConfig(), getState()]);
   return {
     show: s.active, title: c.title, subtitle: c.subtitle, endText: c.endText, showProgress: c.showProgress, rotateSeconds: c.rotateSeconds,
-    startedAt: s.startedAt, until: s.until, anecdotes: parseAnecdotes(c.anecdotes), bg: c.bgVersion ? `/api/startscreen-bg?v=${c.bgVersion}` : null, now,
+    startedAt: s.startedAt, until: s.until, anecdotes: parseAnecdotes(c.anecdotes), bg: c.bgVersion ? `/api/startscreen-bg?v=${c.bgVersion}` : null, bgKind: c.bgKind, now,
   };
 }
 
