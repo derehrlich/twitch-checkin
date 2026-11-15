@@ -461,6 +461,35 @@
         </div>
       </section>
       <section class="card">
+        <h2>Startbildschirm („Gleich geht’s los“)</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="ssUrl"></code> anlegen, am besten als eigene Szene „Startbildschirm“ (oder ganz unten in deiner Gaming-/Talking-Szene, hinter Rahmen und Kamera). Sie bleibt unsichtbar, bis du sie hier startest. Mit <code>?rahmen</code> hinter der Adresse bleibt Platz für deine Holzleiste unten und die Kamera unten rechts, mit <code>?bg=0</code> ist der Hintergrund durchsichtig (dein Waldbild bleibt stehen). Beides geht zusammen: <code id="ssUrl2"></code>.</p>
+        <div class="grid">
+          <div><label for="ssMin">Vorlauf in Minuten</label><input id="ssMin" type="number" min="1" max="240"></div>
+          <div><label for="ssRot">Neue Anekdote alle … Sekunden</label><input id="ssRot" type="number" min="4" max="60"></div>
+          <div><label for="ssTitle">Überschrift</label><input id="ssTitle" maxlength="60"></div>
+          <div><label for="ssSub">Zeile darunter</label><input id="ssSub" maxlength="80"></div>
+          <div><label for="ssEnd">Text bei 0</label><input id="ssEnd" maxlength="80"></div>
+          <div><label><input id="ssProg" type="checkbox"> Baufortschritt-Balken zeigen</label></div>
+        </div>
+        <label for="ssFacts">Bauanekdoten (eine pro Zeile, am schönsten als <code>Überschrift | Text</code>)</label>
+        <textarea id="ssFacts" rows="10" maxlength="20000" style="width:100%"></textarea>
+        <div class="row">
+          <div><label for="ssBg">Hintergrundbild (PNG, JPG, GIF, WebP bis 3 MB, am besten 1920×1080)</label><input id="ssBg" type="file" accept="image/gif,image/png,image/jpeg,image/webp,.gif,.png,.jpg,.jpeg,.webp"></div>
+          <button id="ssBgUp" class="ghost">Hochladen</button>
+          <button id="ssBgReset" class="ghost">Bild entfernen</button>
+        </div>
+        <p class="muted" id="ssInfo"></p>
+        <div class="row">
+          <button id="ssStart">Startbildschirm starten</button>
+          <button id="ssPlus" class="ghost">+5 Minuten</button>
+          <button id="ssStop" class="ghost">Beenden</button>
+          <button id="ssSave" class="ghost">Texte speichern</button>
+          <button id="ssDefault" class="ghost">Beispiel-Anekdoten laden</button>
+          <a class="btn ghost" href="/startscreen?demo" target="_blank" rel="noopener">Vorschau (3 Minuten)</a>
+          <a class="btn ghost" href="/startscreen?demo&rahmen" target="_blank" rel="noopener">Vorschau mit Rahmen</a>
+        </div>
+      </section>
+      <section class="card">
         <h2>Pause-Overlay</h2>
         <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="pauseUrl"></code> anlegen. Sie bleibt unsichtbar, bis eine Pause läuft. Mit <code>?pos=top</code>, <code>bottom</code> … hinter der Adresse änderst du den Platz (Standard: Mitte), mit <code>?size=0.7</code> die Größe. Im Chat startest du sie mit <code id="pauseCmd"></code> und beendest sie mit <code id="pauseEndCmd"></code> (Einstellungen unten, Befehle sind erst nach dem Einschalten aktiv).</p>
         <div class="grid">

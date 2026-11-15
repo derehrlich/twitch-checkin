@@ -56,6 +56,11 @@
   status = 200
 
 [[redirects]]
+  from = "/startscreen"
+  to = "/startscreen.html"
+  status = 200
+
+[[redirects]]
   from = "/countdown"
   to = "/countdown.html"
   status = 200

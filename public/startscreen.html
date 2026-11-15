@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Startbildschirm</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Startbildschirm als OBS-Browserquelle (1920×1080), füllt das ganze Bild.
+     Starten, verlängern und beenden: im Admin (Reiter „Overlays“). Bis dahin bleibt die Seite unsichtbar.
+     Hintergrundbild, Texte, Vorlauf und Bauanekdoten stellst du dort ein.
+     ?demo     Beispiel mit 3 Minuten, immer sichtbar
+     ?rahmen   für die Szene mit deinem Rahmen-Overlay: ohne Warnstreifen, kleiner, Platz für Holzleiste unten und Kamera unten rechts
+     ?bg=0     ohne eigenen Hintergrund (durchsichtig), dein Waldbild oder Szenenhintergrund bleibt sichtbar
+     Beides lässt sich kombinieren: /startscreen?rahmen&bg=0 */
+  html { font-size: .8333vw; } /* 1 rem = 16 px bei 1920 Pixel Breite, alles skaliert mit */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #scene { position: fixed; inset: 0; opacity: 0; transition: opacity .8s; overflow: hidden; color: #fff3da; }
+  #scene.on { opacity: 1; }
+
+  /* Hintergrund: eigenes Bild, sonst ein Bauplan-Blau mit Gitter */
+  #bg { position: absolute; inset: 0; background: #1d2a3a center / cover no-repeat; }
+  #bg.plain {
+    background-color: #1b2b3f;
+    background-image:
+      linear-gradient(rgba(120, 180, 230, .12) 1px, transparent 1px), linear-gradient(90deg, rgba(120, 180, 230, .12) 1px, transparent 1px),
+      linear-gradient(rgba(120, 180, 230, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(120, 180, 230, .06) 1px, transparent 1px),
+      radial-gradient(ellipse at 50% 40%, #27415f 0%, #14202f 75%);
+    background-size: 8rem 8rem, 8rem 8rem, 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+  }
+  #shade { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(8, 12, 20, .35) 0%, rgba(8, 12, 20, .72) 100%); }
+
+  /* Warnstreifen oben und unten */
+  .hazard { position: absolute; left: 0; right: 0; height: 2.6rem; z-index: 3; background: repeating-linear-gradient(-45deg, #f6b82e 0 2.2rem, #231a10 2.2rem 4.4rem); background-size: 6.2226rem 100%; animation: slide 6s linear infinite; box-shadow: 0 0 2rem rgba(0, 0, 0, .55); }
+  .hazard.top { top: 0; } .hazard.bottom { bottom: 0; animation-direction: reverse; }
+  @keyframes slide { to { background-position: 6.2226rem 0; } }
+
+  #main { position: absolute; inset: 2.6rem 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 8rem; box-sizing: border-box; text-align: center; z-index: 2; }
+  .title { font: 700 6.4rem/1.05 var(--wordmark); letter-spacing: .25rem; color: #ffd45e; text-shadow: .3rem .3rem 0 rgba(20, 12, 4, .85), 0 0 3rem rgba(246, 184, 46, .35); overflow-wrap: anywhere; }
+  .sub { margin-top: 1rem; font-size: 2.2rem; font-weight: 600; color: #e9f1fb; text-shadow: 0 .15rem 0 rgba(0, 0, 0, .7); min-height: 1.2em; }
+
+  /* Schild mit der Restzeit */
+  .sign { margin-top: 2.6rem; padding: 1.2rem 4.5rem 1.6rem; border-radius: 1.4rem; background: linear-gradient(#2a2118, #17110b); border: .45rem solid #f6b82e; box-shadow: 0 .6rem 0 rgba(0, 0, 0, .45), 0 0 4rem rgba(246, 184, 46, .25); }
+  .sign small { display: block; font-size: 1.5rem; font-weight: 600; letter-spacing: .3rem; text-transform: uppercase; color: #f6b82e; }
+  .time { font: 700 12rem/1.05 var(--wordmark); letter-spacing: .4rem; color: #fff3da; font-variant-numeric: tabular-nums; text-shadow: .3rem .3rem 0 rgba(0, 0, 0, .6); }
+  .sign.done .time { font-size: 5.4rem; color: #ffd45e; padding: 1.2rem 0; }
+  .sign.done small { display: none; }
+
+  /* Baufortschritt */
+  .progress { width: 70rem; margin-top: 2.4rem; }
+  .bar { position: relative; height: 2.2rem; border-radius: 1.1rem; background: rgba(0, 0, 0, .55); border: .22rem solid rgba(255, 243, 218, .55); overflow: visible; }
+  .fill { height: 100%; width: 0; border-radius: .9rem; background: repeating-linear-gradient(-45deg, #f6b82e 0 1.1rem, #e29b14 1.1rem 2.2rem); transition: width 1s linear; }
+  .crane { position: absolute; top: -2.4rem; left: 0; font-size: 2.8rem; line-height: 1; transform: translateX(-50%); transition: left 1s linear; filter: drop-shadow(0 .2rem 0 rgba(0, 0, 0, .6)); }
+  .phase { margin-top: .9rem; font-size: 1.7rem; font-weight: 600; color: #cfe1f3; letter-spacing: .08rem; }
+
+  /* Bauanekdoten: eine Karte, die zwischendurch wechselt */
+  .fact { position: relative; width: 62rem; max-width: 100%; min-height: 9.5rem; margin-top: 2.2rem; padding: 1.1rem 2.2rem 1.3rem; box-sizing: border-box; border-radius: 1.2rem; background: rgba(12, 18, 28, .72); border-left: .5rem solid #f6b82e; text-align: left; opacity: 0; transform: translateY(1rem); transition: opacity .6s, transform .6s; }
+  .fact.in { opacity: 1; transform: none; }
+  .fact .head { font: 700 1.9rem/1.2 var(--wordmark); letter-spacing: .1rem; color: #ffd45e; }
+  .fact .head:empty { display: none; }
+  .fact .body { margin-top: .35rem; font-size: 2rem; font-weight: 500; line-height: 1.3; color: #fff3da; }
+  .fact .ico { position: absolute; right: 1.4rem; top: .8rem; font-size: 2.2rem; opacity: .85; }
+
+  /* Variante „?rahmen“: bleibt im freien Feld über der Holzleiste und links neben der Kamera */
+  body.framed .hazard { display: none; }
+  body.framed #main { inset: 5% 0 20% 0; padding: 0 12rem 0 4rem; }
+  body.framed .title { font-size: 4.8rem; } body.framed .sub { font-size: 1.8rem; margin-top: .5rem; }
+  body.framed .sign { margin-top: 1.4rem; padding: .7rem 3.2rem 1rem; } body.framed .sign small { font-size: 1.2rem; }
+  body.framed .time { font-size: 8.4rem; } body.framed .sign.done .time { font-size: 4rem; padding: .8rem 0; }
+  body.framed .progress { width: 56rem; margin-top: 1.8rem; } body.framed .phase { font-size: 1.4rem; }
+  body.framed .fact { width: 54rem; min-height: 7.6rem; margin-top: 1.4rem; padding: .8rem 1.8rem 1rem; }
+  body.framed .fact .head { font-size: 1.6rem; } body.framed .fact .body { font-size: 1.6rem; }
+  /* Variante „?bg=0“: durchsichtig, nur ein leichter Schleier hinter dem Text */
+  body.clear #bg { display: none; }
+  body.clear #shade { background: radial-gradient(ellipse at center, rgba(8, 12, 20, .55) 0%, rgba(8, 12, 20, .15) 80%); }
+</style>
+</head>
+<body>
+<div id="scene" aria-live="off">
+  <div id="bg" class="plain"></div>
+  <div id="shade"></div>
+  <div class="hazard top"></div><div class="hazard bottom"></div>
+  <div id="main">
+    <div class="title" id="title">Gleich geht’s los!</div>
+    <div class="sub" id="sub"></div>
+    <div class="sign" id="sign"><small id="signLabel">Baustelle öffnet in</small><div class="time" id="time">10:00</div></div>
+    <div class="progress" id="progress">
+      <div class="bar"><div class="fill" id="fill"></div><div class="crane" id="crane">🏗️</div></div>
+      <div class="phase" id="phase"></div>
+    </div>
+    <div class="fact" id="fact"><span class="ico">🚧</span><div class="head" id="factHead"></div><div class="body" id="factBody"></div></div>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+document.body.classList.toggle('framed', params.has('rahmen'));
+document.body.classList.toggle('clear', params.get('bg') === '0');
+const $ = (id) => document.getElementById(id);
+const two = (n) => String(n).padStart(2, '0');
+const PHASES = [[0, '⛏️ Baugrube wird ausgehoben'], [15, '🧱 Fundament wird gegossen'], [30, '🏗️ Rohbau wächst'], [60, '🏠 Dach wird gedeckt'], [80, '🔧 Innenausbau läuft'], [95, '🎉 Fast Richtfest!']];
+
+let cfg = null, offset = 0;
+let shown = '', queue = [], listKey = '', nextAt = 0, bgUrl = null;
+
+async function poll() {
+  try {
+    let v = await (await fetch('/api/startscreen', { cache: 'no-store' })).json();
+    if (params.has('demo')) { const n = Date.now(); v = { ...v, show: true, startedAt: n, until: n + 3 * 60_000, now: n }; }
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+function shuffle(a) { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
+
+function showFact(t) {
+  const card = $('fact');
+  card.classList.remove('in');
+  setTimeout(() => { $('factHead').textContent = t.head; $('factBody').textContent = t.text; card.classList.add('in'); }, 650);
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  const scene = $('scene');
+  if (!cfg || !cfg.show) { scene.classList.remove('on'); return; }
+  scene.classList.add('on');
+
+  // Hintergrundbild
+  if (cfg.bg !== bgUrl) {
+    bgUrl = cfg.bg;
+    const bg = $('bg');
+    bg.classList.toggle('plain', !bgUrl);
+    bg.style.backgroundImage = bgUrl ? `url("${bgUrl}")` : '';
+  }
+  $('title').textContent = cfg.title;
+  $('sub').textContent = cfg.subtitle;
+
+  const now = Date.now() + offset;
+  const left = Math.max(0, cfg.until - now), total = Math.max(1, cfg.until - cfg.startedAt);
+  const done = left <= 0;
+  const s = Math.ceil(left / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  $('sign').classList.toggle('done', done);
+  $('time').textContent = done ? cfg.endText : (h ? `${h}:${two(m)}:${two(s % 60)}` : `${two(m)}:${two(s % 60)}`);
+
+  // Fortschritt mit Bauphase
+  $('progress').style.display = cfg.showProgress ? '' : 'none';
+  const pct = done ? 100 : Math.min(100, Math.max(0, ((now - cfg.startedAt) / total) * 100));
+  $('fill').style.width = pct + '%'; $('crane').style.left = pct + '%';
+  $('phase').textContent = done ? '🎉 Richtfest! Alles steht.' : [...PHASES].reverse().find(([from]) => pct >= from)[1] + ` · ${Math.floor(pct)} %`;
+
+  // Anekdoten: gemischt der Reihe nach, bei neuer Liste wird neu gemischt
+  const key = JSON.stringify(cfg.anecdotes);
+  if (key !== listKey) { listKey = key; queue = []; nextAt = 0; }
+  const card = $('fact');
+  if (!cfg.anecdotes.length || done) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  if (performance.now() >= nextAt) {
+    if (!queue.length) queue = shuffle(cfg.anecdotes);
+    showFact(queue.shift());
+    nextAt = performance.now() + Math.max(4, cfg.rotateSeconds) * 1000;
+  }
+}
+
+poll(); setInterval(poll, 4000); frame();
+</script>
+</body>
+</html>
