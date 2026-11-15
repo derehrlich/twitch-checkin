@@ -3076,6 +3076,41 @@ await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Sei
   assert.equal((await pub()).show, false, 'ausgeschaltet: Befehl tut nichts');
 });
 
+await test('Startbildschirm: Vorlauf, Verlängern, Anekdoten, Hintergrundbild, öffentliche Seite', async () => {
+  const pubFn = (await import('../netlify/functions/startscreen.mjs')).default;
+  const bgFn = (await import('../netlify/functions/startscreen-bg.mjs')).default;
+  const pub = async () => (await pubFn(new Request(BASE + '/api/startscreen'))).json();
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'startscreen'))).status, 401, 'Admin nur mit Login');
+  let v = await pub();
+  assert.equal(v.show, false, 'Standard unsichtbar'); assert.ok(v.anecdotes.length >= 20, 'Beispiel-Anekdoten sind dabei'); assert.equal(v.bg, null);
+  assert.ok(v.anecdotes[0].head && v.anecdotes[0].text, 'Überschrift und Text getrennt');
+  // Texte, Vorlauf, eigene Anekdoten (Zeile ohne Überschrift, leere Zeilen weg)
+  await api('PUT', 'startscreen', { title: 'Bald!', minutes: 7, rotateSeconds: 1, anecdotes: 'Beton | trocknet\n\nNur Text' });
+  let a = await (await api('GET', 'startscreen')).json();
+  assert.equal(a.config.minutes, 7); assert.equal(a.config.rotateSeconds, 4, 'mindestens 4 Sekunden');
+  await api('POST', 'startscreen/start', {});
+  v = await pub();
+  assert.equal(v.show, true); assert.equal(v.until - v.startedAt, 7 * 60_000); assert.equal(v.title, 'Bald!');
+  assert.deepEqual(v.anecdotes, [{ head: 'Beton', text: 'trocknet' }, { head: '', text: 'Nur Text' }]);
+  const until = v.until;
+  await api('POST', 'startscreen/extend', { minutes: 5 });
+  assert.equal((await pub()).until, until + 5 * 60_000, 'verlängert');
+  await api('POST', 'startscreen/stop', {});
+  assert.equal((await pub()).show, false);
+  // Hintergrundbild: nur echte Bilder
+  assert.equal((await bgFn(new Request(BASE + '/api/startscreen-bg'))).status, 404);
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(20)]).toString('base64');
+  assert.equal((await api('POST', 'startscreen/bg', { name: 'x.txt', data: Buffer.from('kein Bild').toString('base64') })).status, 400);
+  await api('POST', 'startscreen/bg', { name: 'baustelle.png', data: png });
+  v = await pub();
+  assert.match(v.bg, /^\/api\/startscreen-bg\?v=\d+$/);
+  const res = await bgFn(new Request(BASE + v.bg));
+  assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/png');
+  await api('DELETE', 'startscreen/bg', {});
+  assert.equal((await pub()).bg, null); assert.equal((await bgFn(new Request(BASE + '/api/startscreen-bg'))).status, 404);
+});
+
 await test('Geburtstagswoche: Countdown (Zeitzone, öffentlich), Glücksrad (Gewicht, einmalig, Chat), !geburtstag', async () => {
   const cdFn = (await import('../netlify/functions/countdown.mjs')).default;
   const radFn = (await import('../netlify/functions/rad.mjs')).default;
