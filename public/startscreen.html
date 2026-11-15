@@ -73,6 +73,8 @@
   body.framed .fact { width: 54rem; min-height: 7.6rem; margin-top: 1.4rem; padding: .8rem 1.8rem 1rem; }
   body.framed .fact .head { font-size: 1.6rem; } body.framed .fact .body { font-size: 1.6rem; }
   /* Variante „?bg=0“: durchsichtig, nur ein leichter Schleier hinter dem Text */
+  /* Eigener Hintergrund (Bild oder Animation): nur ein ganz leichter Schleier, damit dunkle Bilder nicht schwarz wirken */
+  body.custombg #shade { background: radial-gradient(ellipse at center, rgba(8, 12, 20, .08) 0%, rgba(8, 12, 20, .3) 100%); }
   body.clear #bg { display: none; }
   body.clear #shade { background: radial-gradient(ellipse at center, rgba(8, 12, 20, .55) 0%, rgba(8, 12, 20, .15) 80%); }
 </style>
@@ -130,6 +132,7 @@ function frame() {
   // Hintergrundbild
   if (cfg.bg !== bgUrl) {
     bgUrl = cfg.bg;
+    document.body.classList.toggle('custombg', Boolean(bgUrl));
     const bg = $('bg');
     bg.classList.toggle('plain', !bgUrl);
     bg.replaceChildren();
