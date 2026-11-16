@@ -75,7 +75,7 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - `netlify/lib/overlays/startscreen.mjs` (Schlüssel `startscreen/config`, `startscreen/state`, Hintergrundbild `startbg/image`), öffentlich `GET /api/startscreen` und `/api/startscreen-bg`, Seite `public/startscreen.html` (`/startscreen`, vollflächig; `?rahmen` für Marcels Rahmen-Overlay mit Holzleiste und Kamera, `?bg=0` durchsichtig, `?demo`), Admin-Route `netlify/lib/admin/startscreen.mjs`, Karte in `public/admin/js/startscreen.js` (Reiter Overlays). Vorlauf-Countdown, Baufortschritt-Balken und wechselnde Bauanekdoten (Zeile `Überschrift | Text`). Doku: `docs/startscreen.md`. Kein Schema-Eintrag, alles liegt in der eigenen Config.
 
 ## Tests
-- `npm ci && npm test` (aktuell 132 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 133 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
