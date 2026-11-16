@@ -645,6 +645,85 @@
       </section>
     </div>
 
+    <div class="tab-panel hidden" data-panel="statistik">
+      <p class="muted intro">Zuschauer, Follower und Abos deines Kanals. Gemessen wird jede Minute, solange du live bist. Diese Zahlen stehen nur hier im Admin, nicht im Chat und nicht in Discord.</p>
+      <p id="stHint" class="card hidden" style="padding:14px 18px">Die Messung ist noch <b>ausgeschaltet</b>. Schalte sie unten unter „Twitch-Statistik“ ein und speichere. Gemessen wird erst ab dann, bei deinem nächsten Stream geht es los.</p>
+      <section class="card">
+        <h2>Gesamt</h2>
+        <div class="stats" id="stTotal"></div>
+        <p class="muted" id="stState"></p>
+        <div class="row"><button id="stCheck" class="ghost">Jetzt messen</button></div>
+      </section>
+      <section class="card">
+        <h2>Letzte 30 Tage</h2>
+        <div class="stats" id="stMonth"></div>
+      </section>
+      <section class="card">
+        <h2>Zuschauer pro Stream</h2>
+        <div id="stBars"></div>
+      </section>
+      <section class="card">
+        <h2>Follower-Verlauf</h2>
+        <div id="stFollowers"></div>
+      </section>
+      <section class="card">
+        <h2>Letzte Streams</h2>
+        <div id="stList"></div>
+        <div id="stDetail"></div>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="statistik" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="mediakit">
+      <p class="muted intro">Deine Zahlen und Angebote für Partner-Anfragen als öffentliche Seite. Die Zahlen kommen aus der Twitch-Statistik oder aus einem Twitch-Export. Einnahmen und Zuschauer-Listen stehen nie auf der Seite.</p>
+      <section class="card">
+        <h2>Kennzahlen</h2>
+        <div class="stats" id="mkTiles"></div>
+        <p class="muted" id="mkSource"></p>
+      </section>
+      <section class="card">
+        <h2>Anbieter-Kriterien</h2>
+        <div id="mkCriteria"></div>
+      </section>
+      <section class="card">
+        <h2>Veröffentlichung</h2>
+        <div id="mkState"></div>
+        <label class="check big"><input id="mkPublished" type="checkbox"> Seite veröffentlichen</label>
+        <p class="muted">Die Seite hat die Adresse <code id="mkUrl"></code>. Sie muss ohne Anmeldung erreichbar sein (in Cloudflare Access nicht davorsetzen). Solange Zielgruppe, Preise oder E-Mail fehlen, steht dort ein Platzhalter und sie ist für Suchmaschinen gesperrt.</p>
+        <div class="row">
+          <a class="btn ghost" id="mkOpen" href="/mediakit" target="_blank" rel="noopener">Öffentliche Seite öffnen</a>
+          <button id="mkPreviewBtn" class="ghost">Vorschau aktualisieren</button>
+        </div>
+        <details id="mkPreviewBox" style="margin-top:14px"><summary class="muted">Vorschau (so sehen Besucher die Seite)</summary>
+          <iframe id="mkPreview" title="Vorschau des Mediakits" style="width:100%; height:720px; border:1px solid var(--rand-stark); border-radius:10px; margin-top:10px; background:#08131f"></iframe>
+        </details>
+      </section>
+      <section class="card">
+        <h2>Angaben für die Seite</h2>
+        <label class="check"><input type="radio" name="mkSourceSel" value="stats"> Zahlen aus der eigenen Messung (Twitch-Statistik)</label>
+        <label class="check"><input type="radio" name="mkSourceSel" value="csv" id="mkSourceCsv"> Zahlen aus dem hochgeladenen Twitch-Export</label>
+        <label for="mkIntro">Einleitung</label><textarea id="mkIntro" rows="3" maxlength="300"></textarea>
+        <label for="mkAudience">Zielgruppe <span class="muted">(Alter, Geschlecht, Land, steht in deinen Twitch-Statistiken unter „Zuschauer“)</span></label><textarea id="mkAudience" rows="2" maxlength="300"></textarea>
+        <label for="mkPrices">Preise</label><textarea id="mkPrices" rows="2" maxlength="300"></textarea>
+        <label for="mkEmail">Geschäfts-E-Mail</label><input id="mkEmail" type="email" maxlength="120">
+        <label for="mkSchedule">Zeitplan <span class="muted">(eine Zeile pro Punkt)</span></label><textarea id="mkSchedule" rows="4" maxlength="800"></textarea>
+        <label for="mkFormats">Partnerformate <span class="muted">(eine Zeile pro Format: Name | Beschreibung)</span></label><textarea id="mkFormats" rows="5" maxlength="1500"></textarea>
+        <label for="mkCriteriaText">Anbieter-Kriterien <span class="muted">(nur für dich, nicht auf der Seite. Eine Zeile pro Anbieter: Name | Ø Zuschauer | Hinweis)</span></label><textarea id="mkCriteriaText" rows="3" maxlength="800"></textarea>
+        <div class="row" style="margin-top:12px"><button id="mkSave">Speichern</button></div>
+      </section>
+      <section class="card">
+        <h2>Twitch-Export hochladen (optional)</h2>
+        <p class="muted">Die offiziellen Zahlen von Twitch sind für Partner oft überzeugender als die eigene Messung, vor allem für die Zeit vor der Messung. In Twitch: Creator-Dashboard → Statistiken → Export „Analysen und Einnahmen nach Tag“ (CSV). Gelesen werden nur Streamzeiten, Zuschauer und Follower, <b>keine Einnahmen</b>. Die Datei selbst wird nicht gespeichert.</p>
+        <div class="row">
+          <div><label for="mkFile">CSV-Datei</label><input id="mkFile" type="file" accept=".csv,text/csv"></div>
+          <button id="mkImport">Einlesen</button>
+          <button id="mkRemoveCsv" class="ghost hidden">Eingelesene Zahlen entfernen</button>
+        </div>
+        <p class="muted" id="mkCsvInfo"></p>
+      </section>
+    </div>
+
     <div class="tab-panel hidden" data-panel="medien">
       <section class="card">
         <h2>Töne</h2>

@@ -7,6 +7,7 @@ export const NAV = [
   ['Stream', [['zuschauer', '✅', 'Check-in und Besucher'], ['ereignisse', '🔔', 'Alerts'], ['raids', '⚔️', 'Raids']]],
   ['Chat', [['commands', '💬', 'Eigene Commands'], ['chat', '❗', 'Befehle und Shoutout'], ['moderation', '🛡️', 'Moderation'], ['chatleiste', '🗨️', 'Chat im Stream']]],
   ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste']]],
+  ['Zahlen', [['statistik', '📈', 'Twitch-Statistik'], ['mediakit', '📰', 'Mediakit']]],
   ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
   ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
   ['Verwaltung', [['medien', '🎵', 'Töne und Bilder'], ['tests', '🧪', 'Tests'], ['system', '⚙️', 'System']]],
@@ -22,6 +23,7 @@ const OVERLAYS = [
   ['Pause', '/pause', '1920 × 1080', 'pause'], ['Abspann', '/abspann', '1920 × 1080', 'abspann'], ['Rangliste', '/rangliste?overlay', 'frei', 'abspann'],
   ['Sport-Scoreboard', '/sport', '1920 × 1080', 'sport'], ['Countdown', '/countdown', '1920 × 1080', 'feier'],
   ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'],
+  ['Mediakit (öffentliche Seite)', '/mediakit', 'Browser', 'mediakit'],
 ];
 
 const page = (id) => PAGES.find((p) => p.id === id);

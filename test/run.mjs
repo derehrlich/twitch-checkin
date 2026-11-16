@@ -3119,6 +3119,140 @@ await test('Gewinnspiel-Verwaltung: Chat-Befehl, mehrere gleichzeitig, Minuten-F
   await api('PUT', 'settings', { gwEnabled: false, communityEnabled: false });
 });
 
+await test('Twitch-Statistik: misst nur wenn eingeschaltet, Streams mit Lücke, Follower, Kennzahlen, Wochen, Löschen, Fehler', async () => {
+  const st = await import('../netlify/lib/statistik/stats.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'stats'))).status, 401, 'nur mit Login');
+  assert.deepEqual(await st.statTick(await getSettings()), { skipped: true }, 'ausgeschaltet: keine Messung');
+  assert.equal((await api('POST', 'stats/check', {})).status, 400);
+  await api('PUT', 'settings', { statsEnabled: true });
+  const settings = await getSettings();
+  const realFetch = globalThis.fetch;
+  let live = null, followers = 100, streamsFail = false;
+  globalThis.fetch = async (url, init) => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/helix/streams')) return streamsFail ? new Response('{"error":"boom"}', { status: 500 }) : new Response(JSON.stringify({ data: live ? [{ viewer_count: live, title: 'Bauabend', game_name: 'Enshrouded' }] : [] }), { status: 200 });
+    if (u.pathname.endsWith('/channels/followers')) return new Response(JSON.stringify({ total: followers, data: [] }), { status: 200 });
+    if (u.pathname.endsWith('/helix/subscriptions')) return new Response(JSON.stringify({ total: 7, data: [] }), { status: 200 });
+    return realFetch(url, init);
+  };
+  const T0 = Date.UTC(2030, 5, 10, 12, 0), MIN = 60_000; // ein Montag
+  try {
+    live = 10; assert.equal((await st.statTick(settings, T0)).live, true);
+    live = 20; await st.statTick(settings, T0 + MIN);
+    live = 30; await st.statTick(settings, T0 + 2 * MIN);
+    live = 40; await st.statTick(settings, T0 + 8 * MIN); // Lücke unter 10 Minuten: derselbe Stream
+    let all = await st.allSessions();
+    assert.equal(all.length, 1);
+    const s1 = all[0];
+    assert.deepEqual([s1.samples, s1.peak, s1.sumViewers, s1.followersStart, s1.title, s1.game], [4, 40, 100, 100, 'Bauabend', 'Enshrouded']);
+    assert.deepEqual(s1.curve, [[0, 10], [1, 20], [2, 30], [8, 40]]);
+
+    live = null; followers = 105;
+    await st.statTick(settings, T0 + 9 * MIN);
+    assert.equal((await st.allSessions())[0].endedAt, null, 'nach einer Minute Pause noch nicht zu Ende');
+    await st.statTick(settings, T0 + 19 * MIN);
+    const closed = (await st.allSessions())[0];
+    assert.equal(closed.endedAt, new Date(T0 + 8 * MIN).toISOString(), 'Ende = letzte Messung');
+    assert.equal(closed.followersEnd, 105);
+    assert.deepEqual(st.sessionInfo(closed), { id: s1.id, startedAt: new Date(T0).toISOString(), title: 'Bauabend', game: 'Enshrouded', minutes: 8, peak: 40, avg: 25, open: false, followerPlus: 5 });
+    assert.deepEqual(await db.get('stat/day/2030-06-10'), { followers: 105, subs: 7 });
+
+    live = 15; await st.statTick(settings, T0 + 60 * MIN);
+    all = await st.allSessions();
+    assert.equal(all.length, 2); assert.notEqual(all[0].id, s1.id, 'nach der Pause beginnt ein neuer Stream');
+    live = null;
+
+    // Kennzahlen: nur Streams mit Dauer zählen, Follower aus den Tageswerten
+    await db.set('stat/day/2030-06-09', { followers: 100, subs: 5 });
+    const k = st.numbers30(await st.allSessions(), await st.allDays(), settings, T0 + 2 * 60 * MIN);
+    assert.deepEqual([k.streamDays, k.avgViewers, k.maxViewers, k.newFollowers], [1, 25, 40, 5]);
+    assert.ok(Math.abs(k.hoursStreamed - 8 / 60) < 1e-9 && Math.abs(k.hoursWatched - (25 * 8) / 60) < 1e-9);
+    assert.equal(st.numbers30(await st.allSessions(), await st.allDays(), settings, T0 + 40 * 86_400_000).streamDays, 0, 'älter als 30 Tage zählt nicht');
+
+    // Admin-Ansicht und Verlauf
+    const v = await (await api('GET', 'stats')).json();
+    assert.equal(v.enabled, true); assert.equal(v.total.streams, 1); assert.equal(v.total.followers, 105); assert.equal(v.total.subs, 7);
+    assert.equal(v.sessions.length, 2); assert.equal(v.sessions.find((x) => x.id === s1.id).followerPlus, 5);
+    assert.deepEqual((await (await api('GET', `stats/${s1.id}`)).json()).curve, [[0, 10], [1, 20], [2, 30], [8, 40]]);
+    assert.equal((await api('GET', 'stats/abc')).status, 404, 'ungültige Kennung');
+
+    // Wochen mit mindestens zwei Streamtagen
+    await db.set('stat/session/000000000000009', { id: '000000000000009', startedAt: new Date(T0 + 86_400_000).toISOString(), lastSeen: T0 + 86_400_000 + 5 * MIN, endedAt: null, samples: 3, sumViewers: 30, peak: 12, curve: [] });
+    assert.deepEqual(st.weekConsistency(await st.allSessions(), settings, T0 + 8 * 86_400_000), { ok: 1, counted: 1 });
+    assert.deepEqual(st.weekConsistency(await st.allSessions(), settings, T0 + 3 * 86_400_000), { ok: 0, counted: 0 }, 'die laufende Woche zählt noch nicht');
+    assert.equal((await api('DELETE', 'stats/000000000000009')).status, 200);
+    assert.equal((await api('DELETE', 'stats/000000000000009')).status, 404);
+    assert.deepEqual(st.weekConsistency(await st.allSessions(), settings, T0 + 8 * 86_400_000), { ok: 0, counted: 1 });
+
+    // Fehler von Twitch: Meldung statt Absturz, danach läuft es weiter
+    streamsFail = true;
+    assert.match((await st.statTick(settings, T0 + 70 * MIN)).error, /500/);
+    assert.match((await (await api('GET', 'stats')).json()).error, /500/);
+    streamsFail = false; live = 9; await st.statTick(settings, T0 + 71 * MIN);
+    assert.equal((await (await api('GET', 'stats')).json()).error, null);
+  } finally { globalThis.fetch = realFetch; }
+  await api('PUT', 'settings', { statsEnabled: false });
+});
+
+await test('Mediakit: CSV (deutsch, ohne Einnahmen), Quelle, Kriterien, Veröffentlichung, öffentliche Seite mit Platzhaltern und Maskierung', async () => {
+  const kit = await import('../netlify/lib/statistik/mediakit.mjs');
+  const pub = async () => (await import('../netlify/functions/mediakit.mjs')).default(new Request(BASE + '/mediakit'));
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'mediakit'))).status, 401, 'nur mit Login');
+  assert.equal((await pub()).status, 404, 'nicht veröffentlicht: nichts zu sehen');
+
+  // CSV: Semikolon, Kommazahlen, Einnahmen-Spalte wird nicht gelesen
+  const csv = 'Datum;Gestreamte Minuten;Durchschnittliche Anzahl Zuschauer;Max. Zuschauer;Angesehene Minuten;Follower;Einnahmen\n2026-11-01;120;20,5;30;2460;3;12,34\n2026-11-02;0;0;0;0;0;0\n2026-11-03;180;30;45;5400;5;1,00\n';
+  const n = kit.csvNumbers(csv);
+  assert.deepEqual([n.streamDays, n.avgViewers, n.maxViewers, n.hoursStreamed, n.hoursWatched, n.newFollowers, n.from, n.to], [2, 25.25, 45, 5, 131, 8, '2026-11-01', '2026-11-03']);
+  assert.ok(!JSON.stringify(n).includes('12,34') && !('revenue' in n), 'Einnahmen werden nicht übernommen');
+  assert.throws(() => kit.csvNumbers('Datum,Follower\n2026-11-01,3\n'), /fehlen Spalten/);
+  assert.throws(() => kit.csvNumbers('Datum,Gestreamte Minuten,Average Viewers\n'), /fehlen Spalten/);
+  const en = kit.csvNumbers('Date,Minutes Streamed,Average Viewers,Max Viewers,Minutes Watched,Follows\n11/01/2026,60,10,12,600,2\n');
+  assert.deepEqual([en.streamDays, en.avgViewers, en.from], [1, 10, '2026-11-01'], 'englische Spaltennamen und Datum');
+  const bad = await api('POST', 'mediakit/csv', { text: 'nur,Unsinn\n1,2\n' });
+  assert.equal(bad.status, 400); assert.match((await bad.json()).error, /fehlen Spalten/);
+
+  let v = await (await api('POST', 'mediakit/csv', { text: csv })).json();
+  assert.equal(v.config.source, 'csv', 'nach dem Einlesen nimmt die Seite diese Zahlen'); assert.equal(v.numbers.avgViewers, 25.25); assert.equal(v.csv.readAt.length, 10);
+  assert.deepEqual(v.missing, ['Zielgruppe', 'Preise', 'Geschäfts-E-Mail']);
+  assert.deepEqual([v.criteria[0].name, v.criteria[0].goal, v.criteria[0].percent, v.criteria[0].ok], ['GPORTAL', 40, 63, false]);
+
+  // Angaben prüfen und speichern
+  assert.equal((await api('PUT', 'mediakit', { email: 'kein-mail' })).status, 400);
+  v = await (await api('PUT', 'mediakit', { intro: 'Ruhiger <script>alert(1)</script> Stream', criteria: 'Anbieter A | 20 | läuft\nAnbieter B | 100' })).json();
+  assert.deepEqual(v.criteria.map((c) => [c.name, c.ok, c.percent]), [['Anbieter A', true, 100], ['Anbieter B', false, 25]]);
+  assert.equal(v.config.published, false, 'Veröffentlichen nur mit ausdrücklichem Haken');
+
+  // Vorschau immer gesperrt für Suchmaschinen, öffentliche Seite erst nach dem Veröffentlichen
+  const preview = (await (await api('GET', 'mediakit/preview')).json()).html;
+  assert.match(preview, /name="robots" content="noindex"/); assert.ok(!/\{\{/.test(preview), 'keine offenen Platzhalter im Template');
+  assert.equal((await pub()).status, 404);
+  await api('PUT', 'mediakit', { published: true });
+  let res = await pub(), html = await res.text();
+  assert.equal(res.status, 200); assert.match(res.headers.get('content-type'), /text\/html/);
+  assert.match(html, /<span class="ca">ca\.<\/span>25/); assert.match(html, /<b>45<\/b>/); assert.match(html, /Twitch-Analytics-Export/);
+  assert.match(html, /class="placeholder">\[Altersgruppe/, 'fehlende Angaben stehen als Platzhalter da'); assert.match(html, /name="robots" content="noindex"/, 'solange etwas fehlt: gesperrt');
+  assert.ok(!html.includes('<script>alert') && html.includes('&lt;script&gt;'), 'Eingaben werden maskiert');
+  assert.ok(!html.includes('Anbieter A') && !html.includes('GPORTAL'), 'Anbieter-Kriterien stehen nie auf der öffentlichen Seite');
+  assert.ok(html.includes('/img/mediakit-logo.jpg') && html.includes('/fonts/Silkscreen-Bold.ttf'));
+
+  // Vollständig: keine Sperre, keine Platzhalter
+  await api('PUT', 'mediakit', { audience: '25 bis 44 Jahre, Deutschland', prices: 'nach Absprache', email: 'marcel@beispiel.de' });
+  html = await (await pub()).text();
+  assert.ok(!html.includes('noindex') && !html.includes('class="placeholder"'));
+  assert.match(html, /mailto:marcel@beispiel\.de/); assert.match(html, /25 bis 44 Jahre/);
+
+  // Quelle zurück auf die eigene Messung
+  v = await (await api('DELETE', 'mediakit/csv')).json();
+  assert.equal(v.csv, null); assert.equal(v.config.source, 'stats');
+  v = await (await api('PUT', 'mediakit', { source: 'csv' })).json();
+  assert.equal(v.config.source, 'stats', 'ohne eingelesene Datei bleibt es bei der Messung');
+  await api('PUT', 'mediakit', { published: false });
+  assert.equal((await pub()).status, 404);
+});
+
 const { parseLocal: gwParseLocal } = await import('../netlify/lib/belohnungen/gewinn.mjs');
 const gwParse = (str) => gwParseLocal(str, 'Europe/Berlin');
 await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Seite, Admin-Knöpfe', async () => {

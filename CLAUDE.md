@@ -16,7 +16,7 @@ Der VerwirrBot ist der Discord-Bot mit Dashboard (Python, läuft auf Marcels NAS
 
 ## Betrieb zu Hause (CasaOS)
 - `server.mjs` + `Dockerfile` + `docker-compose.yml` lassen dieselben Functions auf Marcels NAS laufen (Dateispeicher in `/data`, Port 3000). Die Action `.github/workflows/docker-image.yml` baut bei jedem Stand von `main` das Image `ghcr.io/derehrlich/twitch-checkin`. Schritt-für-Schritt-Anleitung für Marcel: `docs/casaos.md`.
-- Geplante Adresse: `https://wache.ehrlichverwirrt.de` über einen Cloudflare Tunnel (Domain `ehrlichverwirrt.de`, DNS bei Cloudflare). Cloudflare Access nur vor `/admin` und `/api/admin`, **nie** vor Webhook, Auth, Overlay, Rangliste oder `/api/community/*`.
+- Geplante Adresse: `https://wache.ehrlichverwirrt.de` über einen Cloudflare Tunnel (Domain `ehrlichverwirrt.de`, DNS bei Cloudflare). Cloudflare Access nur vor `/admin` und `/api/admin`, **nie** vor Webhook, Auth, Overlay, Rangliste, `/mediakit` oder `/api/community/*`.
 - Neue Functions brauchen nichts am Server: `export const config = { path: ... }` genügt, `server.mjs` findet sie. Neue Weiterleitungen in `netlify.toml` werden ebenfalls übernommen (nur `from`/`to`/`status`).
 - Test: `npm test` führt auch `test/server.mjs` aus.
 - Nächtliche Sicherung: `netlify/lib/system/autobackup.mjs` (Timer in `server.mjs`, Ordner `BACKUP_DIR`, Admin-Routen `backup/status` und `backup/now`).
@@ -37,6 +37,7 @@ netlify/lib/         Logik, ein Ordner je Admin-Reiter:
   overlays/            credits (Abspann), sport
   medien/              images, sounds
   system/              autobackup, gesundheit (Störungs-Meldungen an Discord)
+  statistik/           stats (Messung und Auswertung), mediakit (+ mediakit-vorlage.html)
 netlify/lib/admin/   Admin-Routen je Reiter
 public/              Admin-Oberfläche (public/admin), Overlays, Rangliste, Einlaufsound-Seite, Sport-Overlay (sport.html), Alpaka-Leiste (alpakas.html), waagerechter Chat (chat.html, Daten aus `netlify/lib/chat/chatlog.mjs`, Schlüssel `chatlog`; der Stil einer Person gilt beim Abruf auch für schon sichtbare Nachrichten)
 test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm run test:e2e)
@@ -73,6 +74,11 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 
 ## Startbildschirm-Overlay
 - `netlify/lib/overlays/startscreen.mjs` (Schlüssel `startscreen/config`, `startscreen/state`, Hintergrundbild `startbg/image`), öffentlich `GET /api/startscreen` und `/api/startscreen-bg`, Seite `public/startscreen.html` (`/startscreen`, vollflächig; `?rahmen` für Marcels Rahmen-Overlay mit Holzleiste und Kamera, `?bg=0` durchsichtig, `?demo`), Admin-Route `netlify/lib/admin/startscreen.mjs`, Karte in `public/admin/js/startscreen.js` (Reiter Overlays). Vorlauf-Countdown, Baufortschritt-Balken und wechselnde Bauanekdoten (Zeile `Überschrift | Text`). Doku: `docs/startscreen.md`. Kein Schema-Eintrag, alles liegt in der eigenen Config.
+
+## Twitch-Statistik und Mediakit
+- Übernommen aus dem VerwirrBot (dort Phase 7k, Zweig `claude/mediakit-seite`, **nie in `main` gemergt und nicht mehr nötig**). Doku für Marcel: `docs/statistik-mediakit.md`. Admin-Gruppe „Zahlen“ (`public/admin/js/statistik.js`, `mediakit.js`, Diagramme in `charts.js`), Routen `netlify/lib/admin/statistik.mjs` (`stats`, `mediakit`).
+- Messung `netlify/lib/statistik/stats.mjs`: Timer in `server.mjs` jede Minute, nur bei `statsEnabled` (standardmäßig aus). Speicher `stat/session/<id>` (Zuschauer-Kurve, Spitze, Summe), `stat/day/<Tag>` (Follower, Abos), `stat/live`, `stat/state`. Eine Lücke unter 10 Minuten bleibt derselbe Stream. Follower/Abos über `channels/followers` und `subscriptions` (vorhandene Berechtigungen, `total`).
+- Mediakit `netlify/lib/statistik/mediakit.mjs`: Angaben in `mediakit/config`, eingelesene CSV-Kennzahlen in `mediakit/csv` (Einnahmen-Spalten werden nie gelesen, die Datei nie gespeichert). Öffentlich `GET /mediakit` (`netlify/functions/mediakit.mjs`, 404 bis „veröffentlicht“, `noindex` solange Zielgruppe, Preise oder E-Mail fehlen, alle Eingaben werden maskiert). Anbieter-Kriterien stehen nie auf der öffentlichen Seite. Logo und Banner liegen als `public/img/mediakit-*`.
 
 ## Tests
 - `npm ci && npm test` (aktuell 133 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
