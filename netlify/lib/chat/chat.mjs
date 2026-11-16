@@ -4,7 +4,7 @@ import { fill, streamDay } from '../zuschauer/checkin.mjs';
 import { clipById, sendChat } from '../kern/twitch.mjs';
 import { countChat, recordChatter } from '../overlays/credits.mjs';
 import { countCommunityChat, linkByTwitch, secretSet } from '../belohnungen/community.mjs';
-import { countChat as countGewinnChat } from '../belohnungen/gewinn.mjs';
+import { countChat as countGewinnChat, handleGewinnChat } from '../belohnungen/gewinn.mjs';
 import { ensureAward } from '../belohnungen/award.mjs';
 import { touchAlpaca } from '../belohnungen/alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
@@ -64,6 +64,11 @@ export async function handleChat(e, settings) {
   }
   if (counted) await autoShoutout(e, settings).catch((err) => console.warn('Auto-Shoutout fehlgeschlagen:', err.message));
   if (counted) await clipHint(e, settings, text).catch((err) => console.warn('Clip-Hinweis fehlgeschlagen:', err.message));
+  // Chat-Gewinnspiele (z. B. !gewinn): eigener Befehl je Gewinnspiel, unabhängig vom Schalter „Chat-Befehle“
+  if (settings.gwEnabled && text.startsWith('!') && !ignore.includes(String(name).toLowerCase())) {
+    const entered = await handleGewinnChat(e, text, settings).catch((err) => { console.warn('Gewinnspiel fehlgeschlagen:', err.message); return null; });
+    if (entered) return entered;
+  }
   if (!settings.chatCommands || !text.startsWith('!')) return { ok: true };
   return (await fuehreAus(e, text, settings)) ?? { ok: true };
 }

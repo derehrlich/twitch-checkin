@@ -311,81 +311,124 @@
     </div>
 
     <div class="tab-panel hidden" data-panel="gewinn">
-      <p class="muted intro">Sonderziehung zum Geburtstag: Ticket per Kanalpunkte, Wochenpunkte als Bonuslose, gewichtete Ziehung live im Stream, persönlicher Link für jeden Gewinner. Alles lokal auf deinem Server.</p>
-      <p id="gwHint" class="card hidden" style="padding:14px 18px">Die Geburtstags-Ziehung ist noch <b>ausgeschaltet</b>. Schalte sie unten unter „Geburtstags-Ziehung einschalten“ ein, speichere und gleiche die Rewards ab. Erst dann werden Wochenpunkte gezählt.</p>
+      <p class="muted intro">Alle Gewinnspiele an einer Stelle: schnelle Runden im Stream per Chat-Befehl oder Ziehungen über einen Zeitraum mit Kanalpunkte-Ticket. Wer aktiv war, kann Bonuslose bekommen. Mehrere Gewinnspiele können gleichzeitig laufen.</p>
+      <p id="gwHint" class="card hidden" style="padding:14px 18px">Gewinnspiele sind noch <b>ausgeschaltet</b>. Schalte sie ganz unten unter „Kanalpunkte-Ticket: Reward und Texte“ ein und speichere. Erst dann zählen Punkte und Chat-Befehle.</p>
       <section class="card">
-        <h2>Stand</h2>
+        <h2>Gewinnspiele</h2>
         <div id="gwDraws"></div>
-        <div id="gwStatus"></div>
-        <div class="row" style="margin-top:12px">
-          <button id="gwOpen">Tickets jetzt öffnen</button><button id="gwClose" class="ghost">Tickets jetzt schließen</button><button class="js-sync ghost">Rewards mit Twitch abgleichen</button>
+        <h3 style="margin-top:22px">Neues Gewinnspiel</h3>
+        <div class="tiles" id="gwNew">
+          <button type="button" class="tile" data-kind="quick"><span class="tile-head">⚡ Schnell im Stream</span><span class="muted">Mitmachen per Chat-Befehl, läuft ein paar Minuten, jeder ein Los, Gewinner wird sofort angesagt.</span></button>
+          <button type="button" class="tile" data-kind="period"><span class="tile-head">📅 Mit Zeitraum</span><span class="muted">Kanalpunkte-Ticket von/bis, Bonuslose aus den Monatspunkten, Gewinner bekommt einen persönlichen Link.</span></button>
+          <button type="button" class="tile" data-kind="simple"><span class="tile-head">🔑 Einfache Verlosung</span><span class="muted">Kanalpunkte-Ticket, ein Preis (zum Beispiel ein Key), jeder ein Los.</span></button>
+          <button type="button" class="tile" data-kind="bday"><span class="tile-head">🎂 Geburtstags-Ziehung</span><span class="muted">Drei Preise, Wochenpunkte als Bonuslose und das Mitternachts-Los.</span></button>
         </div>
-        <p class="muted">OBS-Browserquelle (1920×1080) für die Live-Ziehung: <code id="gwOverlayUrl"></code>. Sie bleibt unsichtbar, bis gezogen wird. Gewinner-Links haben die Form <code>/gewinn/&lt;Code&gt;</code>, das ist der einzige Pfad, der ohne Login von außen erreichbar sein muss.</p>
+        <p class="muted">Alles lässt sich nach dem Anlegen ändern. Die Vorlage füllt nur die Felder vor.</p>
       </section>
-      <section class="card">
-        <h2>Einstellungen der Ziehung</h2>
-        <div class="grid2">
-          <div><label for="gwName">Name</label><input id="gwName" maxlength="60"></div>
-          <div><label for="gwFrom">Wochenpunkte zählen ab</label><input id="gwFrom" type="datetime-local"></div>
-          <div><label for="gwOpenAt">Ticket-Fenster öffnet</label><input id="gwOpenAt" type="datetime-local"></div>
-          <div><label for="gwCloseAt">Ticket-Fenster schließt (leer = bis zur Ziehung)</label><input id="gwCloseAt" type="datetime-local"></div>
-          <div><label for="gwBonusOpen">Mitternachts-Los: Fenster öffnet</label><input id="gwBonusOpen" type="datetime-local"></div>
-          <div><label for="gwBonusClose">Mitternachts-Los: Fenster schließt</label><input id="gwBonusClose" type="datetime-local"></div>
-          <div><label for="gwBonusLots">Mitternachts-Los: Extra-Lose pro Person</label><input id="gwBonusLots" type="number" min="1" max="10"></div>
-          <div><label for="gwPlanned">Geplante Ziehung (nur zur Erinnerung)</label><input id="gwPlanned" type="datetime-local"></div>
-          <div><label for="gwPer">Wochenpunkte pro Bonuslos (X)</label><input id="gwPer" type="number" min="1" max="100000"></div>
-          <div><label for="gwMax">Höchstens so viele Lose pro Person</label><input id="gwMax" type="number" min="1" max="1000"></div>
-          <div><label for="gwWCheckin">Punkte je Check-in-Tag</label><input id="gwWCheckin" type="number" min="0" max="10000"></div>
-          <div><label for="gwWStreak">Streak-Bonus: Punkte je Streak-Tag</label><input id="gwWStreak" type="number" min="0" max="10000"></div>
-          <div><label for="gwWStreakCap">Streak-Bonus zählt höchstens bis Streak</label><input id="gwWStreakCap" type="number" min="0" max="365"></div>
-          <div><label for="gwWChat">Punkte je Chat-Nachricht</label><input id="gwWChat" type="number" min="0" max="10000"></div>
-          <div><label for="gwWChatCap">Chat-Nachrichten, die pro Tag zählen</label><input id="gwWChatCap" type="number" min="0" max="1000"></div>
-          <div><label for="gwWChatGap">Mindestabstand zwischen zwei Nachrichten (Sekunden)</label><input id="gwWChatGap" type="number" min="0" max="3600"></div>
-          <div><label for="gwHours">Meldefrist der Gewinner (Stunden)</label><input id="gwHours" type="number" min="1" max="720"></div>
-          <div><label for="gwAddrDays">Frist für die Adresse nach der Meldung (Tage)</label><input id="gwAddrDays" type="number" min="1" max="90"></div>
-          <div><label for="gwKeep">Adresse löschen nach „versendet“ (Tage)</label><input id="gwKeep" type="number" min="1" max="365"></div>
+
+      <div id="gwDetail" class="hidden" style="display:grid; gap:20px;">
+        <section class="card">
+          <h2 id="gwTitle">Gewinnspiel</h2>
+          <div id="gwStatus"></div>
+          <div class="row" style="margin-top:12px">
+            <button id="gwOpen">Jetzt öffnen</button><button id="gwClose" class="ghost">Jetzt schließen</button><button id="gwDraw">🎉 Jetzt ziehen (live)</button>
+          </div>
+          <p class="muted" id="gwHelp"></p>
+        </section>
+        <section class="card">
+          <h2>Teilnehmer und Lose</h2>
+          <div id="gwStats"></div>
+          <div id="gwTickets"></div>
+          <div class="row" style="margin-top:14px"><div><label for="gwBlockName">Person sperren (Twitch-Name)</label><input id="gwBlockName" maxlength="40"></div><button id="gwBlock" class="danger">Sperren</button></div>
+          <div id="gwBlocked" class="muted"></div>
+        </section>
+        <section class="card">
+          <h2>Gewinner</h2>
+          <div id="gwWinners"></div>
+          <p class="muted">Bei „Flüstern fehlgeschlagen“ kopierst du den Link und schickst ihn selbst (Discord oder Twitch). Wer sich nicht in der Frist meldet, wird automatisch ersetzt und bekommt einen neuen Link. Preise „ohne Link“ sind mit der Ansage im Chat erledigt.</p>
+        </section>
+
+        <h2 class="part">Einstellungen dieses Gewinnspiels</h2>
+        <div class="folds">
+          <details class="card fold" id="gwFoldConfig">
+            <summary><span class="fold-title">Mitmachen, Zeiten und Lose</span></summary>
+            <div class="fold-body">
+              <div class="grid2">
+                <div><label for="gwName">Name</label><input id="gwName" maxlength="60"></div>
+                <div><label for="gwEntry">So macht man mit</label><select id="gwEntry"><option value="chat">Chat-Befehl (kostenlos)</option><option value="reward">Kanalpunkte-Ticket</option></select></div>
+                <div data-if="chat"><label for="gwCommand">Chat-Befehl</label><input id="gwCommand" maxlength="26" placeholder="!gewinn"></div>
+                <div data-if="chat"><label for="gwMinutes">Nach dem Öffnen so viele Minuten offen (0 = bis du schließt)</label><input id="gwMinutes" type="number" min="0" max="1440"></div>
+                <div data-if="reward"><label for="gwOpenAt">Ticket-Fenster öffnet</label><input id="gwOpenAt" type="datetime-local"></div>
+                <div data-if="reward"><label for="gwCloseAt">Ticket-Fenster schließt (leer = bis zur Ziehung)</label><input id="gwCloseAt" type="datetime-local"></div>
+                <div><label for="gwPlanned">Geplante Ziehung (nur zur Erinnerung)</label><input id="gwPlanned" type="datetime-local"></div>
+              </div>
+              <label class="check big" data-if="chat"><input id="gwReply" type="checkbox"> Jede Teilnahme kurz im Chat bestätigen</label>
+              <h3>Lose</h3>
+              <div class="grid2">
+                <div><label for="gwSource">Gewinnchance</label><select id="gwSource"><option value="none">Jeder hat ein Los</option><option value="month">Bonuslose aus den Monatspunkten der Rangliste</option><option value="draw">Bonuslose aus der Aktivität während des Gewinnspiels</option></select></div>
+                <div data-if="points"><label for="gwPer">Punkte pro Bonuslos</label><input id="gwPer" type="number" min="1" max="100000"></div>
+                <div data-if="points"><label for="gwMax">Höchstens so viele Lose pro Person</label><input id="gwMax" type="number" min="1" max="1000"></div>
+                <div data-if="draw"><label for="gwFrom">Aktivität zählt ab</label><input id="gwFrom" type="datetime-local"></div>
+                <div data-if="draw"><label for="gwWCheckin">Punkte je Check-in-Tag</label><input id="gwWCheckin" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWStreak">Streak-Bonus: Punkte je Streak-Tag</label><input id="gwWStreak" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWStreakCap">Streak-Bonus zählt höchstens bis Streak</label><input id="gwWStreakCap" type="number" min="0" max="365"></div>
+                <div data-if="draw"><label for="gwWChat">Punkte je Chat-Nachricht</label><input id="gwWChat" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWChatCap">Chat-Nachrichten, die pro Tag zählen</label><input id="gwWChatCap" type="number" min="0" max="1000"></div>
+                <div data-if="draw"><label for="gwWChatGap">Mindestabstand zwischen zwei Nachrichten (Sekunden)</label><input id="gwWChatGap" type="number" min="0" max="3600"></div>
+              </div>
+              <p class="muted" id="gwSourceHelp"></p>
+              <div data-if="reward">
+                <h3>Mitternachts-Los (zweiter Reward, nur wenn gewünscht)</h3>
+                <div class="grid2">
+                  <div><label for="gwBonusOpen">Fenster öffnet (leer = kein Mitternachts-Los)</label><input id="gwBonusOpen" type="datetime-local"></div>
+                  <div><label for="gwBonusClose">Fenster schließt</label><input id="gwBonusClose" type="datetime-local"></div>
+                  <div><label for="gwBonusLots">Extra-Lose pro Person</label><input id="gwBonusLots" type="number" min="1" max="10"></div>
+                </div>
+              </div>
+              <h3>Gewinner: Fristen und Versand</h3>
+              <div class="grid2">
+                <div><label for="gwHours">Meldefrist der Gewinner (Stunden)</label><input id="gwHours" type="number" min="1" max="720"></div>
+                <div><label for="gwAddrDays">Frist für die Adresse nach der Meldung (Tage)</label><input id="gwAddrDays" type="number" min="1" max="90"></div>
+                <div><label for="gwKeep">Adresse löschen nach „versendet“ (Tage)</label><input id="gwKeep" type="number" min="1" max="365"></div>
+              </div>
+              <p class="muted" id="gwCountriesRow">Versand nach: <label><input type="checkbox" class="gwCountry" value="DE"> Deutschland</label> <label><input type="checkbox" class="gwCountry" value="AT"> Österreich</label> <label><input type="checkbox" class="gwCountry" value="CH"> Schweiz</label></p>
+              <div class="row"><button id="gwSave">Speichern</button><button id="gwDelete" class="danger">Gewinnspiel löschen</button></div>
+              <p class="muted">Nach der Ziehung bleiben Lose-Rechnung und Preise gesperrt, nur Fristen, Länder, Bedingungen und Keys sind änderbar. Abos und Bits haben nie Einfluss auf die Gewinnchance.</p>
+            </div>
+          </details>
+          <details class="card fold" id="gwFoldPrizes">
+            <summary><span class="fold-title">Preise</span><span class="fold-count" id="gwPrizeCount"></span></summary>
+            <div class="fold-body">
+              <p class="muted">Reihenfolge = Platz. <b>Key:</b> Der Gewinner bekommt einen persönlichen Link und sieht dort den Key. <b>Sachpreis:</b> Link mit Adressformular. <b>Ohne Link:</b> Der Gewinner wird nur im Chat und im Overlay angesagt.</p>
+              <div id="gwPrizes"></div>
+              <div class="row"><button id="gwAddPrize" class="ghost">Preis hinzufügen</button><button id="gwSavePrizes">Preise speichern</button></div>
+            </div>
+          </details>
+          <details class="card fold">
+            <summary><span class="fold-title">Teilnahmebedingungen</span><span class="pill" id="gwTermsPill"></span></summary>
+            <div class="fold-body">
+              <textarea id="gwTerms" rows="14" maxlength="12000" style="width:100%"></textarea>
+              <label class="check big"><input id="gwTermsPub" type="checkbox"> Auf <code>/gewinn/bedingungen</code> veröffentlichen</label>
+              <div class="row"><button id="gwSaveTerms">Texte speichern</button></div>
+              <p class="muted">Das ist ein Entwurf und keine Rechtsberatung. Vor der Veröffentlichung selbst prüfen oder gegenlesen lassen. Welche Daten verarbeitet werden, steht in <code>docs/gewinnspiel.md</code>.</p>
+            </div>
+          </details>
+          <details class="card fold">
+            <summary><span class="fold-title">Probe-Ziehung, Overlay und Protokoll</span></summary>
+            <div class="fold-body">
+              <p class="muted">OBS-Browserquelle (1920×1080) für die Live-Ziehung: <code id="gwOverlayUrl"></code>. Sie bleibt unsichtbar, bis gezogen wird.</p>
+              <div class="row">
+                <div><label for="gwSeed">Fester Seed (nur für Tests, sonst leer)</label><input id="gwSeed" maxlength="64"></div>
+                <button id="gwTest" class="ghost">Probe-Ziehung (speichert nichts)</button>
+              </div>
+              <pre id="gwTestOut" class="muted" style="white-space:pre-wrap"></pre>
+              <div class="row"><button id="gwReplay" class="ghost">Overlay noch einmal abspielen</button><button id="gwHide" class="ghost">Overlay ausblenden</button><button id="gwProtocol" class="ghost">Protokoll ansehen</button></div>
+              <pre id="gwProtocolOut" style="white-space:pre-wrap; max-height:340px; overflow:auto" class="muted"></pre>
+            </div>
+          </details>
         </div>
-        <p class="muted" id="gwCountriesRow">Versand nach: <label><input type="checkbox" class="gwCountry" value="DE"> Deutschland</label> <label><input type="checkbox" class="gwCountry" value="AT"> Österreich</label> <label><input type="checkbox" class="gwCountry" value="CH"> Schweiz</label></p>
-        <div class="row"><button id="gwSave">Speichern</button></div>
-        <p class="muted">Ein Los für das Ticket, dazu ein Bonuslos je X Wochenpunkte, gedeckelt. Nach der Ziehung bleiben Gewichtung und Preise gesperrt, nur Fristen, Länder, Bedingungen und Keys sind änderbar. Abos und Bits haben keinen Einfluss.</p>
-      </section>
-      <section class="card">
-        <h2>Preise</h2>
-        <p class="muted">Reihenfolge = Platz. Bei Key-Preisen trägst du den Key ein, er erscheint nur dem Gewinner nach der Meldung (und hier im Dashboard).</p>
-        <div id="gwPrizes"></div>
-        <div class="row"><button id="gwAddPrize" class="ghost">Preis hinzufügen</button><button id="gwSavePrizes">Preise speichern</button></div>
-      </section>
-      <section class="card">
-        <h2>Teilnehmer und Lose</h2>
-        <div id="gwStats"></div>
-        <div id="gwTickets"></div>
-        <div class="row" style="margin-top:14px"><div><label for="gwBlockName">Person sperren (Twitch-Name)</label><input id="gwBlockName" maxlength="40"></div><button id="gwBlock" class="danger">Sperren</button></div>
-        <div id="gwBlocked" class="muted"></div>
-      </section>
-      <section class="card">
-        <h2>Ziehung</h2>
-        <div class="row">
-          <div><label for="gwSeed">Fester Seed (nur für Tests, sonst leer)</label><input id="gwSeed" maxlength="64"></div>
-          <button id="gwTest" class="ghost">Test-Ziehung (speichert nichts)</button>
-          <button id="gwDraw">Jetzt ziehen (live)</button>
-        </div>
-        <pre id="gwTestOut" class="muted" style="white-space:pre-wrap"></pre>
-        <div class="row"><button id="gwReplay" class="ghost">Overlay noch einmal abspielen</button><button id="gwHide" class="ghost">Overlay ausblenden</button><button id="gwProtocol" class="ghost">Protokoll ansehen</button></div>
-        <pre id="gwProtocolOut" style="white-space:pre-wrap; max-height:340px; overflow:auto" class="muted"></pre>
-      </section>
-      <section class="card">
-        <h2>Gewinner</h2>
-        <div id="gwWinners"></div>
-        <p class="muted">Bei „Flüstern fehlgeschlagen“ kopierst du den Link und schickst ihn selbst (Discord oder Twitch). Wer sich nicht in der Frist meldet, wird automatisch ersetzt und bekommt einen neuen Link.</p>
-      </section>
-      <section class="card">
-        <h2>Teilnahmebedingungen (Entwurf)</h2>
-        <textarea id="gwTerms" rows="14" maxlength="12000" style="width:100%"></textarea>
-        <label class="check big"><input id="gwTermsPub" type="checkbox"> Auf <code>/gewinn/bedingungen</code> veröffentlichen</label>
-        <div class="row"><button id="gwSaveTerms">Texte speichern</button></div>
-        <p class="muted">Das ist ein Entwurf und keine Rechtsberatung. Vor der Veröffentlichung selbst prüfen oder gegenlesen lassen. Welche Daten verarbeitet werden, steht in <code>docs/gewinnspiel.md</code>.</p>
-      </section>
-      <h2 class="part">Einstellungen und Texte</h2>
+      </div>
+      <h2 class="part">Einstellungen und Texte für alle Gewinnspiele</h2>
       <div data-schema="gewinn" class="folds"></div>
     </div>
 

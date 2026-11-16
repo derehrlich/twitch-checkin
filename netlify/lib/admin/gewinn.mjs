@@ -1,8 +1,8 @@
-// /api/admin/gewinn: Geburtstags-Ziehung verwalten (alles hinter dem Admin-Login).
+// /api/admin/gewinn: Gewinnspiele verwalten (alles hinter dem Admin-Login).
 import { json } from '../kern/http.mjs';
 import { getSettings } from '../kern/settings.mjs';
 import {
-  adminView, applyConfig, createDraw, currentDraw, getResult, isId, readAddress, redrawLog, runDraw, saveDraw, setCurrent, setOverlay, testDraw, winnerAction, forgetCache,
+  adminView, applyConfig, createDraw, currentDraw, deleteDraw, getDraw, getResult, isId, readAddress, redrawLog, runDraw, saveDraw, setCurrent, setOverlay, setWindow, testDraw, winnerAction, forgetCache,
 } from '../belohnungen/gewinn.mjs';
 import { lookupUser } from '../kern/twitch.mjs';
 
@@ -10,26 +10,30 @@ const fail = (res) => json({ error: res.error }, res.status ?? 400);
 
 export async function gewinn({ route, method, body }) {
   const settings = await getSettings();
-  const view = async () => json(await adminView(settings));
+  // Mit einer Kennung vorn (gewinn/<id>/…) gilt die Aktion für dieses Gewinnspiel, ohne für die Ticket-Ziehung (gw/current)
+  const drawId = isId(route[1]) ? route[1] : null;
+  if (drawId) route = [route[0], ...route.slice(2)];
+  const view = async (id = drawId) => json(await adminView(settings, Date.now(), id));
   if (route.length === 1 && method === 'GET') return view();
-  if (route[1] === 'new' && method === 'POST') { await createDraw(settings, { simple: body?.simple === true }); return view(); }
-  if (route[1] === 'select' && method === 'POST') { if (!(await setCurrent(String(body.id ?? '')))) return json({ error: 'Nicht gefunden' }, 404); return view(); }
+  if (route[1] === 'new' && method === 'POST') {
+    const kind = ['bday', 'simple', 'quick', 'period'].includes(body?.kind) ? body.kind : body?.simple === true ? 'simple' : 'bday';
+    const made = await createDraw(settings, { kind });
+    return view(body?.kind ? made.id : null);
+  }
+  if (route[1] === 'select' && method === 'POST') { if (!(await setCurrent(String(body.id ?? '')))) return json({ error: 'Nicht gefunden (nur Gewinnspiele mit Kanalpunkte-Ticket können den Reward bekommen)' }, 404); return view(); }
+  if (drawId && route.length === 1 && method === 'DELETE') { const res = await deleteDraw(drawId); return res.error ? fail(res) : view(null); }
 
-  const draw = await currentDraw();
-  if (!draw) return json({ error: 'Es gibt noch keine Ziehung. Lege zuerst eine an.' }, 404);
+  const draw = drawId ? await getDraw(drawId) : await currentDraw();
+  if (!draw) return json({ error: drawId ? 'Dieses Gewinnspiel gibt es nicht' : 'Es gibt noch keine Ziehung. Lege zuerst eine an.' }, 404);
 
   if (route[1] === 'config' && method === 'PUT') {
     try { await saveDraw(applyConfig(draw, body, settings)); } catch (e) { return json({ error: e.message }, 400); }
     forgetCache();
     return view();
   }
-  if (route[1] === 'window' && method === 'POST') { // Ticket-Fenster von Hand öffnen oder schließen
-    if (draw.drawnAt) return json({ error: 'Es wurde schon gezogen' }, 409);
-    if (body.action === 'open') { draw.ticketOpen = new Date().toISOString(); draw.ticketClose = null; draw.manualClosed = false; }
-    else if (body.action === 'close') draw.manualClosed = true;
-    else return json({ error: 'Unbekannte Aktion' }, 400);
-    await saveDraw(draw); forgetCache();
-    return view();
+  if (route[1] === 'window' && method === 'POST') { // Teilnahme von Hand öffnen oder schließen
+    const res = await setWindow(draw, body.action, settings);
+    return res.error ? fail(res) : view();
   }
   if (route[1] === 'block' && method === 'POST') {
     const name = String(body.name ?? '').trim().replace(/^@/, '').slice(0, 40);
@@ -45,13 +49,13 @@ export async function gewinn({ route, method, body }) {
     await saveDraw(draw); forgetCache();
     return view();
   }
-  if (route[1] === 'test-draw' && method === 'POST') return json(await testDraw(draw, String(body.seed ?? '').slice(0, 64)));
+  if (route[1] === 'test-draw' && method === 'POST') return json(await testDraw(draw, String(body.seed ?? '').slice(0, 64), settings));
   if (route[1] === 'draw' && method === 'POST') {
     if (body.confirm !== true) return json({ error: 'Bitte die Ziehung bestätigen' }, 400);
-    const res = await runDraw(settings, { seed: String(body.seed ?? '').slice(0, 64) || undefined });
+    const res = await runDraw(settings, { seed: String(body.seed ?? '').slice(0, 64) || undefined, drawId: draw.id });
     return res.error ? fail(res) : view();
   }
-  if (route[1] === 'overlay' && method === 'POST') { const res = await setOverlay(body.action); return res.error ? fail(res) : view(); }
+  if (route[1] === 'overlay' && method === 'POST') { const res = await setOverlay(body.action, Date.now(), draw.id); return res.error ? fail(res) : view(); }
   if (route[1] === 'protocol' && method === 'GET') {
     const result = await getResult(draw.id);
     return result ? json({ result, redraws: await redrawLog(draw.id) }) : json({ error: 'Noch nicht gezogen' }, 404);
@@ -62,7 +66,7 @@ export async function gewinn({ route, method, body }) {
       return a ? json({ address: a }) : json({ error: 'Keine Adresse gespeichert' }, 404);
     }
     if (method === 'POST' && route[3]) {
-      const res = await winnerAction(settings, route[2], route[3]);
+      const res = await winnerAction(settings, route[2], route[3], Date.now(), draw.id);
       return res.error ? fail(res) : view();
     }
   }

@@ -245,10 +245,10 @@ export const SCHEMA = {
   ],
 
   gewinn: [
-    { title: 'Geburtstags-Ziehung: Ticket und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du darüber in der Karte „Geburtstags-Ziehung“. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
-      c('gwEnabled', false, 'Geburtstags-Ziehung einschalten (legt den Reward an und zählt die Wochenpunkte, braucht den Chat-Webhook)'),
+    { title: 'Kanalpunkte-Ticket: Reward und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du oben je Gewinnspiel. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
+      c('gwEnabled', false, 'Gewinnspiele einschalten (legt den Ticket-Reward an, zählt Punkte und hört auf die Chat-Befehle, braucht den Chat-Webhook)'),
       t('gwRewardTitle', 'Geburtstags-Ticket', 'Reward-Name', { maxlength: 45 }), n('gwRewardCost', 500, 'Preis des Tickets (Kanalpunkte, günstig halten)', { min: 1, max: 1000000 }),
-      c('gwBonusEnabled', true, 'Mitternachts-Los anbieten (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind; das Fenster stellst du in der Karte „Geburtstags-Ziehung“ ein)'),
+      c('gwBonusEnabled', true, 'Mitternachts-Los anbieten (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind; das Fenster stellst du oben im Gewinnspiel ein)'),
       t('gwBonusRewardTitle', 'Mitternachts-Los', 'Mitternachts-Los: Reward-Name', { maxlength: 45 }), n('gwBonusRewardCost', 15, 'Mitternachts-Los: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       a('gwBonusTemplate', '🌙 {user}, dein Mitternachts-Los ist drin! Du hast {lots} Extra-Los obendrauf. Alles Gute zum Geburtstag!', 'Mitternachts-Los erhalten (mit Ticket)', { user: 'Max', lots: 1 }),
       a('gwBonusNoTicketTemplate', '🌙 {user}, dein Mitternachts-Los ist gemerkt! Damit es zählt, brauchst du noch das Geburtstags-Ticket (kommt am Danke-Stream).', 'Mitternachts-Los erhalten (noch ohne Ticket)', { user: 'Max', lots: 1 }),
@@ -262,6 +262,12 @@ export const SCHEMA = {
       a('gwWinnerTemplate', '🎉 Platz {place}: {user} gewinnt {prize}! Du bekommst gleich eine Flüsternachricht mit deinem persönlichen Link, du hast {hours} Stunden Zeit.', 'Gewinner-Ansage im Chat', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24 }),
       a('gwRedrawTemplate', '🔁 Nachgezogen: {user} gewinnt {prize} (Platz {place}). {old} hat sich nicht gemeldet. Persönlicher Link per Flüstern, {hours} Stunden Zeit.', 'Nachgezogen', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24, old: 'Anna' }),
       a('gwWhisperTemplate', 'Glückwunsch {user}! Du hast {prize} gewonnen 🎉 Dein persönlicher Link (nur für dich, {hours} Stunden gültig, bitte nicht weitergeben): {url}', 'Flüsternachricht mit dem Link', { user: 'Max', prize: 'Enshrouded', hours: 24, url: 'https://…' }),
+    ] },
+    { title: 'Gewinnspiele im Chat: Texte', hint: `Für Gewinnspiele, bei denen man mit einem Chat-Befehl mitmacht. Platzhalter: ${code('name')} Name des Gewinnspiels, ${code('command')} Befehl, ${code('minutes')} Minuten bis zum Schluss, ${code('count')} Teilnehmer, ${code('user')}, ${code('lots')} Lose, ${code('prize')} Preis, ${code('place')} Platz. Ob jede Teilnahme bestätigt wird, stellst du je Gewinnspiel ein.`, items: [
+      a('gwChatOpenTemplate', '🎁 Gewinnspiel „{name}“ ist offen! Schreib {command} in den Chat, um mitzumachen.', 'Gewinnspiel geöffnet', { name: 'Gewinnspiel im Stream', command: '!gewinn', minutes: 5, count: 0 }),
+      a('gwChatEnterTemplate', '✅ {user} ist dabei ({lots} Los(e)).', 'Teilnahme bestätigt', { user: 'Max', name: 'Gewinnspiel im Stream', lots: 1 }),
+      a('gwChatCloseTemplate', '⏹️ „{name}“ ist geschlossen. {count} machen mit, gleich wird gezogen!', 'Gewinnspiel geschlossen', { name: 'Gewinnspiel im Stream', command: '!gewinn', count: 12 }),
+      a('gwWinnerPlainTemplate', '🎉 {user} gewinnt {prize}! Glückwunsch!', 'Gewinner-Ansage bei Preisen ohne Link (nur Bekanntgabe)', { user: 'Max', prize: 'Preis', place: 1, name: 'Gewinnspiel im Stream' }),
     ] },
   ],
 

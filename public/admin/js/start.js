@@ -20,12 +20,9 @@ function collectTodos(d) {
   const pending = (d.entry?.entries ?? []).filter((e) => e.pending);
   if (pending.length) out.push(todo('warn', `${pending.length === 1 ? 'Ein Einlaufsound wartet' : `${pending.length} Einlaufsounds warten`} auf deine Freigabe: ${pending.map((e) => e.name).join(', ')}`, 'einlaufsound', 'Anhören und freigeben'));
   const g = d.gewinn;
-  for (const w of g?.winners ?? []) {
-    if (w.status === 'verfallen') continue;
-    if (w.kind === 'item' && w.status === 'adresse_erhalten') out.push(todo('warn', `Gewinnspiel: Die Adresse von ${w.name} ist da, der Preis „${w.prizeName}“ kann verschickt werden.`, 'gewinn', 'Zum Gewinnspiel'));
-    else if (w.sendError && ['gezogen', 'link_verschickt'].includes(w.status)) out.push(todo('warn', `Gewinnspiel: ${w.name} hat den Gewinner-Link nicht bekommen. Bitte von Hand schicken.`, 'gewinn', 'Zum Gewinnspiel'));
-  }
-  if (g?.enabled && g.draw && !g.draw.drawnAt && !g.rewardReady) out.push(todo('warn', 'Gewinnspiel: Der Ticket-Reward fehlt noch bei Twitch.', 'start', 'Unten abgleichen'));
+  const TASK = { ship: (t) => `Die Adresse von ${t.name} ist da, der Preis „${t.prizeName}“ kann verschickt werden.`, link: (t) => `${t.name} hat den Gewinner-Link nicht bekommen. Bitte von Hand schicken.`, key: (t) => `${t.name} hat sich gemeldet, aber der Key für „${t.prizeName}“ fehlt noch.` };
+  for (const t of g?.tasks ?? []) out.push(todo('warn', `${t.drawName}: ${TASK[t.task](t)}`, 'gewinn', 'Zum Gewinnspiel'));
+  if (g?.enabled && (g.draws ?? []).some((x) => x.current && !x.drawn) && !g.rewardReady) out.push(todo('warn', 'Gewinnspiel: Der Ticket-Reward fehlt noch bei Twitch.', 'start', 'Unten abgleichen'));
   for (const ev of d.tickets?.events ?? []) if (ev.status === 'open' && !ev.rewardId) out.push(todo('warn', `Event „${ev.name}“: Der Ticket-Reward fehlt noch bei Twitch.`, 'tickets', 'Zu den Events'));
   return out;
 }
@@ -33,10 +30,10 @@ function collectTodos(d) {
 function collectLive(d) {
   const out = [];
   const g = d.gewinn;
-  if (g?.enabled && g.draw) {
-    const dr = g.draw;
-    const state = dr.drawnAt ? `gezogen am ${fmt(dr.drawnAt)}` : { vorher: 'Tickets noch nicht offen', offen: 'Tickets offen', zu: 'Tickets geschlossen' }[g.window] ?? '';
-    out.push({ icon: '🎁', title: dr.name, big: `${g.tickets?.length ?? 0}`, unit: 'Teilnehmer', sub: state, tab: 'gewinn' });
+  if (g?.enabled) for (const x of g.draws ?? []) {
+    if (x.drawn || (x.entry === 'reward' && !x.current)) continue;
+    const state = { vorher: 'noch nicht offen', offen: x.ticketClose ? `offen bis ${new Date(x.ticketClose).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : 'offen', zu: 'geschlossen, bereit zur Ziehung' }[x.window];
+    out.push({ icon: '🎁', title: x.name, big: `${x.count}`, unit: 'Teilnehmer', sub: `${x.entry === 'chat' ? x.command : 'Ticket'} · ${state}`, tab: 'gewinn' });
   }
   if (d.tickets?.enabled) for (const ev of d.tickets.events) if (['open', 'planned', 'closed'].includes(ev.status)) out.push({ icon: '🎟️', title: ev.name, big: `${ev.taken} / ${ev.seats}`, unit: 'Plätze vergeben', sub: `${ev.when} · ${ev.statusLabel}${ev.waiting ? ` · Warteliste ${ev.waiting}` : ''}`, tab: 'tickets' });
   if (d.pause?.state?.active) out.push({ icon: '☕', title: 'Pause läuft', big: d.pause.state.text || 'Pause', unit: '', sub: d.pause.state.until ? `bis ${fmt(d.pause.state.until)}` : 'ohne Zeitangabe', tab: 'pause' });

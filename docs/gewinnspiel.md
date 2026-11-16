@@ -1,10 +1,35 @@
+# Gewinnspiele
+
+Admin-Seite **Gewinnspiel** (Gruppe „Aktionen“). Alles läuft lokal auf der Stadtwache, es gibt keine externen Formulardienste.
+
+## Mehrere Gewinnspiele verwalten
+Oben steht die Liste aller Gewinnspiele, darunter legst du mit einer Vorlage ein neues an. Mehrere können gleichzeitig laufen.
+
+| Vorlage | Mitmachen | Lose | Preis |
+|---|---|---|---|
+| Schnell im Stream | Chat-Befehl (z. B. `!gewinn`), nach dem Öffnen 5 Minuten offen | jeder ein Los | ohne Link, nur Ansage |
+| Mit Zeitraum | Kanalpunkte-Ticket, Zeiten von/bis | Bonuslose aus den Monatspunkten der Rangliste | Key mit persönlichem Link |
+| Einfache Verlosung | Kanalpunkte-Ticket | jeder ein Los | Key |
+| Geburtstags-Ziehung | Kanalpunkte-Ticket | Wochenpunkte, Mitternachts-Los | drei Preise |
+
+Die Vorlage füllt nur die Felder vor. Unter „Mitmachen, Zeiten und Lose“ stellst du alles um:
+- **So macht man mit:** Chat-Befehl (kostenlos, eigener Befehl je Gewinnspiel) oder Kanalpunkte-Ticket.
+- **Gewinnchance:** jeder ein Los, Bonuslose aus den Monatspunkten (Twitch-Chat, Check-ins, bei verknüpften Konten Discord; es zählt der Stand bei der Ziehung) oder Bonuslose aus der Aktivität während des Gewinnspiels. Dazu „Punkte pro Bonuslos“ und die Obergrenze.
+- **Preise:** Key (Link zeigt den Key), Sachpreis (Link mit Adressformular) oder „Ohne Link“ (nur Ansage im Chat und im Overlay).
+
+Ablauf einer schnellen Runde: anlegen, Preis eintragen, **Öffnen** (der Bot sagt es im Chat an), nach Ablauf der Minuten schließt es sich selbst, dann **Jetzt ziehen**.
+
+Wichtig:
+- Es gibt nur **einen** Kanalpunkte-Ticket-Reward. Er gehört immer zu genau einem Gewinnspiel (Knopf „Ticket-Reward hierher“ in der Liste). Chat-Gewinnspiele laufen unabhängig davon.
+- Die Texte im Chat stehen ganz unten auf der Seite („Gewinnspiele im Chat: Texte“ und „Kanalpunkte-Ticket: Reward und Texte“). Dort ist auch der Hauptschalter „Gewinnspiele einschalten“.
+- Ein gezogenes Gewinnspiel lässt sich nicht löschen, weil das Protokoll erhalten bleibt.
+- Abos und Bits haben nie Einfluss auf die Gewinnchance.
+
 # Geburtstags-Gewinnspiel (Danke-Stream, 30.11.2026)
 
-Admin-Reiter **Gewinnspiel**. Alles läuft lokal auf der Stadtwache, es gibt keine externen Formulardienste.
-
 ## So läuft es ab
-1. **Einrichten:** Im Reiter unten „Geburtstags-Ziehung einschalten“ anhaken und speichern, dann **Rewards mit Twitch abgleichen**. Danach einmal im Admin auf Start → **Mit Twitch verbinden** klicken (neue Berechtigung `user:manage:whispers` für Flüsternachrichten).
-2. **Ziehung anlegen** (Knopf im Reiter). Vorbelegt: Wochenpunkte ab 23.11. 0:00, Tickets ab 30.11. 0:00, 3 Preise, 1 Bonuslos je 100 Wochenpunkte, höchstens 10 Lose.
+1. **Einrichten:** Auf der Seite ganz unten „Gewinnspiele einschalten“ anhaken und speichern, dann **Rewards mit Twitch abgleichen**. Danach einmal im Admin auf Start → **Mit Twitch verbinden** klicken (neue Berechtigung `user:manage:whispers` für Flüsternachrichten).
+2. **Ziehung anlegen** (Vorlage „Geburtstags-Ziehung“). Vorbelegt: Wochenpunkte ab 23.11. 0:00, Tickets ab 30.11. 0:00, 3 Preise, 1 Bonuslos je 100 Wochenpunkte, höchstens 10 Lose.
 3. **Wochenpunkte** zählen ab dem eingestellten Zeitpunkt automatisch: Check-in 50 Punkte je Tag, Streak-Bonus 10 Punkte je Streak-Tag (bis Streak 7), Chat 2 Punkte je Nachricht (Abstand 20 s, höchstens 20 pro Tag). Alle Werte im Reiter änderbar. **Wichtig: Die Stadtwache muss vor dem 23.11. mit diesem Stand laufen**, sonst fehlen Punkte.
 3b. **Mitternachts-Los:** Zweiter Reward „Mitternachts-Los“ (15 Kanalpunkte). Nur im Fenster **29.11. 0:00 bis 0:30** kaufbar (Zeiten und Anzahl Extra-Lose in der Karte „Geburtstags-Ziehung“ änderbar), ein Los pro Person. Außerhalb des Fensters gibt es die Punkte zurück, und der Reward wird in Twitch pausiert. Das Extra-Los kommt **obendrauf** (zählt nicht gegen die Höchstzahl der Lose) und zählt nur zusammen mit dem Geburtstags-Ticket: Wer es um Mitternacht kauft und das Ticket erst am 30.11. holt, ist trotzdem dabei (der Chat sagt es ihr oder ihm). Abschalten: Haken „Mitternachts-Los anbieten“ in den Einstellungen.
 4. **Tickets:** Reward „Geburtstags-Ticket“ (500 Kanalpunkte). Pro Person eines. Nur im Ticket-Fenster, sonst Punkte zurück. Fenster auch von Hand öffnen/schließen.

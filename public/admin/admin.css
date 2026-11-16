@@ -53,6 +53,11 @@ body:has(#app.hidden) .burger { display: none; }
 .tile-head { display: flex; gap: 8px; align-items: center; font-size: .85rem; font-weight: 600; color: var(--leise); }
 .tile b { font-size: 1.7rem; font-weight: 800; line-height: 1.15; letter-spacing: -.5px; overflow-wrap: anywhere; }
 .tile .muted { font-size: .82rem; }
+button.tile { text-align: left; font-weight: 400; box-shadow: none; font-size: .95rem; cursor: pointer; }
+button.tile:hover { filter: none; background: var(--karte2); }
+button.tile .tile-head { color: var(--text); font-size: 1rem; font-weight: 700; }
+tr.gw-sel td { background: color-mix(in srgb, var(--gelb) 10%, transparent); }
+.bad { color: var(--rot); font-weight: 600; }
 @media (max-width: 640px) { .todo { flex-wrap: wrap; } .todo .btn { margin-left: 26px; } }
 
 /* Zugeklappte Karten für Einstellungen und Texte */
@@ -136,3 +141,9 @@ table.tk th { text-align: left; color: var(--leise); font-weight: 600; padding: 
 table.tk td { padding: 6px 8px; border-bottom: 1px solid var(--rand); vertical-align: middle; }
 table.tk input { margin: 0; min-width: 150px; }
 .tk-act { white-space: nowrap; } .tk-act button { padding: 5px 10px; margin: 2px 2px 2px 0; }
+
+/* Breite Inhalte (Tabellen) dürfen die Seite am Handy nicht aufziehen, sie scrollen in ihrer Karte */
+.tab-panel > *, #gwDetail > *, .folds > * { min-width: 0; }
+.pill { white-space: nowrap; display: inline-block; }
+table.tk code { word-break: normal; white-space: nowrap; }
+#gwCountriesRow label { display: inline-flex; align-items: center; gap: 6px; margin: 0 14px 0 6px; }
