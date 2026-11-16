@@ -6,8 +6,10 @@
 //   stat/session/<id>      { id, startedAt, lastSeen, endedAt, title, game, samples, sumViewers, peak, followersStart, followersEnd, subsEnd, curve: [[Minute, Zuschauer]] }
 //   stat/day/<YYYY-MM-DD>  { followers, subs }  letzter Stand des Tages
 //   stat/state             { checkedAt, followersAt, error, followers, subs }
+//   stat/chat/<id>         { users: { <twitchId>: { name, n } } }  Nachrichten je Person im Stream (für den Rückblick, nie der Inhalt)
 import { db } from '../kern/store.mjs';
 import { helix, userToken } from '../kern/twitch.mjs';
+import { streamDay } from '../zuschauer/checkin.mjs';
 
 const GAP_MS = 10 * 60_000; // so lange darf die Messung aussetzen, ohne dass ein neuer Stream beginnt
 const FOLLOW_LIVE_MS = 10 * 60_000, FOLLOW_IDLE_MS = 6 * 3_600_000;
@@ -18,6 +20,24 @@ async function counts(userId) {
   const total = async (endpoint) => { try { return (await helix('GET', endpoint, { query: { broadcaster_id: userId, first: 1 } })).total ?? null; } catch { return null; } };
   return { followers: await total('channels/followers'), subs: await total('subscriptions') }; // Abos gibt es nur mit Affiliate/Partner, sonst null
 }
+
+// ---- Nachrichten je Stream: im Speicher gezählt (kein Schreibzugriff pro Nachricht), einmal pro Minute gesichert
+const pending = new Map(); // twitchId -> { name, n }
+let liveId = null; // Kennung des laufenden Streams laut letzter Messung
+export function countStreamChat(userId, name) {
+  if (!liveId) return;
+  const p = pending.get(userId) ?? { name, n: 0 };
+  p.name = name; p.n += 1; pending.set(userId, p);
+}
+async function flushChat() {
+  if (!pending.size || !liveId) { pending.clear(); return; }
+  const key = `stat/chat/${liveId}`, doc = (await db.get(key)) ?? { users: {} };
+  for (const [id, p] of pending) { const u = doc.users[id] ?? { name: p.name, n: 0 }; doc.users[id] = { name: p.name, n: u.n + p.n }; }
+  pending.clear();
+  await db.set(key, doc);
+}
+/** Nur für Tests: vergisst den Zwischenspeicher. */
+export const resetChatCounter = () => { pending.clear(); liveId = null; };
 
 /** Eine Messung. Läuft jede Minute (Timer in server.mjs), nur wenn die Statistik eingeschaltet ist. */
 export async function statTick(settings, now = Date.now()) {
@@ -31,6 +51,7 @@ export async function statTick(settings, now = Date.now()) {
     await db.set('stat/state', { ...state, checkedAt: now, error: String(e.message).slice(0, 200) });
     return { error: e.message };
   }
+  await flushChat().catch((e) => console.warn('Chat-Zähler nicht gesichert:', e.message));
   const live = await db.get('stat/live');
   const running = live && now - live.lastSeen < GAP_MS ? await db.get(sKey(live.id)) : null;
   const dueFollow = now - (state.followersAt ?? 0) >= (stream ? FOLLOW_LIVE_MS : FOLLOW_IDLE_MS);
@@ -50,11 +71,13 @@ export async function statTick(settings, now = Date.now()) {
     if (c?.subs != null) s.subsEnd = c.subs;
     await db.set(sKey(s.id), s);
     await db.set('stat/live', { id: s.id, lastSeen: now });
+    liveId = s.id;
   } else if (ending) {
     const s = await db.get(sKey(live.id));
     if (s) { s.endedAt = new Date(s.lastSeen).toISOString(); if (c?.followers != null) s.followersEnd = c.followers; if (c?.subs != null) s.subsEnd = c.subs; await db.set(sKey(s.id), s); }
     await db.delete('stat/live');
   }
+  if (!stream) liveId = null;
   await db.set('stat/state', { ...state, checkedAt: now, error: null, ...(c ? { followersAt: now, followers: c.followers ?? state.followers ?? null, subs: c.subs ?? state.subs ?? null } : {}) });
   return { live: Boolean(stream), viewers: stream ? Number(stream.viewer_count) || 0 : null };
 }
@@ -134,18 +157,54 @@ export async function adminView(settings, now = Date.now()) {
     },
     last30: numbers30(sessions, days, settings, now),
     sessions: sessions.slice(0, 60).map(sessionInfo),
+    latest: sessions.find((x) => x.samples && (minutesOf(x) > 0 || !x.endedAt)) ? await reviewOf(sessions.find((x) => x.samples && (minutesOf(x) > 0 || !x.endedAt)).id, settings, now) : null,
     followers: withFol.slice(-90).map((d) => ({ date: d.date, followers: d.followers })),
   };
 }
 
-export async function sessionCurve(id) {
+/** Rückblick auf einen Stream: Zahlen, Verlauf, Chat, Check-ins, Raids und was sonst passiert ist. Nur für Marcel (Admin). */
+export async function reviewOf(id, settings, now = Date.now()) {
   if (!/^\d{15}$/.test(String(id))) return null;
   const s = await db.get(sKey(id));
-  return s ? { ...sessionInfo(s), curve: s.curve ?? [] } : null;
+  if (!s) return null;
+  const info = sessionInfo(s);
+  const startMs = Date.parse(s.startedAt), endMs = s.endedAt ? Date.parse(s.endedAt) : s.lastSeen;
+  const days = [...new Set([streamDay(settings, new Date(startMs)), streamDay(settings, new Date(endMs))])];
+
+  // Follows, Abos, Geschenke, Bits und Raids im Zeitraum des Streams (Protokoll des Abspanns)
+  const events = { follows: 0, subs: 0, gifts: 0, bits: 0, raids: [] };
+  for (const day of days) for (const k of await db.list(`log/${day}/`)) {
+    const x = await db.get(k);
+    if (!x || x.t < startMs - 10 * 60_000 || x.t > endMs + 15 * 60_000) continue;
+    if (x.type === 'follow') events.follows++;
+    else if (x.type === 'sub' || x.type === 'resub') events.subs++;
+    else if (x.type === 'gift') events.gifts += x.total ?? 1;
+    else if (x.type === 'cheer') events.bits += x.bits ?? 0;
+    else if (x.type === 'raid') events.raids.push({ name: x.user, viewers: x.viewers ?? 0 });
+  }
+  let checkins = 0;
+  for (const day of days) checkins += (await db.list(`checked/${day}/`)).length;
+
+  const chatDoc = await db.get(`stat/chat/${id}`);
+  const ignore = new Set(String(settings.creditsIgnore ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean));
+  const people = Object.values(chatDoc?.users ?? {}).filter((u) => !ignore.has(String(u.name).toLowerCase()));
+  const chat = {
+    measured: Boolean(chatDoc), chatters: people.length, messages: people.reduce((a, u) => a + u.n, 0),
+    top: people.sort((a, b) => b.n - a.n || String(a.name).localeCompare(String(b.name), 'de')).slice(0, 5).map((u) => ({ name: u.name, n: u.n })),
+  };
+
+  // Vergleich mit den bis zu zehn Streams davor
+  const before = (await allSessions()).filter((x) => x.startedAt < s.startedAt && x.samples && minutesOf(x) > 0).slice(0, 10);
+  const prevAvg = before.length ? before.reduce((a, x) => a + avgOf(x), 0) / before.length : null;
+  const compare = prevAvg ? { streams: before.length, avg: Math.round(prevAvg * 10) / 10, percent: Math.round((info.avg / prevAvg - 1) * 100) } : null;
+
+  const curve = s.curve ?? [];
+  const best = curve.reduce((m, p) => (p[1] > (m?.[1] ?? -1) ? p : m), null);
+  return { ...info, curve, peakMinute: best ? best[0] : null, followersStart: s.followersStart, followersEnd: s.followersEnd, subsTotal: s.subsEnd, chat, checkins, events, compare };
 }
 export async function deleteSession(id) {
   if (!/^\d{15}$/.test(String(id)) || !(await db.get(sKey(id)))) return false;
-  await db.delete(sKey(id));
+  await db.delete(sKey(id)); await db.delete(`stat/chat/${id}`);
   if ((await db.get('stat/live'))?.id === id) await db.delete('stat/live');
   return true;
 }

@@ -71,7 +71,7 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button[data-tab]').count(), 27);
+assert.equal(await page.locator('.tabs button[data-tab]').count(), 29);
 // Einstellungen stehen in zugeklappten Karten: für den Test alle aufklappen
 const openFolds = () => page.evaluate(() => document.querySelectorAll('details.fold').forEach((d) => { d.open = true; }));
 const go = async (tab) => { await page.click(`.tabs button[data-tab="${tab}"]`); await openFolds(); };
@@ -80,7 +80,7 @@ assert.deepEqual(await visiblePanels(), ['start']);
 await page.waitForFunction(() => document.querySelectorAll('#checks .check').length >= 5);
 const checks = await page.locator('#checks').innerText(); assert.match(checks, /Mit Twitch verbunden als streamerin/);
 assert.match(await page.inputValue('#overlayUrl'), /\/overlay$/); ok('Start: Status und OBS-Adresse');
-for (const tab of ['zuschauer', 'ereignisse', 'raids', 'commands', 'chat', 'moderation', 'soundboard', 'einlaufsound', 'gewinn', 'feier', 'rad', 'obs', 'abspann', 'statistik', 'mediakit', 'medien', 'tests', 'system']) {
+for (const tab of ['zuschauer', 'ereignisse', 'raids', 'commands', 'chat', 'moderation', 'soundboard', 'einlaufsound', 'gewinn', 'feier', 'rad', 'obs', 'abspann', 'statistik', 'mediakit', 'umfrage', 'meine', 'medien', 'tests', 'system']) {
   await page.click(`.tabs button[data-tab="${tab}"]`); assert.deepEqual(await visiblePanels(), [tab]); assert.equal(await page.evaluate(() => location.hash), '#' + tab);
 }
 ok('alle Reiter schalten um und setzen die Adresse (#reiter)');

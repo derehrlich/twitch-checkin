@@ -76,3 +76,6 @@ npm ci
 ADMIN_PASSWORD=test SITE_URL=http://localhost:3000 npm start   # Daten in ./data
 npm test
 ```
+
+## Was in der Sicherung steckt
+Die nächtliche Sicherung und der Download unter System → Backup enthalten Besucher, Einstellungen, Soundboard, Raids, Einlaufsounds, Verknüpfungen und Monatszahlen sowie Events und Tickets, Gewinnspiele, Glücksrad, Adventures, Countdown, Chat-Stile, Zitate, Zähler, Bonuspunkte, Statistik, Mediakit und Umfragen. Nicht enthalten sind die Twitch-Verbindung und Adressen von Gewinnern (mit Absicht). Beim **Wiederherstellen** wird nur ersetzt, was die Sicherungsdatei selbst kennt: Eine ältere Datei löscht keine Events, Gewinnspiele oder Statistik, die es damals noch nicht gab.

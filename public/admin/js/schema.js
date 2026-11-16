@@ -334,6 +334,30 @@ export const SCHEMA = {
     ] },
   ],
 
+  poll: [
+    { title: 'Umfragen', hint: `Mods und du starten im Chat mit <code>!umfrage 3 Welches Spiel? | Enshrouded | Satisfactory</code> (die Zahl vorn sind Minuten und ist optional, ohne Antworten gibt es „Ja“ und „Nein“, höchstens 6 Antworten). Der Chat stimmt mit der Zahl ab (<code>1</code> oder <code>!1</code>). Beenden mit dem Beenden-Befehl oder im Admin. Platzhalter: ${code('question')} Frage, ${code('options')} Antworten mit Nummer, ${code('minutes')} Minuten, ${code('result')} Ergebnis mit Prozent, ${code('winner')} Gewinner (bei Gleichstand beide), ${code('total')} Stimmen, ${code('user')}. Die Anzeige im Stream (Browserquelle <code>/umfrage</code>) steht auf der Seite „Umfragen“.`, items: [
+      c('pollEnabled', false, 'Umfragen einschalten (Chat-Befehle brauchen „Chat-Befehle“ und „Chat-Nachrichten“, die Stimmen zählen auch ohne)'),
+      t('pollCommand', '!umfrage', 'Befehl: Umfrage starten (nur Mods)', { maxlength: 26, kind: 'command', placeholder: '!umfrage' }),
+      t('pollEndCommand', '!umfrageende', 'Befehl: Umfrage beenden (nur Mods)', { maxlength: 26, kind: 'command', placeholder: '!umfrageende' }),
+      n('pollMinutes', 2, 'So lange läuft eine Umfrage, wenn nichts anderes angegeben ist (Minuten)', { min: 1, max: 60 }),
+      n('pollShowSeconds', 30, 'So lange bleibt das Ergebnis nach dem Ende im Stream stehen (Sekunden)', { min: 5, max: 300 }),
+      c('pollChat', true, 'Start und Ergebnis im Chat schreiben'),
+      a('pollStartTemplate', '📊 Umfrage: {question} Schreib die Zahl in den Chat: {options}. Du hast {minutes} Min.', 'Umfrage startet (Chat)', { question: 'Welches Spiel als Nächstes?', options: '1 = Enshrouded · 2 = Satisfactory', minutes: 2 }),
+      a('pollResultTemplate', '📊 Ergebnis „{question}“: {result}. Vorn liegt: {winner}!', 'Ergebnis (Chat)', { question: 'Welches Spiel als Nächstes?', result: 'Enshrouded 12 (63 %) · Satisfactory 7 (37 %)', winner: 'Enshrouded', total: 19 }),
+      a('pollNoVotesTemplate', '📊 Die Umfrage „{question}“ ist vorbei, aber niemand hat abgestimmt.', 'Niemand hat abgestimmt', { question: 'Welches Spiel als Nächstes?' }),
+      a('pollUsageTemplate', '{user}, so geht es: !umfrage 3 Welches Spiel? | Enshrouded | Satisfactory (die Zahl vorn sind Minuten, ohne Antworten gibt es Ja und Nein).', 'Falsch benutzt', { user: 'Max' }),
+      a('pollBusyTemplate', '{user}, es läuft schon eine Umfrage. Beenden geht mit !umfrageende.', 'Es läuft schon eine Umfrage', { user: 'Max' }),
+    ] },
+  ],
+
+  meine: [
+    { title: '„Meine Stadtwache“ (persönliche Seite)', hint: `Zuschauer melden sich auf <code>/meine</code> mit Twitch an (ohne Berechtigungen, Twitch bestätigt nur, wer sie sind) und sehen nur ihre eigenen Zahlen: Besuche, Streak, Zeit im Stream, nächster Meilenstein, Punkte und Rang im Monat und ihren Einlaufsound. Der Befehl schreibt den Link in den Chat. Platzhalter: ${code('user')} ${code('url')}. Die Seite muss ohne Cloudflare Access erreichbar sein.`, items: [
+      c('meineEnabled', false, '„Meine Stadtwache“ einschalten'),
+      t('meineCommand', '!meine', 'Chat-Befehl, der den Link zur Seite schreibt', { maxlength: 26, kind: 'command', placeholder: '!meine' }),
+      a('meineTemplate', '{user}, deine persönliche Seite mit Streak, Besuchen, Rang und Einlaufsound: {url}', 'Chatnachricht mit dem Link', { user: 'Max', url: 'https://…/meine' }),
+    ] },
+  ],
+
   statistik: [
     { title: 'Twitch-Statistik', hint: 'Die Stadtwache fragt jede Minute bei Twitch nach, ob du live bist, und merkt sich dann die Zuschauerzahl, dazu Follower und Abos. Die Zahlen stehen nur hier im Admin und, wenn du es veröffentlichst, als Kennzahlen im Mediakit. Es wird nichts in den Chat geschrieben.', items: [
       c('statsEnabled', false, 'Zuschauer, Follower und Abos messen'),
@@ -353,8 +377,9 @@ export const SCHEMA = {
       n('backupKeep', 7, 'So viele Sicherungen aufheben', { min: 1, max: 90 }),
       c('backupMedia', true, 'Mit Tönen und Bildern sichern'),
     ] },
-    { title: 'Störungen an Discord melden', hint: `Die Stadtwache prüft alle paar Minuten, ob alles läuft, und schreibt dir bei Problemen in einen Discord-Kanal: Twitch hat Webhooks widerrufen, die Twitch-Verbindung ist ungültig, Webhooks fehlen oder die nächtliche Sicherung ist fehlgeschlagen. Eine Meldung kommt, wenn ein Problem bei zwei Prüfungen hintereinander da war, danach höchstens einmal am Tag erneut, und eine Nachricht, wenn alles wieder in Ordnung ist. <b>So bekommst du die Adresse:</b> In Discord auf den Kanal gehen → Kanal bearbeiten (Zahnrad) → Integrationen → Webhooks → Neuer Webhook → „Webhook-URL kopieren“ und hier einfügen. Die Adresse ist wie ein Passwort: Wer sie hat, kann in den Kanal schreiben. Nach dem Speichern mit dem Knopf unten testen.`, items: [
+    { title: 'Störungen an Discord melden', hint: `Die Stadtwache prüft alle paar Minuten, ob alles läuft, und schreibt dir bei Problemen in einen Discord-Kanal: Twitch hat Webhooks widerrufen, die Twitch-Verbindung ist ungültig, Webhooks fehlen, die nächtliche Sicherung ist fehlgeschlagen, der VerwirrBot meldet sich nicht mehr oder die Twitch-Statistik misst nicht mehr. Eine Meldung kommt, wenn ein Problem bei zwei Prüfungen hintereinander da war, danach höchstens einmal am Tag erneut, und eine Nachricht, wenn alles wieder in Ordnung ist. <b>So bekommst du die Adresse:</b> In Discord auf den Kanal gehen → Kanal bearbeiten (Zahnrad) → Integrationen → Webhooks → Neuer Webhook → „Webhook-URL kopieren“ und hier einfügen. Die Adresse ist wie ein Passwort: Wer sie hat, kann in den Kanal schreiben. Nach dem Speichern mit dem Knopf unten testen.`, items: [
       c('healthEnabled', false, 'Störungen an Discord melden'),
+      c('healthBotWatch', true, 'Melden, wenn sich der VerwirrBot nicht mehr meldet (nach etwa 15 Minuten Stille; ausschalten, wenn du ihn nicht mehr nutzt)'),
       t('healthDiscordWebhook', '', 'Discord-Webhook-Adresse', { maxlength: 200, kind: 'discordhook', empty: true, placeholder: 'https://discord.com/api/webhooks/…' }),
     ] },
   ],

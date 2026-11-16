@@ -167,3 +167,7 @@ table.tk code { word-break: normal; white-space: nowrap; }
 .sw-peak { background: color-mix(in srgb, var(--gelb) 38%, var(--karte)); } .sw-avg { background: var(--gelb); }
 .chart-tip { position: fixed; z-index: 60; pointer-events: none; background: var(--karte2); color: var(--text); border: 1px solid var(--rand-stark); border-radius: 10px; padding: 8px 12px; font-size: .85rem; line-height: 1.45; box-shadow: var(--schatten); max-width: 260px; }
 progress { accent-color: var(--gelb); }
+.top-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; counter-reset: rang; }
+.top-list li { display: flex; justify-content: space-between; gap: 12px; counter-increment: rang; padding: 6px 10px; background: var(--feld); border: 1px solid var(--rand); border-radius: 10px; }
+.top-list li::before { content: counter(rang) "."; color: var(--gelb); font-weight: 700; margin-right: 8px; }
+.top-list li b { flex: 1; overflow-wrap: anywhere; }

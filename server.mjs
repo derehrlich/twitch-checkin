@@ -211,5 +211,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // Twitch-Statistik: jede Minute Zuschauer messen, solange der Kanal live ist (nur aktiv, wenn im Admin eingeschaltet)
   const { statTick } = await import('./netlify/lib/statistik/stats.mjs');
   setInterval(() => getSettings().then((st) => (st.statsEnabled ? statTick(st) : null)).catch((e) => console.error('Statistik:', e.message)), 60_000).unref();
+  // Umfragen: abgelaufene alle paar Sekunden beenden (das Overlay tut es beim Abruf ebenfalls)
+  const { tick: pollTick } = await import('./netlify/lib/overlays/umfrage.mjs');
+  setInterval(() => getSettings().then((st) => (st.pollEnabled ? pollTick(st) : null)).catch((e) => console.error('Umfrage:', e.message)), 5_000).unref();
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
 }

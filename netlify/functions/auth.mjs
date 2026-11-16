@@ -4,7 +4,7 @@ import { db } from '../lib/kern/store.mjs';
 import { cookie, hasSession, makeViewerSession, parseCookies, safeEqual, text } from '../lib/kern/http.mjs';
 import { SCOPES, siteUrl, toStored, tokenRequest, userByLogin } from '../lib/kern/twitch.mjs';
 
-const NEXT_PAGES = ['/einlaufsound', '/verknuepfen'];
+const NEXT_PAGES = ['/einlaufsound', '/verknuepfen', '/meine'];
 
 export const config = { path: ['/api/auth/login', '/api/auth/viewer', '/api/auth/callback'] };
 

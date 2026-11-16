@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<title>Meine Stadtwache</title>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<script src="/thema.js" defer></script>
+<style>
+  main { max-width: 680px; margin: 0 auto; padding: 28px 20px 56px; display: grid; gap: 18px; }
+  section.card { padding: 22px 26px 26px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 14px; }
+  .stat { background: var(--feld); border: 1px solid var(--rand); border-radius: 14px; padding: 12px 16px; color: var(--leise); font-size: .85rem; min-width: 0; }
+  .stat b { display: block; font-size: 1.9rem; font-weight: 800; line-height: 1.15; letter-spacing: -.5px; color: var(--text); overflow-wrap: anywhere; }
+  .big { font-size: 1.1rem; margin: 4px 0 0; }
+  progress { width: 100%; height: 14px; accent-color: var(--gelb); margin: 8px 0 4px; }
+  ul.parts { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  ul.parts li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; background: var(--feld); border: 1px solid var(--rand); border-radius: 10px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .ok { color: var(--gruen); font-weight: 700; } .warn { color: var(--orange); font-weight: 700; }
+  .hidden { display: none !important; }
+  @media (max-width: 640px) { main { padding: 18px 14px 40px; } .brand img { display: none; } section.card { padding: 18px 16px 20px; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Meine Stadtwache</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+  <button id="logout" class="ghost hidden">Abmelden</button>
+</header>
+<main>
+  <section class="card hidden" id="off"><h2>Gerade nicht aktiv</h2><p>Diese Seite ist im Moment ausgeschaltet.</p></section>
+  <section class="card hidden" id="login">
+    <h2>Deine Zahlen im Dorf</h2>
+    <p>Hier siehst du, wie es bei dir läuft: deine Streak, deine Besuche, dein Platz in der Monatsrangliste und dein Einlaufsound. Melde dich dafür mit Twitch an. Du gibst der Stadtwache dabei keine Berechtigungen, Twitch bestätigt nur, wer du bist.</p>
+    <div class="row"><a class="btn" href="/api/auth/viewer?next=/meine">Mit Twitch anmelden</a></div>
+    <p class="muted" id="cancelled"></p>
+  </section>
+  <div id="me" class="hidden" style="display:grid; gap:18px">
+    <section class="card"><h2 id="hello">Hallo</h2><div class="stats" id="tiles"></div></section>
+    <section class="card" id="mileCard"><h2>Nächster Meilenstein</h2><div id="mile"></div></section>
+    <section class="card" id="monthCard"><h2 id="monthTitle">Rangliste</h2><div id="month"></div></section>
+    <section class="card" id="entryCard"><h2>Dein Einlaufsound</h2><div id="entry"></div></section>
+    <section class="card"><h2>Datenschutz</h2><p class="muted" style="margin:0">Du siehst hier nur deine eigenen Zahlen. Die Stadtwache speichert dafür nichts Neues, alles wird aus dem berechnet, was sie ohnehin schon zählt (Check-ins, Chat-Anzahl, nie der Inhalt). Mit „Abmelden“ vergisst dieser Browser dich wieder.</p></section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const nf = new Intl.NumberFormat('de-DE');
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('de-DE') : '–');
+const dur = (min) => (min >= 60 ? `${Math.floor(min / 60)} Std ${min % 60} Min` : `${min} Min`);
+function el(tag, cls, text, parent) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; parent?.append(e); return e; }
+function tile(parent, value, label) { const t = el('div', 'stat', null, parent); el('b', '', value, t); t.append(label); }
+
+async function load() {
+  const me = await (await fetch('/api/meine', { cache: 'no-store' })).json();
+  $('off').classList.toggle('hidden', me.enabled !== false);
+  $('login').classList.toggle('hidden', me.enabled === false || me.loggedIn);
+  $('me').classList.toggle('hidden', !me.loggedIn);
+  $('logout').classList.toggle('hidden', !me.loggedIn);
+  $('cancelled').textContent = new URLSearchParams(location.search).has('abgebrochen') ? 'Die Anmeldung wurde abgebrochen.' : '';
+  if (!me.loggedIn) return;
+  const v = me.visits;
+  $('hello').textContent = `Hallo ${me.name}`;
+  const tiles = $('tiles'); tiles.replaceChildren();
+  tile(tiles, `🔥 ${v.streak.current}`, `Streak (Rekord ${v.streak.record})`);
+  tile(tiles, nf.format(v.count), 'Besuche');
+  tile(tiles, v.minutes ? dur(v.minutes) : '–', 'Zeit im Stream');
+  tile(tiles, v.today ? '✅ ja' : 'noch nicht', 'Heute eingecheckt');
+  const mile = $('mile'); mile.replaceChildren();
+  if (v.count === 0) el('p', 'muted', 'Du hast noch keinen Check-in. Löse im nächsten Stream den Check-in-Reward ein, dann zählt dein erster Besuch.', mile);
+  else if (v.next) { el('p', 'big', `Noch ${v.next.left} ${v.next.left === 1 ? 'Besuch' : 'Besuche'} bis zum ${v.next.at}. Meilenstein`, mile); const p = el('progress', '', null, mile); p.max = v.next.at; p.value = v.count; p.setAttribute('aria-label', 'Fortschritt zum nächsten Meilenstein'); el('p', 'muted', `${v.count} von ${v.next.at}${v.first ? ` · dabei seit ${fmtDate(v.first)}` : ''}`, mile); }
+  else el('p', 'big', 'Du hast alle Meilensteine geschafft. 🏆', mile);
+  const m = me.month, mc = $('month'); mc.replaceChildren();
+  $('monthCard').classList.toggle('hidden', !m);
+  if (m) {
+    $('monthTitle').textContent = `Rangliste ${m.label}`;
+    if (m.rank) el('p', 'big', `Platz ${m.rank} von ${m.total} mit ${nf.format(m.points)} Punkten`, mc);
+    else {
+      el('p', 'big', `${nf.format(m.points)} Punkte in diesem Monat`, mc);
+      el('p', 'muted', m.wouldRank ? `Mit diesen Punkten stündest du auf Platz ${m.wouldRank} von ${m.total + 1}. In der Rangliste erscheinst du aber nur, wenn du dein Discord-Konto verknüpfst: Gib im Discord /verknuepfen ein.` : 'In der Rangliste erscheinst du, wenn du dein Discord-Konto verknüpfst: Gib im Discord /verknuepfen ein.', mc);
+    }
+    const ul = el('ul', 'parts', null, mc);
+    for (const [label, n] of [['Chat-Nachrichten', m.parts.msgs], ['aktive Tage', m.parts.days], ['Check-ins', m.parts.checkins], ['Bonus', m.parts.bonus]]) { const li = el('li', '', null, ul); el('span', '', label, li); el('b', '', nf.format(n), li); }
+  }
+  $('entryCard').classList.toggle('hidden', !me.entrySound);
+  const en = $('entry'); en.replaceChildren();
+  if (me.entrySound) {
+    const s = me.entrySound;
+    const text = { active: `Dein Sound „${s.soundName ?? ''}“ ist aktiv${s.validUntil ? ` bis ${fmtDate(s.validUntil)}` : ''}.`, pending: 'Dein Sound wird gerade geprüft.', awaiting: 'Du kannst jetzt deinen Sound hochladen.', expired: 'Dein Einlaufsound ist abgelaufen.', none: 'Du hast noch keinen Einlaufsound. Mit Kanalpunkten bekommst du einen eigenen Sound beim Check-in.' }[s.status] ?? '';
+    el('p', s.status === 'active' ? 'ok' : '', text, en).style.margin = '0';
+    const row = el('div', 'row', null, en); const a = el('a', 'btn ghost', 'Zur Einlaufsound-Seite', row); a.href = '/einlaufsound';
+  }
+}
+$('logout').addEventListener('click', async () => { await fetch('/api/meine/logout', { method: 'POST' }); await load(); });
+load().catch(() => { $('off').classList.remove('hidden'); });
+</script>
+</body>
+</html>

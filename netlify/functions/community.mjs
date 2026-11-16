@@ -17,13 +17,14 @@ import { announceAgain, awardForBot } from '../lib/belohnungen/award.mjs';
 import { ackDm, pendingDms } from '../lib/belohnungen/gewinn.mjs';
 import { botView, submitFromDiscord } from '../lib/belohnungen/adventures.mjs';
 import { json } from '../lib/kern/http.mjs';
-import { addBonus, allLinks, botAuthorized, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
+import { addBonus, allLinks, botAuthorized, noteBotSeen, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
 export const config = { path: ['/api/community/*'] };
 
 export default async (req) => {
   if (!secretSet()) return json({ error: 'LINK_SECRET ist nicht gesetzt' }, 503);
   if (!botAuthorized(req)) return json({ error: 'Nicht berechtigt' }, 401);
+  await noteBotSeen().catch(() => {}); // Lebenszeichen für die Störungs-Meldungen
   const route = new URL(req.url).pathname.replace(/^\/api\/community\/?/, '').split('/').filter(Boolean);
   const settings = await getSettings();
   const writes = req.method === 'POST';

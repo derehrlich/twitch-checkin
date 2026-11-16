@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Umfrage</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Umfrage als OBS-Browserquelle (z. B. 1920×1080, Hintergrund bleibt durchsichtig).
+     Starten und beenden: im Chat mit !umfrage und !umfrageende (nur Mods), oder im Admin (Seite „Umfragen“).
+     ?pos=left (Standard) | right | center | top | bottom | top-left | top-right | bottom-left | bottom-right   Platz auf dem Bild
+     ?size=0.6 … 2   Größe (Standard 1)    ?demo   Beispiel, immer sichtbar */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  #box { position: fixed; padding: 20px 26px 18px; box-sizing: border-box; opacity: 0; transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; --s: 1; width: calc(560px * var(--s)); max-width: 94vw; transform: var(--out) scale(var(--s)); }
+  #box.on { opacity: 1; transform: var(--in) scale(var(--s)); }
+  .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .icon { font-size: 34px; line-height: 1; }
+  .q { font: 700 30px/1.15 var(--wordmark); letter-spacing: 1px; color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .8); overflow-wrap: anywhere; }
+  .opt { position: relative; display: flex; align-items: center; gap: 12px; margin-top: 9px; padding: 9px 14px; border-radius: 10px; overflow: hidden; background: rgba(20, 10, 4, .5); border: 2px solid rgba(20, 10, 4, .7); font-size: 22px; font-weight: 600; color: #fff3da; }
+  .opt .bar { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(to right, rgba(79, 184, 196, .75), rgba(79, 184, 196, .45)); transition: width .8s cubic-bezier(.2, .9, .3, 1); }
+  .opt > span { position: relative; text-shadow: 0 2px 0 rgba(43, 24, 12, .75); }
+  .opt .n { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--yellow); color: var(--frame); font: 700 20px var(--wordmark); text-shadow: none; }
+  .opt .label { flex: 1; overflow-wrap: anywhere; }
+  .opt .pct { flex: none; font-variant-numeric: tabular-nums; }
+  .opt.win { border-color: #ffd45e; box-shadow: 0 0 0 2px rgba(255, 212, 94, .5); }
+  .opt.win .bar { background: linear-gradient(to right, rgba(246, 184, 46, .85), rgba(246, 184, 46, .5)); }
+  .foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 18px; font-weight: 600; color: #e9d3ae; }
+</style>
+</head>
+<body>
+<div id="box" class="panel" aria-live="off">
+  <div class="head"><div class="icon">📊</div><div class="q" id="q"></div></div>
+  <div id="opts"></div>
+  <div class="foot"><span id="how"></span><span id="time"></span></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const box = $('box');
+const POS = { // [Ankerstyle, eingeblendet, ausgeblendet]
+  left: ['top:50%;left:30px', 'translate(0,-50%)', 'translate(-120%,-50%)'],
+  right: ['top:50%;right:30px', 'translate(0,-50%)', 'translate(120%,-50%)'],
+  center: ['top:50%;left:50%', 'translate(-50%,-50%)', 'translate(-50%,-30%)'],
+  top: ['top:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,-160%)'],
+  bottom: ['bottom:36px;left:50%', 'translate(-50%,0)', 'translate(-50%,160%)'],
+  'top-left': ['top:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'top-right': ['top:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+  'bottom-left': ['bottom:30px;left:30px', 'translate(0,0)', 'translate(-120%,0)'],
+  'bottom-right': ['bottom:30px;right:30px', 'translate(0,0)', 'translate(120%,0)'],
+};
+const [anchor, tin, tout] = POS[params.get('pos')] ?? POS.left;
+box.style.cssText += anchor + `;--in:${tin};--out:${tout};`;
+const size = Number(params.get('size')); if (size >= 0.3 && size <= 3) box.style.setProperty('--s', size);
+box.style.transformOrigin = { left: '0 50%', right: '100% 50%', top: '50% 0', bottom: '50% 100%', center: '50% 50%', 'top-left': '0 0', 'top-right': '100% 0', 'bottom-left': '0 100%', 'bottom-right': '100% 100%' }[params.get('pos') ?? 'left'] ?? '0 50%';
+
+let cfg = null, offset = 0, built = null;
+const t0 = Date.now();
+const DEMO = () => ({ show: true, id: 'demo', status: 'open', question: 'Welches Spiel als Nächstes?', total: 19, endsAt: Date.now() + 83_000, now: Date.now(),
+  options: [{ n: 1, label: 'Enshrouded', votes: 12, percent: 63 }, { n: 2, label: 'Satisfactory', votes: 5, percent: 26 }, { n: 3, label: 'Planet Zoo', votes: 2, percent: 11 }] });
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function poll() {
+  try {
+    const v = params.has('demo') ? DEMO() : await (await fetch('/api/umfrage', { cache: 'no-store' })).json();
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+const two = (n) => String(n).padStart(2, '0');
+function frame() {
+  requestAnimationFrame(frame);
+  if (!cfg || !cfg.show) { box.classList.remove('on'); return; }
+  if (built !== cfg.id) { // neue Umfrage: Zeilen neu aufbauen, danach nur noch Breiten und Zahlen ändern (die Balken laufen weich)
+    built = cfg.id;
+    $('q').textContent = cfg.question;
+    $('opts').innerHTML = cfg.options.map((o) => `<div class="opt" data-n="${o.n}"><div class="bar"></div><span class="n">${o.n}</span><span class="label">${esc(o.label)}</span><span class="pct"></span></div>`).join('');
+  }
+  for (const o of cfg.options) {
+    const row = $('opts').querySelector(`[data-n="${o.n}"]`); if (!row) continue;
+    row.querySelector('.bar').style.width = o.percent + '%';
+    row.querySelector('.pct').textContent = cfg.total ? `${o.percent} %` : '';
+    row.classList.toggle('win', Boolean(o.win));
+  }
+  const now = Date.now() + offset, left = Math.max(0, cfg.endsAt - now), s = Math.ceil(left / 1000);
+  if (cfg.status === 'open') {
+    $('how').textContent = `Schreib ${cfg.options.map((o) => o.n).join(', ')} in den Chat`;
+    $('time').textContent = left > 0 ? `noch ${Math.floor(s / 60)}:${two(s % 60)}` : 'gleich vorbei';
+  } else { $('how').textContent = `${cfg.total} ${cfg.total === 1 ? 'Stimme' : 'Stimmen'}`; $('time').textContent = cfg.total ? 'Ergebnis' : 'niemand hat abgestimmt'; }
+  box.classList.add('on');
+}
+
+poll(); setInterval(poll, 2000); frame();
+</script>
+</body>
+</html>

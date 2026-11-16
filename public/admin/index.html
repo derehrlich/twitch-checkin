@@ -432,6 +432,50 @@
       <div data-schema="gewinn" class="folds"></div>
     </div>
 
+    <div class="tab-panel hidden" data-panel="umfrage">
+      <p class="muted intro">Eine Frage an den Chat mit bis zu 6 Antworten. Der Chat stimmt mit der Zahl ab, die Anzeige läuft als Browserquelle im Stream.</p>
+      <p id="pollHint" class="card hidden" style="padding:14px 18px">Umfragen sind noch <b>ausgeschaltet</b>. Schalte sie unten unter „Umfragen“ ein und speichere. Erst dann zählen Stimmen und Chat-Befehle.</p>
+      <section class="card">
+        <h2>Neue Umfrage</h2>
+        <label for="pollQ">Frage</label><input id="pollQ" maxlength="120" placeholder="Welches Spiel als Nächstes?">
+        <label for="pollOpts">Antworten (eine pro Zeile, höchstens 6, leer lassen für „Ja“ und „Nein“)</label>
+        <textarea id="pollOpts" rows="4" placeholder="Enshrouded&#10;Satisfactory&#10;Planet Zoo"></textarea>
+        <div class="row">
+          <div style="flex:0 1 200px"><label for="pollMin">Dauer (Minuten)</label><input id="pollMin" type="number" min="1" max="60"></div>
+          <button id="pollStart">Umfrage starten</button>
+        </div>
+        <p class="muted" id="pollCmdHelp"></p>
+      </section>
+      <section class="card">
+        <h2>Läuft gerade</h2>
+        <div id="pollNow"></div>
+        <div class="row" style="margin-top:12px">
+          <button id="pollEnd" class="ghost">Jetzt beenden</button>
+          <button id="pollHide" class="ghost">Aus dem Stream nehmen</button>
+          <a class="btn ghost" href="/umfrage?demo" target="_blank" rel="noopener">Vorschau</a>
+        </div>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="pollUrl"></code> anlegen, Hintergrund durchsichtig. Sie bleibt unsichtbar, bis eine Umfrage läuft. Mit <code>?pos=right</code>, <code>top</code>, <code>bottom-left</code> … hinter der Adresse änderst du den Platz (Standard: links in der Mitte), mit <code>?size=0.7</code> die Größe. „Jetzt beenden“ schreibt das Ergebnis in den Chat, „Aus dem Stream nehmen“ blendet die Anzeige ohne Ergebnis aus.</p>
+      </section>
+      <section class="card">
+        <h2>Letzte Umfragen</h2>
+        <div id="pollHistory"></div>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="poll" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="meine">
+      <p class="muted intro">Eine persönliche Seite für jeden Zuschauer: Streak, Besuche, Zeit im Stream, nächster Meilenstein, Rang im Monat und Einlaufsound an einem Ort. Das motiviert zum Mitmachen. Jeder sieht nur die eigenen Zahlen.</p>
+      <section class="card">
+        <h2>Die Seite</h2>
+        <p>Adresse: <code id="meineUrl"></code></p>
+        <div class="row"><a class="btn" href="/meine" target="_blank" rel="noopener">Seite öffnen</a></div>
+        <p class="muted">Die Anmeldung läuft mit Twitch und ohne Berechtigungen (wie beim Einlaufsound). Es wird nichts Neues gespeichert, alles kommt aus dem, was die Stadtwache ohnehin zählt. In der Rangliste steht nur, wer sein Discord-Konto verknüpft hat. Alle anderen sehen ihre Punkte und wo sie damit stünden, mit dem Hinweis auf <code>/verknuepfen</code>. Die Seite muss ohne Cloudflare Access erreichbar sein. Der Chat-Befehl (unten einstellbar) schreibt den Link.</p>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="meine" class="folds"></div>
+    </div>
+
     <div class="tab-panel hidden" data-panel="feier">
       <p class="muted intro">Countdown, Geburtstags-Befehl und die Seite mit dem Wochenplan.</p>
       <section class="card">
@@ -648,6 +692,10 @@
     <div class="tab-panel hidden" data-panel="statistik">
       <p class="muted intro">Zuschauer, Follower und Abos deines Kanals. Gemessen wird jede Minute, solange du live bist. Diese Zahlen stehen nur hier im Admin, nicht im Chat und nicht in Discord.</p>
       <p id="stHint" class="card hidden" style="padding:14px 18px">Die Messung ist noch <b>ausgeschaltet</b>. Schalte sie unten unter „Twitch-Statistik“ ein und speichere. Gemessen wird erst ab dann, bei deinem nächsten Stream geht es los.</p>
+      <section class="card" id="stReviewCard">
+        <h2 id="stReviewTitle">Rückblick auf den letzten Stream</h2>
+        <div id="stReview"><p class="muted">Lädt …</p></div>
+      </section>
       <section class="card">
         <h2>Gesamt</h2>
         <div class="stats" id="stTotal"></div>
@@ -669,7 +717,6 @@
       <section class="card">
         <h2>Letzte Streams</h2>
         <div id="stList"></div>
-        <div id="stDetail"></div>
       </section>
       <h2 class="part">Einstellungen und Texte</h2>
       <div data-schema="statistik" class="folds"></div>

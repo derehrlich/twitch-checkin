@@ -94,3 +94,13 @@
   from = "/alpakas"
   to = "/alpakas.html"
   status = 200
+
+[[redirects]]
+  from = "/umfrage"
+  to = "/umfrage.html"
+  status = 200
+
+[[redirects]]
+  from = "/meine"
+  to = "/meine.html"
+  status = 200

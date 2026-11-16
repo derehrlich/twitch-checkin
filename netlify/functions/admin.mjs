@@ -23,6 +23,7 @@ import { feier } from '../lib/admin/feier.mjs';
 import { adventure } from '../lib/admin/adventure.mjs';
 import { pauseRoute } from '../lib/admin/pause.mjs';
 import { mediakitRoute, statsRoute } from '../lib/admin/statistik.mjs';
+import { umfrageRoute } from '../lib/admin/umfrage.mjs';
 import { startscreen } from '../lib/admin/startscreen.mjs';
 
 export const config = { path: '/api/admin/*' };
@@ -55,6 +56,7 @@ const ROUTES = {
   pause: pauseRoute,
   stats: statsRoute,
   mediakit: mediakitRoute,
+  umfrage: umfrageRoute,
   startscreen,
 };
 
