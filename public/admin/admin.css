@@ -147,3 +147,23 @@ table.tk input { margin: 0; min-width: 150px; }
 .pill { white-space: nowrap; display: inline-block; }
 table.tk code { word-break: normal; white-space: nowrap; }
 #gwCountriesRow label { display: inline-flex; align-items: center; gap: 6px; margin: 0 14px 0 6px; }
+
+/* Diagramme (Statistik): Farben aus den Seitenfarben, damit Hell und Dunkel stimmen */
+.chart-scroll { overflow-x: auto; }
+.chart { width: 100%; height: auto; display: block; }
+.ch-grid { stroke: var(--rand); stroke-width: 1; }
+.ch-axis { stroke: var(--rand-stark); stroke-width: 1; }
+.ch-text { fill: var(--leise); font-size: 11px; font-family: system-ui, sans-serif; }
+.ch-peak { fill: color-mix(in srgb, var(--gelb) 38%, var(--karte)); }
+.ch-avg { fill: var(--gelb); }
+.ch-line { stroke: var(--gelb); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ch-dot { fill: var(--gelb); stroke: var(--karte); stroke-width: 2; }
+.ch-hit { fill: transparent; }
+.ch-mark { outline: none; cursor: default; }
+.ch-mark:hover .ch-peak, .ch-mark:focus-visible .ch-peak { fill: color-mix(in srgb, var(--gelb) 55%, var(--karte)); }
+.ch-mark:focus-visible .ch-hit { stroke: var(--gelb); stroke-width: 2; }
+.chart-legend { display: flex; gap: 18px; margin: 6px 0 0; color: var(--leise); font-size: .85rem; }
+.chart-legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.sw-peak { background: color-mix(in srgb, var(--gelb) 38%, var(--karte)); } .sw-avg { background: var(--gelb); }
+.chart-tip { position: fixed; z-index: 60; pointer-events: none; background: var(--karte2); color: var(--text); border: 1px solid var(--rand-stark); border-radius: 10px; padding: 8px 12px; font-size: .85rem; line-height: 1.45; box-shadow: var(--schatten); max-width: 260px; }
+progress { accent-color: var(--gelb); }

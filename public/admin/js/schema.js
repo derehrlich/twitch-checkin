@@ -334,6 +334,12 @@ export const SCHEMA = {
     ] },
   ],
 
+  statistik: [
+    { title: 'Twitch-Statistik', hint: 'Die Stadtwache fragt jede Minute bei Twitch nach, ob du live bist, und merkt sich dann die Zuschauerzahl, dazu Follower und Abos. Die Zahlen stehen nur hier im Admin und, wenn du es veröffentlichst, als Kennzahlen im Mediakit. Es wird nichts in den Chat geschrieben.', items: [
+      c('statsEnabled', false, 'Zuschauer, Follower und Abos messen'),
+    ] },
+  ],
+
   allgemein: [
     { title: 'Allgemein', hint: 'Der Stream-Tag wechselt zur eingestellten Uhrzeit, damit Streams nach Mitternacht nicht doppelt zählen.', items: [
       n('volume', 0.6, 'Lautstärke im Overlay (0 bis 1)', { min: 0, max: 1, step: 0.1 }),
