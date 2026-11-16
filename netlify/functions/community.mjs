@@ -6,6 +6,8 @@
 //   GET  /api/community/link?twitch=name     zu einem Twitch-Namen das Discord-Konto: { linked, discordId, twitchName }
 //   POST /api/community/bonus    Bonuspunkte für den Monat { key, points, reason, discordId | twitch }, jeder key zählt nur einmal
 //   POST /api/community/sync     Discord-Zahlen des Monats melden { month, rows: [{ discordId, msgs, days }] }
+//   GET  /api/community/levels       Dorf-Level: Stufen mit Titel und die Stufe aller verknüpften Konten [{ discordId, level, points }]
+//   POST /api/community/plan         { items: [{ date, time, text }] } der Streamplan des Bots für !plan
 //   GET  /api/community/gewinn/dm       Gewinner-Links, die per Discord-DM verschickt werden sollen [{ winnerId, discordId, message }]
 //   POST /api/community/gewinn/dm/ack   { winnerId, failed? } nach dem Senden der DM (failed: true = nicht zustellbar)
 //   GET  /api/community/adventure   Adventure-Einreichungen { enabled, open, count, entries: [{ title, name, source, status }] }
@@ -16,6 +18,8 @@ import { getSettings } from '../lib/kern/settings.mjs';
 import { announceAgain, awardForBot } from '../lib/belohnungen/award.mjs';
 import { ackDm, pendingDms } from '../lib/belohnungen/gewinn.mjs';
 import { botView, submitFromDiscord } from '../lib/belohnungen/adventures.mjs';
+import { botView as levelBotView } from '../lib/belohnungen/level.mjs';
+import { savePlan } from '../lib/chat/plan.mjs';
 import { json } from '../lib/kern/http.mjs';
 import { addBonus, allLinks, botAuthorized, noteBotSeen, DISCORD_ID, linkByDiscord, linkByTwitchName, monthBoard, removeLink, saveDiscordMonth, secretSet, weights } from '../lib/belohnungen/community.mjs';
 
@@ -66,6 +70,8 @@ export default async (req) => {
     const res = await submitFromDiscord(settings, { discordId: body.discordId, discordName: body.discordName, text: body.text });
     return json({ ok: res.ok, reason: res.reason ?? null, reply: res.reply }, res.status ?? 200);
   }
+  if (route[0] === 'levels' && req.method === 'GET') return json(await levelBotView(settings));
+  if (route[0] === 'plan' && writes) return json({ ok: true, saved: await savePlan(body.items) });
   if (route[0] === 'unlink' && writes) return json({ ok: await removeLink({ discordId: String(body.discordId ?? '') }) });
   return json({ error: 'Not found' }, 404);
 };

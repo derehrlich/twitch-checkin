@@ -6,6 +6,7 @@ import { streamDay } from './checkin.mjs';
 import { computeStreak, getStreamDays, parseLevels } from './streak.mjs';
 import { linkByTwitch, monthBoard, monthOf, pointsOf } from '../belohnungen/community.mjs';
 import { viewFor } from '../belohnungen/entrysound.mjs';
+import { levelOf } from '../belohnungen/level.mjs';
 import { siteUrl } from '../kern/twitch.mjs';
 import { fill } from './checkin.mjs';
 
@@ -42,8 +43,13 @@ export async function meView(viewer, settings, now = Date.now()) {
       streak: { current: streak.current, record: streak.record }, next: next ? { at: next, left: next - count } : null,
     },
     month: null,
+    level: null,
     entrySound: settings.entrySoundEnabled ? (({ status, validUntil, soundName }) => ({ status, validUntil, soundName }))(await viewFor(viewer.id, settings)) : null,
   };
+  if (settings.levelEnabled) {
+    const { n, title, points, next, progress, total } = await levelOf(settings, viewer.id, { user, now });
+    out.level = { n, title, points, next, progress, total };
+  }
   if (settings.communityEnabled) {
     const mine = await monthOfPerson(settings, viewer.id, user, now);
     const board = await cachedBoard(settings, now);

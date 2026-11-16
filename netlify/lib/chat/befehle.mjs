@@ -19,6 +19,8 @@ import { birthdayReply } from '../overlays/countdown.mjs';
 import * as pause from '../overlays/pause.mjs';
 import * as poll from '../overlays/umfrage.mjs';
 import { meText } from '../zuschauer/meine.mjs';
+import { levelReply } from '../belohnungen/level.mjs';
+import { getPlan, planText } from './plan.mjs';
 import { cancelByUser, confirmByUser, ingameByUser, modCommand, mySeat, sweepOffers, ticketsInfo } from '../belohnungen/tickets.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -109,6 +111,9 @@ export const BEFEHLE = [
   { id: 'umfrage', wort: (s) => s.pollCommand, aktiv: (s) => s.pollEnabled, rolle: 'mod', run: ({ e, args, settings }) => poll.chatStart(e, args, settings) },
   { id: 'umfrageende', wort: (s) => s.pollEndCommand, aktiv: (s) => s.pollEnabled, rolle: 'mod', run: ({ settings }) => poll.chatEnd(settings) },
   { id: 'meine', wort: (s) => s.meineCommand, aktiv: (s) => s.meineEnabled, run: ({ e, settings }) => meText(e, settings) },
+  { id: 'level', wort: (s) => s.levelCommand, aktiv: (s) => s.levelEnabled, run: ({ e, settings }) => levelReply(e, settings) },
+  { id: 'discord', wort: (s) => s.discordCommand, aktiv: (s) => s.discordCmdEnabled && s.discordInvite, run: ({ settings }) => fill(settings.discordTemplate, { url: settings.discordInvite }) },
+  { id: 'plan', wort: (s) => s.planCommand, aktiv: (s) => s.planCmdEnabled, run: async ({ settings }) => planText(await getPlan(), settings) },
   { id: 'adventure', wort: (s) => s.advCommand, aktiv: (s) => s.advEnabled, run: async ({ e, args, settings }) => (await submitFromTwitch(settings, e, args)).reply },
   { id: 'tickets', wort: (s) => s.ticketsCommand, aktiv: (s) => s.ticketsEnabled, run: ({ settings }) => ticketsInfo(settings) },
   { id: 'platz', wort: (s) => s.ticketSeatCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return mySeat(e.chatter_user_id, e.chatter_user_name, settings); } },

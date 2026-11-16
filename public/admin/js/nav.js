@@ -6,7 +6,7 @@ export const NAV = [
   ['', [['start', '🏠', 'Start']]],
   ['Stream', [['zuschauer', '✅', 'Check-in und Besucher'], ['ereignisse', '🔔', 'Alerts'], ['raids', '⚔️', 'Raids']]],
   ['Chat', [['commands', '💬', 'Eigene Commands'], ['chat', '❗', 'Befehle und Shoutout'], ['moderation', '🛡️', 'Moderation'], ['chatleiste', '🗨️', 'Chat im Stream']]],
-  ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste'], ['meine', '🙋', 'Meine Stadtwache']]],
+  ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste'], ['level', '🏗️', 'Dorf-Level'], ['meine', '🙋', 'Meine Stadtwache']]],
   ['Zahlen', [['statistik', '📈', 'Twitch-Statistik'], ['mediakit', '📰', 'Mediakit']]],
   ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['umfrage', '📊', 'Umfragen'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
   ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
