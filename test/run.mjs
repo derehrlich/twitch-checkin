@@ -3038,6 +3038,87 @@ await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit 
   await api('PUT', 'settings', { gwEnabled: false });
 });
 
+await test('Gewinnspiel-Verwaltung: Chat-Befehl, mehrere gleichzeitig, Minuten-Fenster, Monatspunkte als Lose, Preis ohne Link, Löschen', async () => {
+  const gw = await import('../netlify/lib/belohnungen/gewinn.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const say = async (text, id, name) => handleChat({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, message_id: crypto.randomUUID(), message: { text, fragments: [{ type: 'text', text }] } }, await getSettings());
+  await api('PUT', 'settings', { gwEnabled: true, gwRevealSeconds: 0, chatEnabled: true, communityEnabled: true });
+  const before = (await (await api('GET', 'gewinn')).json());
+  const ticketDraw = before.draw.id; // die Ticket-Ziehung aus dem Test davor bleibt die mit dem Reward
+
+  // Schnelles Gewinnspiel: eigene Kennung, nimmt der Ticket-Ziehung den Reward nicht weg
+  let v = await (await api('POST', 'gewinn/new', { kind: 'quick' })).json();
+  const quick = v.draw.id;
+  assert.notEqual(quick, ticketDraw); assert.equal(v.draw.entry, 'chat'); assert.equal(v.draw.command, '!gewinn'); assert.equal(v.draw.pointsSource, 'none'); assert.equal(v.draw.prizes[0].kind, 'none');
+  assert.equal((await db.get('gw/current')).id, ticketDraw, 'der Ticket-Reward bleibt, wo er ist');
+  assert.equal((await api('POST', 'gewinn/select', { id: quick })).status, 404, 'ein Chat-Gewinnspiel bekommt den Reward nie');
+  v = await (await api('PUT', `gewinn/${quick}/config`, { name: 'Schnellrunde', command: 'Los!!', minutes: 5, prizes: [{ name: 'Ruhm und Ehre', kind: 'none' }] })).json();
+  assert.equal(v.draw.command, '!los', 'Befehl wird aufgeräumt'); assert.equal(v.draw.name, 'Schnellrunde');
+
+  // Vor dem Öffnen passiert nichts, auch keine Antwort
+  const n0 = chats().length;
+  assert.equal((await say('!los', 'q1', 'Anna')).gewinn, 'closed'); assert.equal(chats().length, n0);
+  // Öffnen: Ansage im Chat, schließt nach 5 Minuten
+  v = await (await api('POST', `gewinn/${quick}/window`, { action: 'open' })).json();
+  assert.equal(v.window, 'offen'); assert.match(chats().at(-1), /Schnellrunde.*!los/);
+  assert.ok(Math.abs(Date.parse(v.draw.closesAt) - Date.now() - 300_000) < 5000, 'schließt in 5 Minuten');
+  assert.equal((await say('!los', 'q1', 'Anna')).gewinn, 'entered'); assert.match(chats().at(-1), /Anna ist dabei \(1 Los/);
+  const n1 = chats().length;
+  assert.equal((await say('!LOS bitte', 'q1', 'Anna')).gewinn, 'duplicate'); assert.equal(chats().length, n1, 'doppelt: still');
+  await say('!los', 'q2', 'Ben'); await say('!los', 'q3', 'Cem');
+  await say('!los', '999', 'Streamerin'); // der Kanalinhaber darf probieren, zählt aber nicht
+  v = await (await api('GET', `gewinn/${quick}`)).json();
+  assert.equal(v.draw.id, quick); assert.equal(v.tickets.length, 4); assert.equal(v.stats.participants, 3); assert.equal(v.stats.totalLots, 3);
+  assert.deepEqual(v.draws.find((x) => x.id === quick) && [v.draws.find((x) => x.id === quick).count, v.draws.find((x) => x.id === quick).entry], [4, 'chat']);
+
+  // Zweites Chat-Gewinnspiel läuft gleichzeitig mit eigenem Befehl und Bonuslosen aus den Monatspunkten
+  v = await (await api('POST', 'gewinn/new', { kind: 'quick' })).json();
+  const month = v.draw.id;
+  await api('PUT', `gewinn/${month}/config`, { name: 'Monatsrunde', command: '!monat', minutes: 0, pointsSource: 'month', perPoints: 10, maxLots: 4, replyEntry: false });
+  await api('POST', `gewinn/${month}/window`, { action: 'open' });
+  const settings = await getSettings();
+  const m = (await import('../netlify/lib/belohnungen/community.mjs')).monthOf(settings);
+  await db.set(`cmonth/${m}/q1`, { name: 'Anna', msgs: 25, days: 0, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  await db.set(`cmonth/${m}/q2`, { name: 'Ben', msgs: 500, days: 0, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  assert.equal(await gw.monthPoints(settings, 'q1'), 25 * settings.communityWeightMsg);
+  const n2 = chats().length;
+  await say('!monat', 'q1', 'Anna'); await say('!monat', 'q2', 'Ben'); await say('!monat', 'q3', 'Cem');
+  assert.equal(chats().length, n2, 'ohne Bestätigung bleibt der Chat ruhig');
+  v = await (await api('GET', `gewinn/${month}`)).json();
+  const expect = async (id) => Math.min(4, 1 + Math.floor((await gw.monthPoints(settings, id)) / 10));
+  assert.deepEqual(v.tickets.map((t) => [t.name, t.lots]), [['Anna', await expect('q1')], ['Ben', 4], ['Cem', await expect('q3')]], '1 Los + 1 je 10 Monatspunkte, Deckel 4');
+  assert.ok(v.tickets[0].lots >= 3 && v.tickets[0].points >= 25, 'Annas Monatspunkte geben Bonuslose');
+  assert.equal((await say('!los', 'q4', 'Dora')).gewinn, 'entered', 'das erste läuft daneben weiter');
+
+  // Zeit um: der Tick schließt im Chat (einmal), danach kommt niemand mehr rein
+  const later = Date.now() + 6 * 60_000;
+  await gw.gewinnTick(settings, later); assert.match(chats().at(-1), /Schnellrunde.*geschlossen.*5 machen mit/);
+  const n3 = chats().length; await gw.gewinnTick(settings, later + 60_000); assert.equal(chats().length, n3, 'nur einmal ansagen');
+  assert.equal((await gw.handleGewinnChat({ chatter_user_id: 'q5', chatter_user_name: 'Emil' }, '!los', settings, later)).gewinn, 'closed');
+
+  // Ziehen: Preis ohne Link ist sofort erledigt, kein Flüstern, eigene Ansage
+  const whispers = calls.filter((c) => c.path.endsWith('/whispers')).length;
+  await api('POST', `gewinn/${quick}/window`, { action: 'close' });
+  v = await (await api('POST', `gewinn/${quick}/draw`, { confirm: true, seed: 'schnell' })).json();
+  assert.equal(v.winners.length, 1); assert.equal(v.winners[0].status, 'abgeschlossen'); assert.equal(v.winners[0].link, '');
+  assert.ok(v.winners[0].name !== 'Streamerin'); assert.match(chats().at(-1), /gewinnt Ruhm und Ehre/);
+  assert.equal(calls.filter((c) => c.path.endsWith('/whispers')).length, whispers, 'kein Link verschickt');
+  assert.equal((await api('POST', `gewinn/${quick}/draw`, { confirm: true })).status, 409);
+  assert.equal((await gw.getDraw(ticketDraw)).drawnAt === (await gw.getDraw(quick)).drawnAt, false, 'andere Ziehungen bleiben unberührt');
+  assert.deepEqual(await gw.gewinnTick(settings, Date.now() + 48 * 3_600_000).then((r) => r.redrawn), 0, 'ohne Frist wird nichts nachgezogen');
+  // Nachziehen von Hand geht auch ohne Link
+  v = await (await api('POST', `gewinn/${quick}/winner/${v.winners[0].id}/redraw`, {})).json();
+  assert.equal(v.winners.filter((w) => w.status === 'abgeschlossen').length, 1); assert.equal(v.winners.filter((w) => w.status === 'verfallen').length, 1);
+
+  // Löschen: nur ungezogene, samt Tickets
+  assert.equal((await api('DELETE', `gewinn/${quick}`)).status, 409, 'gezogen bleibt wegen des Protokolls');
+  v = await (await api('DELETE', `gewinn/${month}`)).json();
+  assert.equal(v.draws.some((x) => x.id === month), false); assert.equal((await db.list(`gw/${month}/`)).length, 0);
+  assert.equal((await say('!monat', 'q6', 'Finn')).gewinn, undefined, 'der Befehl gehört zu nichts mehr');
+  await api('PUT', 'settings', { gwEnabled: false, communityEnabled: false });
+});
+
 const { parseLocal: gwParseLocal } = await import('../netlify/lib/belohnungen/gewinn.mjs');
 const gwParse = (str) => gwParseLocal(str, 'Europe/Berlin');
 await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Seite, Admin-Knöpfe', async () => {

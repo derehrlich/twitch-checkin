@@ -21,18 +21,8 @@ import { initGewinn, loadGewinn } from './gewinn.js';
 import { initFeier, loadFeier } from './feier.js';
 import { initPause, loadPause } from './pause.js';
 import { initStartscreen, loadStartscreen } from './startscreen.js';
-
-const TABS = ['start', 'zuschauer', 'ereignisse', 'chat', 'belohnungen', 'tickets', 'gewinn', 'feier', 'overlays', 'medien', 'system'];
-// Alte Adressen (#abspann, #besucher …) führen weiter an die richtige Stelle
-const OLD_TABS = { checkin: 'zuschauer', besucher: 'zuschauer', alerts: 'ereignisse', raids: 'ereignisse', abspann: 'chat', commands: 'chat', alpakas: 'belohnungen', soundboard: 'belohnungen', einlaufsound: 'belohnungen', community: 'belohnungen', sport: 'overlays', tests: 'system', allgemein: 'system' };
-
-function showTab(name) {
-  name = OLD_TABS[name] ?? name;
-  if (!TABS.includes(name)) name = 'start';
-  for (const p of document.querySelectorAll('.tab-panel')) p.classList.toggle('hidden', p.dataset.panel !== name);
-  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
-  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
-}
+import { initNav } from './nav.js';
+import { initStart, loadStart } from './start.js';
 
 function showLogin(disabled) {
   $('login').classList.remove('hidden'); $('app').classList.add('hidden'); $('logout').classList.add('hidden');
@@ -42,7 +32,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadStartscreen(), loadUpdate(), loadAutoBackup()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadStartscreen(), loadUpdate(), loadAutoBackup(), loadStart()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -57,9 +47,7 @@ initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); ini
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
-$('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) showTab(b.dataset.tab); });
-addEventListener('hashchange', () => showTab(location.hash.slice(1)));
-showTab(location.hash.slice(1));
+initStart(); initNav();
 
 $('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
 $('loginForm').addEventListener('submit', run(async (e) => {

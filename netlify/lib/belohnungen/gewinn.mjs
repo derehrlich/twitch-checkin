@@ -1,8 +1,14 @@
-// Sonderziehung (Geburtstags-Gewinnspiel): Ticket per Kanalpunkte, Wochenpunkte als Bonuslose, gewichtete Ziehung,
-// Gewinner-Links mit Meldefrist und Nachziehen. Alles lokal, keine Drittdienste.
+// Gewinnspiele: mehrere nebeneinander, jedes mit eigenen Zeiten, Preisen und eigener Lose-Rechnung.
+//   Mitmachen (draw.entry):  'reward' = Kanalpunkte-Ticket (es gibt EINEN Ticket-Reward, er gehört zur Ziehung in gw/current)
+//                            'chat'   = Chat-Befehl (draw.command, z. B. !gewinn), beliebig viele gleichzeitig
+//   Lose (draw.pointsSource): 'none'  = jeder ein Los
+//                            'draw'  = Bonuslose aus der Aktivität seit draw.pointsFrom (Check-in, Streak, Chat)
+//                            'month' = Bonuslose aus den Monatspunkten der Community-Rangliste
+//   Preise (prize.kind):     'key', 'item' (Sachpreis mit Adresse), 'none' (nur Bekanntgabe, kein Link)
+// Gewichtete Ziehung, Gewinner-Links mit Meldefrist und Nachziehen. Alles lokal, keine Drittdienste.
 //
 // Speicher (alles unter gw/, ohne Adressen):
-//   gw/current                   { id }  die Ziehung, für die Tickets eingelöst werden
+//   gw/current                   { id }  die Ziehung, zu der der Kanalpunkte-Ticket-Reward gehört
 //   gw/draw/<id>                 Einstellungen der Ziehung (Zeiten, Lose-Rechnung, Preise, Sperrliste, Bedingungen)
 //   gw/<id>/pts/<twitchId>       Wochenpunkte { name, checkinDays, streakPts, chatCount, chatDay, dayMsgs, lastAt, points }
 //   gw/<id>/ticket/<twitchId>    eingelöstes Ticket { name, at, points, redemptionId } (setIfNew = genau eines pro Person)
@@ -18,7 +24,7 @@ import crypto from 'node:crypto';
 import { db } from '../kern/store.mjs';
 import { fill, streamDay } from '../zuschauer/checkin.mjs';
 import { helix, sendChat, sendWhisper, setRedemptionStatus, siteUrl, userToken } from '../kern/twitch.mjs';
-import { linkByTwitch } from './community.mjs';
+import { linkByTwitch, monthOf, pointsOf as communityPoints } from './community.mjs';
 
 export const STATUS = ['gezogen', 'link_verschickt', 'gemeldet', 'adresse_erhalten', 'versendet', 'abgeschlossen', 'verfallen'];
 export const STATUS_LABEL = { gezogen: 'Gezogen', link_verschickt: 'Link verschickt', gemeldet: 'Gemeldet', adresse_erhalten: 'Adresse erhalten', versendet: 'Versendet', abgeschlossen: 'Abgeschlossen', verfallen: 'Verfallen (nachgezogen)' };
@@ -76,8 +82,14 @@ export function toLocal(iso, tz) {
 // ---- Ziehung anlegen und lesen
 
 const drawKey = (id) => `gw/draw/${id}`;
-let currentCache = null; // { at, id } spart Zugriffe bei jeder Chat-Nachricht
-export const forgetCache = () => { currentCache = null; };
+let currentCache = null; // { at, draw } spart Zugriffe bei jeder Chat-Nachricht
+let chatCache = null; // { at, draws } alle noch nicht gezogenen Chat-Gewinnspiele
+export const forgetCache = () => { currentCache = null; chatCache = null; };
+
+/** Ältere Ziehungen haben diese Felder noch nicht: Ticket per Kanalpunkte, Bonuslose aus der Aktivität. */
+export const entryOf = (draw) => (draw?.entry === 'chat' ? 'chat' : 'reward');
+export const sourceOf = (draw) => (['none', 'draw', 'month'].includes(draw?.pointsSource) ? draw.pointsSource : 'draw');
+export const commandOf = (draw) => String(draw?.command || '!gewinn').toLowerCase();
 
 export function defaultDraw(settings, now = new Date()) {
   const tz = settings.timezone;
@@ -94,6 +106,7 @@ export function defaultDraw(settings, now = new Date()) {
     ],
     blocked: [], winnerHours: 24, addressDays: 7, keepDays: 30, countries: ['DE'],
     terms: DEFAULT_TERMS, termsPublished: false, drawnAt: null,
+    entry: 'reward', command: '!gewinn', minutes: 0, replyEntry: true, pointsSource: 'draw',
   };
 }
 
@@ -105,16 +118,35 @@ export function simpleDraw(settings, now = new Date()) {
   return {
     ...defaultDraw(settings, now),
     name: 'Verlosung',
-    pointsFrom: now.toISOString(), ticketOpen: null, bonusOpen: null, bonusClose: null, bonusLots: 0, maxLots: 1,
+    pointsFrom: now.toISOString(), ticketOpen: null, bonusOpen: null, bonusClose: null, bonusLots: 0, maxLots: 1, pointsSource: 'none',
     prizes: [{ id: rid(), name: 'Mystery-Key', kind: 'key', key: '' }],
   };
 }
 
+/** Schnelles Gewinnspiel im Stream: Mitmachen per Chat-Befehl, jeder ein Los, ein Preis ohne Versand. Öffnen per Knopf. */
+export function quickDraw(settings, now = new Date()) {
+  return {
+    ...simpleDraw(settings, now),
+    name: 'Gewinnspiel im Stream', entry: 'chat', minutes: 5,
+    prizes: [{ id: rid(), name: 'Preis', kind: 'none', key: '' }],
+  };
+}
+
+/** Gewinnspiel über einen Zeitraum: Kanalpunkte-Ticket, Bonuslose aus den Monatspunkten der Rangliste. Zeiten trägt Marcel ein. */
+export function periodDraw(settings, now = new Date()) {
+  return {
+    ...simpleDraw(settings, now),
+    name: 'Gewinnspiel', pointsSource: 'month', perPoints: 100, maxLots: 5,
+    prizes: [{ id: rid(), name: 'Preis', kind: 'key', key: '' }],
+  };
+}
+
 /** Legt eine Ziehung an. Eine schon aktive Ziehung bleibt aktiv (sonst würden laufende Tickets umgelenkt); `activate` schaltet die neue sofort aktiv. */
-export async function createDraw(settings, { simple = false, activate = false } = {}, now = new Date()) {
-  const draw = simple ? simpleDraw(settings, now) : defaultDraw(settings, now);
+export async function createDraw(settings, { simple = false, kind = simple ? 'simple' : 'bday', activate = false } = {}, now = new Date()) {
+  const draw = ({ simple: simpleDraw, quick: quickDraw, period: periodDraw }[kind] ?? defaultDraw)(settings, now);
   await saveDraw(draw);
-  if (activate || !(await db.get('gw/current'))) await db.set('gw/current', { id: draw.id });
+  // Nur Ticket-Ziehungen können den (einen) Kanalpunkte-Reward bekommen; Chat-Gewinnspiele laufen daneben
+  if (entryOf(draw) === 'reward' && (activate || !(await db.get('gw/current')))) await db.set('gw/current', { id: draw.id });
   forgetCache();
   return draw;
 }
@@ -123,13 +155,37 @@ export async function currentDraw() {
   const cur = await db.get('gw/current');
   return cur ? getDraw(cur.id) : null;
 }
-export async function listDraws() {
+export async function allDraws() {
   const out = [];
-  for (const k of await db.list('gw/draw/')) { const d = await db.get(k); if (d) out.push({ id: d.id, name: d.name, drawn: Boolean(d.drawnAt), createdAt: d.createdAt }); }
+  for (const k of await db.list('gw/draw/')) { const d = await db.get(k); if (d) out.push(d); }
   return out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
+/** Liste für die Übersicht: Art, Fenster und Teilnehmerzahl je Gewinnspiel. */
+export async function listDraws(now = Date.now()) {
+  const cur = (await db.get('gw/current'))?.id;
+  const out = [];
+  for (const d of await allDraws()) {
+    out.push({
+      id: d.id, name: d.name, drawn: Boolean(d.drawnAt), drawnAt: d.drawnAt, createdAt: d.createdAt, entry: entryOf(d), command: commandOf(d), source: sourceOf(d),
+      window: windowState(d, now), ticketClose: d.ticketClose, current: d.id === cur, count: (await db.list(`gw/${d.id}/ticket/`)).length,
+    });
+  }
+  return out;
+}
+/** Löscht ein Gewinnspiel samt Tickets und Punkten. Gezogene bleiben (Protokoll und Gewinner). */
+export async function deleteDraw(id) {
+  const draw = await getDraw(id);
+  if (!draw) return { error: 'Nicht gefunden', status: 404 };
+  if (draw.drawnAt) return { error: 'Ein gezogenes Gewinnspiel bleibt wegen des Protokolls erhalten', status: 409 };
+  for (const k of await db.list(`gw/${id}/`)) await db.delete(k);
+  await db.delete(drawKey(id));
+  if ((await db.get('gw/current'))?.id === id) await db.delete('gw/current');
+  forgetCache();
+  return { ok: true };
+}
 export async function setCurrent(id) {
-  if (!(await getDraw(id))) return false;
+  const draw = await getDraw(id);
+  if (!draw || entryOf(draw) !== 'reward') return false;
   await db.set('gw/current', { id });
   forgetCache();
   return true;
@@ -140,6 +196,13 @@ const cachedCurrent = async (now) => {
   const draw = await currentDraw();
   currentCache = { at: now, draw };
   return draw;
+};
+/** Chat-Gewinnspiele, die noch nicht gezogen sind (für Befehl und Punkte). Wird bei jeder Änderung im Admin verworfen. */
+const chatDraws = async (now) => {
+  if (chatCache && now - chatCache.at < 30000) return chatCache.draws;
+  const draws = (await allDraws()).filter((d) => entryOf(d) === 'chat' && !d.drawnAt);
+  chatCache = { at: now, draws };
+  return draws;
 };
 
 /** Zustand des Ticket-Fensters: 'vorher' | 'offen' | 'zu' (inkl. nach der Ziehung) */
@@ -176,11 +239,16 @@ export function applyConfig(draw, input, settings) {
     if ('bonusLots' in i) next.bonusLots = num(i.bonusLots, 1, 10, draw.bonusLots ?? 1);
     if ('perPoints' in i) next.perPoints = num(i.perPoints, 1, 100000, draw.perPoints);
     if ('maxLots' in i) next.maxLots = num(i.maxLots, 1, 1000, draw.maxLots);
+    if ('entry' in i) next.entry = i.entry === 'chat' ? 'chat' : 'reward';
+    if ('command' in i) { const c = '!' + String(i.command ?? '').trim().toLowerCase().replace(/^!+/, '').replace(/[^a-z0-9äöüß_]/g, '').slice(0, 25); next.command = c.length > 1 ? c : commandOf(draw); }
+    if ('minutes' in i) next.minutes = num(i.minutes, 0, 1440, draw.minutes ?? 0);
+    if ('replyEntry' in i) next.replyEntry = Boolean(i.replyEntry);
+    if ('pointsSource' in i) next.pointsSource = ['none', 'draw', 'month'].includes(i.pointsSource) ? i.pointsSource : sourceOf(draw);
     const w = i.weights ?? {};
     for (const [k, max] of [['checkin', 10000], ['streak', 10000], ['streakCap', 365], ['chat', 10000], ['chatDayCap', 1000], ['chatGap', 3600]]) if (k in w) next.weights[k] = num(w[k], 0, max, draw.weights[k]);
     if (Array.isArray(i.prizes)) {
       const old = new Map(draw.prizes.map((p) => [p.id, p]));
-      next.prizes = i.prizes.slice(0, 10).map((p) => ({ id: isId(p?.id) ? p.id : rid(), name: str(p?.name, 80) || 'Preis', kind: p?.kind === 'item' ? 'item' : 'key', key: p?.key === undefined ? (old.get(p?.id)?.key ?? '') : str(p.key, 200) })).filter(Boolean);
+      next.prizes = i.prizes.slice(0, 10).map((p) => ({ id: isId(p?.id) ? p.id : rid(), name: str(p?.name, 80) || 'Preis', kind: ['item', 'none'].includes(p?.kind) ? p.kind : 'key', key: p?.key === undefined ? (old.get(p?.id)?.key ?? '') : str(p.key, 200) })).filter(Boolean);
       if (!next.prizes.length) throw new Error('Mindestens ein Preis wird gebraucht');
     }
   } else if (Array.isArray(i.prizes)) { // nur die Keys dürfen nachgetragen werden
@@ -202,15 +270,15 @@ const ptsKey = (did, id) => `gw/${did}/pts/${id}`;
 const computePoints = (w, rec) => rec.checkinDays.length * w.checkin + rec.streakPts + rec.chatCount * w.chat;
 const blank = (name) => ({ name, checkinDays: [], streakPts: 0, chatCount: 0, chatDay: null, dayMsgs: 0, lastAt: 0, points: 0 });
 
-/** Zählt nur, solange eine Ziehung läuft, die Wochenpunkt-Zeit begonnen hat und noch nicht gezogen wurde. */
-async function countingDraw(now) {
-  const draw = await cachedCurrent(now);
-  return draw && !draw.drawnAt && draw.pointsFrom && now >= Date.parse(draw.pointsFrom) ? draw : null;
+/** Gezählt wird für jede laufende Ziehung mit Bonuslosen aus der Aktivität: die Ticket-Ziehung in gw/current und alle Chat-Gewinnspiele.
+ *  Bedingung: die Punkte-Zeit hat begonnen und es wurde noch nicht gezogen. */
+async function countingDraws(now) {
+  const cur = await cachedCurrent(now);
+  const draws = [...(cur && entryOf(cur) === 'reward' ? [cur] : []), ...(await chatDraws(now))];
+  return draws.filter((d) => !d.drawnAt && sourceOf(d) === 'draw' && d.pointsFrom && now >= Date.parse(d.pointsFrom));
 }
 
-export async function countChat(id, name, settings, now = Date.now()) {
-  const draw = await countingDraw(now);
-  if (!draw) return false;
+async function chatPoint(draw, id, name, settings, now) {
   const w = draw.weights, day = streamDay(settings, new Date(now));
   const rec = (await db.get(ptsKey(draw.id, id))) ?? blank(name);
   if (now - rec.lastAt < w.chatGap * 1000) return false;
@@ -221,11 +289,13 @@ export async function countChat(id, name, settings, now = Date.now()) {
   await db.set(ptsKey(draw.id, id), rec);
   return true;
 }
+export async function countChat(id, name, settings, now = Date.now()) {
+  let counted = false;
+  for (const draw of await countingDraws(now)) counted = (await chatPoint(draw, id, name, settings, now)) || counted;
+  return counted;
+}
 
-/** Check-in: Punkte pro Tag und ein Streak-Bonus (Streak-Tage, gedeckelt). Pro Stream-Tag nur einmal. */
-export async function countCheckin(id, name, streak, settings, now = Date.now()) {
-  const draw = await countingDraw(now);
-  if (!draw) return false;
+async function checkinPoint(draw, id, name, streak, settings, now) {
   const w = draw.weights, day = streamDay(settings, new Date(now));
   const rec = (await db.get(ptsKey(draw.id, id))) ?? blank(name);
   if (rec.checkinDays.includes(day)) return false;
@@ -235,12 +305,32 @@ export async function countCheckin(id, name, streak, settings, now = Date.now())
   await db.set(ptsKey(draw.id, id), rec);
   return true;
 }
+/** Check-in: Punkte pro Tag und ein Streak-Bonus (Streak-Tage, gedeckelt). Pro Stream-Tag nur einmal. */
+export async function countCheckin(id, name, streak, settings, now = Date.now()) {
+  let counted = false;
+  for (const draw of await countingDraws(now)) counted = (await checkinPoint(draw, id, name, streak, settings, now)) || counted;
+  return counted;
+}
 
-export const lotsFor = (draw, points) => Math.min(draw.maxLots, 1 + Math.floor(Math.max(0, points) / draw.perPoints));
+/** Monatspunkte einer Person wie in der Community-Rangliste (Twitch-Chat, Check-in-Tage, Bonus; Discord nur bei Verknüpften). */
+export async function monthPoints(settings, id, now = Date.now()) {
+  const month = monthOf(settings, new Date(now));
+  const [tw, user, bonus, link] = await Promise.all([db.get(`cmonth/${month}/${id}`), db.get(`user/${id}`), db.get(`bonus/${month}/${id}`), linkByTwitch(id).catch(() => null)]);
+  const dc = link ? await db.get(`dmonth/${month}/${link.discordId}`) : null;
+  const checkins = (user?.days ?? []).filter((d) => d.startsWith(month)).length;
+  return communityPoints(settings, { msgs: (tw?.msgs ?? 0) + (dc?.msgs ?? 0), days: (tw?.days ?? 0) + (dc?.days ?? 0), checkins }) + (bonus?.points ?? 0);
+}
+
+export const lotsFor = (draw, points) => (sourceOf(draw) === 'none' ? 1 : Math.min(draw.maxLots, 1 + Math.floor(Math.max(0, points) / draw.perPoints)));
 /** Lose gesamt: Ticket plus Wochenpunkte (mit Deckel) plus das Mitternachts-Los obendrauf (zählt nicht gegen den Deckel). */
 export const totalLots = (draw, points, extra) => lotsFor(draw, points) + (extra ? draw.bonusLots ?? 1 : 0);
 const hasBonus = async (did, id) => Boolean(await db.get(`gw/${did}/bonus/${id}`));
-const pointsOf = async (did, id) => (await db.get(ptsKey(did, id)))?.points ?? 0;
+/** Punkte einer Person für diese Ziehung, je nach Quelle. */
+const pointsFor = async (draw, id, settings, now = Date.now()) => {
+  const src = sourceOf(draw);
+  if (src === 'none') return 0;
+  return src === 'month' ? monthPoints(settings, id, now) : (await db.get(ptsKey(draw.id, id)))?.points ?? 0;
+};
 
 // ---- Sperrliste
 
@@ -261,7 +351,7 @@ export async function handleGewinnTicket(redemption, settings, now = Date.now())
   const vars = { user: name, cost: settings.gwRewardCost };
   if (!draw || windowState(draw, now) !== 'offen') { await say(settings, settings.gwClosedTemplate, vars); await refund(redemption); return { ok: false, reason: 'closed' }; }
   if (isBlocked(draw, id, name)) { await say(settings, settings.gwBlockedTemplate, vars); await refund(redemption); return { ok: false, reason: 'blocked' }; }
-  const points = await pointsOf(draw.id, id);
+  const points = await pointsFor(draw, id, settings, now);
   // Atomar: nur das erste Ticket zählt, auch wenn zwei Einlösungen gleichzeitig ankommen
   if (!(await db.setIfNew(`gw/${draw.id}/ticket/${id}`, { name, at: new Date(now).toISOString(), points, redemptionId: rid_ }))) {
     await say(settings, settings.gwDuplicateTemplate, vars); await refund(redemption); return { ok: false, reason: 'duplicate' };
@@ -270,6 +360,40 @@ export async function handleGewinnTicket(redemption, settings, now = Date.now())
   await say(settings, settings.gwTicketTemplate, { ...vars, lots });
   await setRedemptionStatus(rid_, redemption.reward.id, 'FULFILLED');
   return { ok: true, points, lots };
+}
+
+/** Chat-Befehl eines Chat-Gewinnspiels (z. B. !gewinn): genau ein Los-Ticket pro Person, nur solange es offen ist.
+ *  Gibt null zurück, wenn der Befehl zu keinem Gewinnspiel gehört (dann laufen die übrigen Befehle normal weiter). */
+export async function handleGewinnChat(e, text, settings, now = Date.now()) {
+  if (!text.startsWith('!')) return null;
+  const word = text.split(/\s+/)[0].toLowerCase();
+  const mine = (await chatDraws(now)).filter((d) => commandOf(d) === word);
+  if (!mine.length) return null;
+  const draw = mine.find((d) => windowState(d, now) === 'offen');
+  const id = e.chatter_user_id, name = e.chatter_user_name;
+  if (!draw) return { ok: false, gewinn: 'closed' };
+  if (isBlocked(draw, id, name)) return { ok: false, gewinn: 'blocked' };
+  const points = await pointsFor(draw, id, settings, now);
+  if (!(await db.setIfNew(`gw/${draw.id}/ticket/${id}`, { name, at: new Date(now).toISOString(), points, via: 'chat' }))) return { ok: false, gewinn: 'duplicate' };
+  if (draw.replyEntry !== false) await say(settings, settings.gwChatEnterTemplate, { user: name, name: draw.name, lots: lotsFor(draw, points) });
+  return { ok: true, gewinn: 'entered', drawId: draw.id };
+}
+
+/** Ticket-Fenster von Hand öffnen oder schließen. Chat-Gewinnspiele sagen das im Chat an und schließen nach draw.minutes von selbst. */
+export async function setWindow(draw, action, settings, now = Date.now()) {
+  if (draw.drawnAt) return { error: 'Es wurde schon gezogen', status: 409 };
+  const chat = entryOf(draw) === 'chat';
+  if (action === 'open') {
+    draw.ticketOpen = new Date(now).toISOString(); draw.manualClosed = false; draw.closeSaid = false;
+    draw.ticketClose = chat && draw.minutes > 0 ? new Date(now + draw.minutes * 60_000).toISOString() : null;
+  } else if (action === 'close') { draw.manualClosed = true; draw.closeSaid = true; }
+  else return { error: 'Unbekannte Aktion', status: 400 };
+  await saveDraw(draw); forgetCache();
+  if (chat) {
+    const count = (await db.list(`gw/${draw.id}/ticket/`)).length;
+    await say(settings, action === 'open' ? settings.gwChatOpenTemplate : settings.gwChatCloseTemplate, { name: draw.name, command: commandOf(draw), minutes: draw.minutes || '', count });
+  }
+  return { ok: true };
 }
 
 /** Reward „Mitternachts-Los“: ein Extra-Los pro Person, nur im Bonus-Fenster (Standard 29.11. 0:00 bis 0:30). Sonst Hinweis und Punkte zurück. */
@@ -301,17 +425,20 @@ export async function broadcasterId() {
   try { return String((await userToken()).user_id ?? ''); } catch { return ''; }
 }
 
-/** Alle Teilnehmer mit aktuellem Punktestand und Losen. `eligible` = zählt bei der Ziehung (nicht gesperrt, nicht der Kanalinhaber). */
-export async function participants(draw) {
+/** Alle Teilnehmer mit aktuellem Punktestand und Losen. `eligible` = zählt bei der Ziehung (nicht gesperrt, nicht der Kanalinhaber).
+ *  Bei der Quelle „Monatspunkte“ werden die Einstellungen gebraucht (Gewichte der Rangliste). */
+export async function participants(draw, settings = null, now = Date.now()) {
   const owner = await broadcasterId();
-  const pts = new Map((await readAll(`gw/${draw.id}/pts/`)).map(([k, v]) => [k.split('/').pop(), v]));
+  const src = sourceOf(draw);
+  const pts = src === 'draw' ? new Map((await readAll(`gw/${draw.id}/pts/`)).map(([k, v]) => [k.split('/').pop(), v])) : new Map();
   const bonus = new Set((await db.list(`gw/${draw.id}/bonus/`)).map((k) => k.split('/').pop()));
-  const rows = (await readAll(`gw/${draw.id}/ticket/`)).map(([k, t]) => {
+  const rows = [];
+  for (const [k, t] of await readAll(`gw/${draw.id}/ticket/`)) {
     const id = k.split('/').pop();
-    const points = pts.get(id)?.points ?? 0;
+    const points = src === 'month' && settings ? await monthPoints(settings, id, now) : pts.get(id)?.points ?? 0;
     const blocked = isBlocked(draw, id, t.name);
-    return { id, name: t.name, at: t.at, pointsAtTicket: t.points, points, extra: bonus.has(id), lots: totalLots(draw, points, bonus.has(id)), blocked, eligible: !blocked && id !== owner };
-  });
+    rows.push({ id, name: t.name, at: t.at, pointsAtTicket: t.points, points, extra: bonus.has(id), lots: totalLots(draw, points, bonus.has(id)), blocked, eligible: !blocked && id !== owner });
+  }
   return rows.sort((a, b) => a.at.localeCompare(b.at));
 }
 
@@ -359,8 +486,8 @@ export async function winnersOf(did) {
 const eligibleEntries = (rows) => rows.filter((r) => r.eligible).map((r) => ({ id: r.id, name: r.name, lots: r.lots, points: r.points }));
 
 /** Probe: zieht nur zur Ansicht, speichert nichts. */
-export async function testDraw(draw, seed) {
-  const entries = eligibleEntries(await participants(draw));
+export async function testDraw(draw, seed, settings = null) {
+  const entries = eligibleEntries(await participants(draw, settings));
   const useSeed = String(seed || crypto.randomBytes(8).toString('hex'));
   const { winners } = weightedDraw(entries, Math.min(draw.prizes.length, entries.length), useSeed);
   return { seed: useSeed, participants: entries.length, winners: winners.map((w, i) => ({ place: i + 1, prize: draw.prizes[i].name, name: w.name, lots: w.lots })) };
@@ -385,8 +512,10 @@ const note = (w, text, now = Date.now()) => { w.history = [...(w.history ?? []),
 async function makeWinner(draw, prize, place, pick, now) {
   const w = { id: rid(), drawId: draw.id, prizeId: prize.id, prizeName: prize.name, kind: prize.kind, place, twitchId: pick.id, name: pick.name, lots: pick.lots, status: 'gezogen', createdAt: new Date(now).toISOString(), history: [], code: null };
   note(w, 'Gezogen', now);
+  if (prize.kind === 'none') { w.status = 'abgeschlossen'; w.deadline = null; await saveWinner(w); return w; } // nur Bekanntgabe: kein Link, keine Frist
   return issueLink(draw, w, now);
 }
+const byId = async (drawId) => (drawId ? getDraw(drawId) : currentDraw());
 
 /** Link per Twitch-Flüstern schicken. Klappt das nicht und das Konto ist mit Discord verknüpft, wartet eine DM auf den VerwirrBot.
  *  Sonst muss der Link von Hand geschickt werden (steht im Dashboard). */
@@ -408,11 +537,11 @@ export async function deliverLink(draw, winner, settings, now = Date.now()) {
 }
 
 /** Ziehung durchführen: Protokoll schreiben (einmalig), Gewinner anlegen, Overlay starten, Chat und Links nacheinander. */
-export async function runDraw(settings, { seed, now = Date.now(), announceNow = false } = {}) {
-  const draw = await currentDraw();
+export async function runDraw(settings, { seed, now = Date.now(), announceNow = false, drawId = null } = {}) {
+  const draw = await byId(drawId);
   if (!draw) return { error: 'Es gibt keine Ziehung', status: 404 };
   if (draw.drawnAt || (await getResult(draw.id))) return { error: 'Diese Ziehung ist schon gelaufen', status: 409 };
-  const rows = await participants(draw);
+  const rows = await participants(draw, settings, now);
   const entries = eligibleEntries(rows);
   if (!entries.length) return { error: 'Es gibt noch keine gültigen Teilnehmer', status: 400 };
   const useSeed = String(seed || crypto.randomBytes(16).toString('hex'));
@@ -420,7 +549,7 @@ export async function runDraw(settings, { seed, now = Date.now(), announceNow = 
   const { winners, log } = weightedDraw(entries, n, useSeed);
   const body = {
     drawId: draw.id, name: draw.name, at: new Date(now).toISOString(), seed: useSeed, algorithm: 'v1: gewichtet nach Losen, ohne Zurücklegen, Zufallszahl i = HMAC-SHA256(seed, i), Teilnehmer nach Twitch-ID sortiert',
-    rules: { perPoints: draw.perPoints, maxLots: draw.maxLots, weights: draw.weights, pointsFrom: draw.pointsFrom },
+    rules: { entry: entryOf(draw), pointsSource: sourceOf(draw), perPoints: draw.perPoints, maxLots: draw.maxLots, weights: draw.weights, pointsFrom: draw.pointsFrom },
     participants: entries.length, totalLots: entries.reduce((s, e) => s + e.lots, 0), excluded: rows.filter((r) => !r.eligible).map((r) => ({ id: r.id, name: r.name, blocked: r.blocked })),
     entries: entries.sort((a, b) => (a.id < b.id ? -1 : 1)),
     winners: winners.map((w, i) => ({ place: i + 1, prizeId: draw.prizes[i].id, prize: draw.prizes[i].name, twitchId: w.id, name: w.name, lots: w.lots })), log,
@@ -443,7 +572,8 @@ async function announce(draw, winners, settings, { now, immediate = false } = {}
   const order = [...winners].sort((a, b) => b.place - a.place);
   const gap = revealMs(settings);
   const step = async (w) => {
-    await say(settings, settings.gwWinnerTemplate, { user: w.name, prize: w.prizeName, place: w.place, hours: draw.winnerHours });
+    await say(settings, w.kind === 'none' ? settings.gwWinnerPlainTemplate : settings.gwWinnerTemplate, { user: w.name, prize: w.prizeName, place: w.place, hours: draw.winnerHours, name: draw.name });
+    if (w.kind === 'none') return;
     const fresh = (await getWinner(draw.id, w.id)) ?? w;
     if (fresh.status === 'verfallen') return;
     await deliverLink(draw, fresh, settings);
@@ -463,9 +593,9 @@ export async function overlayView(settings, now = Date.now()) {
   const shown = Math.min(order.length, Math.floor((now - st.startedAt) / gap) + 1);
   return { active: true, title: result.name, startedAt: st.startedAt, now, revealMs: gap, total: order.length, winners: order.slice(0, Math.max(0, shown)).map((w) => ({ place: w.place, prize: w.prize, name: w.name })) };
 }
-export async function setOverlay(action, now = Date.now()) {
+export async function setOverlay(action, now = Date.now(), drawId = null) {
   const st = await db.get('gw/overlay');
-  const draw = await currentDraw();
+  const draw = await byId(drawId);
   if (!draw?.drawnAt) return { error: 'Es wurde noch nicht gezogen' };
   if (action === 'hide') await db.set('gw/overlay', { ...(st ?? { drawId: draw.id }), hidden: true });
   else await db.set('gw/overlay', { drawId: draw.id, startedAt: now, hidden: false }); // „show“ und „replay“ spielen die Aufdeckung neu ab
@@ -475,8 +605,8 @@ export async function setOverlay(action, now = Date.now()) {
 // ---- Nachziehen
 
 /** Ersetzt einen Gewinner (nicht gemeldet oder auf Wunsch) durch den Nächsten aus der Verlosung: gleiche Lose, ohne die bisherigen Gewinner. */
-export async function redraw(settings, winnerId, { reason = 'manuell nachgezogen', now = Date.now() } = {}) {
-  const draw = await currentDraw();
+export async function redraw(settings, winnerId, { reason = 'manuell nachgezogen', now = Date.now(), drawId = null } = {}) {
+  const draw = await byId(drawId);
   const old = draw ? await getWinner(draw.id, winnerId) : null;
   if (!old) return { error: 'Diesen Gewinner gibt es nicht', status: 404 };
   if (old.status === 'verfallen') return { error: 'Dieser Gewinner ist schon ersetzt', status: 409 };
@@ -496,7 +626,7 @@ export async function redraw(settings, winnerId, { reason = 'manuell nachgezogen
   const fresh = await makeWinner(draw, prize, old.place, winners[0], now);
   old.replacedBy = fresh.id; await saveWinner(old);
   await say(settings, settings.gwRedrawTemplate, { user: fresh.name, prize: fresh.prizeName, place: fresh.place, hours: draw.winnerHours, old: old.name });
-  await deliverLink(draw, fresh, settings, now);
+  if (fresh.kind !== 'none') await deliverLink(draw, fresh, settings, now);
   return { ok: true, replacement: fresh };
 }
 
@@ -596,11 +726,11 @@ export async function submitAddress(code, input, now = Date.now()) {
 
 // ---- Dashboard-Aktionen am Gewinner
 
-export async function winnerAction(settings, winnerId, action, now = Date.now()) {
-  const draw = await currentDraw();
+export async function winnerAction(settings, winnerId, action, now = Date.now(), drawId = null) {
+  const draw = await byId(drawId);
   const w = draw ? await getWinner(draw.id, winnerId) : null;
   if (!w) return { error: 'Diesen Gewinner gibt es nicht', status: 404 };
-  if (action === 'redraw') return redraw(settings, winnerId, { now });
+  if (action === 'redraw') return redraw(settings, winnerId, { now, drawId: draw.id });
   if (w.status === 'verfallen') return { error: 'Dieser Gewinner ist schon ersetzt', status: 409 };
   if (action === 'link') { // neuer Link, neue Frist
     if (!['gezogen', 'link_verschickt', 'gemeldet'].includes(w.status)) return { error: 'Für diesen Stand braucht es keinen neuen Link', status: 409 };
@@ -647,16 +777,26 @@ async function syncTicketReward(draw, now) {
   }
 }
 
-/** Nicht gemeldet nach der Frist -> verfallen und nachziehen. Adressen nach Ablauf der Aufbewahrung löschen. Ticket-Fenster abgleichen. */
+const OLD_MS = 120 * 86_400_000; // so lange nach der Ziehung werden Fristen und Adressen noch geprüft
+
+/** Jede Minute, für alle Gewinnspiele: nicht gemeldet nach der Frist -> verfallen und nachziehen. Adressen nach Ablauf der Aufbewahrung löschen.
+ *  Ticket-Reward nach dem Fenster der Ticket-Ziehung pausieren. Chat-Gewinnspiele, deren Zeit um ist, im Chat schließen. */
 export async function gewinnTick(settings, now = Date.now()) {
-  const draw = await currentDraw();
-  if (!draw) return { redrawn: 0, deleted: 0 };
   let redrawn = 0, deleted = 0;
-  if (settings.gwEnabled) await syncTicketReward(draw, now);
-  if (draw.drawnAt) {
+  const current = await currentDraw();
+  if (current && settings.gwEnabled) await syncTicketReward(current, now);
+  for (const draw of await allDraws()) {
+    if (!draw.drawnAt) {
+      if (entryOf(draw) === 'chat' && draw.ticketOpen && !draw.manualClosed && !draw.closeSaid && draw.ticketClose && now >= Date.parse(draw.ticketClose)) {
+        draw.closeSaid = true; await saveDraw(draw); forgetCache();
+        await say(settings, settings.gwChatCloseTemplate, { name: draw.name, command: commandOf(draw), minutes: draw.minutes || '', count: (await db.list(`gw/${draw.id}/ticket/`)).length });
+      }
+      continue;
+    }
+    if (now - Date.parse(draw.drawnAt) > OLD_MS) continue;
     for (const w of await winnersOf(draw.id)) {
       if (['gezogen', 'link_verschickt'].includes(w.status) && now > Date.parse(w.deadline)) {
-        const res = await redraw(settings, w.id, { reason: `keine Meldung in ${draw.winnerHours} Stunden`, now });
+        const res = await redraw(settings, w.id, { reason: `keine Meldung in ${draw.winnerHours} Stunden`, now, drawId: draw.id });
         if (res.ok) redrawn++;
       } else if (w.hasAddress && w.shippedAt && now >= Date.parse(w.shippedAt) + draw.keepDays * 86_400_000) {
         await deleteAddress(w, now);
@@ -670,17 +810,32 @@ export async function gewinnTick(settings, now = Date.now()) {
 
 // ---- Zusammenfassung für den Admin
 
-export async function adminView(settings, now = Date.now()) {
-  const draw = await currentDraw();
+/** Gewinner aller jüngeren Ziehungen, bei denen Marcel etwas tun muss (fürs Dashboard): Preis verschicken oder Link von Hand schicken. */
+export async function openTasks(now = Date.now()) {
+  const out = [];
+  for (const draw of await allDraws()) {
+    if (!draw.drawnAt || now - Date.parse(draw.drawnAt) > OLD_MS) continue;
+    for (const w of await winnersOf(draw.id)) {
+      const task = w.kind === 'item' && w.status === 'adresse_erhalten' ? 'ship' : w.sendError && !w.dmQueued && ['gezogen', 'link_verschickt'].includes(w.status) ? 'link' : w.kind === 'key' && w.status === 'gemeldet' ? 'key' : null;
+      if (task) out.push({ task, drawId: draw.id, drawName: draw.name, name: w.name, prizeName: w.prizeName });
+    }
+  }
+  return out;
+}
+
+/** Ansicht für den Admin: Liste aller Gewinnspiele und die Einzelheiten zu einem (drawId, sonst die Ticket-Ziehung, sonst das neueste). */
+export async function adminView(settings, now = Date.now(), drawId = null) {
   const tz = settings.timezone;
-  const draws = await listDraws();
+  const draws = await listDraws(now);
+  const draw = (drawId ? await getDraw(drawId) : null) ?? (await currentDraw()) ?? (draws[0] ? await getDraw(draws[0].id) : null);
   if (!draw) return { enabled: settings.gwEnabled, draw: null, draws };
-  const rows = await participants(draw);
+  const rows = await participants(draw, settings, now);
   const result = await getResult(draw.id);
   const winners = (await winnersOf(draw.id)).map((w) => ({ ...w, statusLabel: STATUS_LABEL[w.status], link: ['gezogen', 'link_verschickt', 'gemeldet'].includes(w.status) ? linkOf(w) : '', expired: ['gezogen', 'link_verschickt'].includes(w.status) && now > Date.parse(w.deadline), code: undefined }));
-  const view = { ...draw, bonusOpen: toLocal(draw.bonusOpen, tz), bonusClose: toLocal(draw.bonusClose, tz), ticketOpen: toLocal(draw.ticketOpen, tz), ticketClose: toLocal(draw.ticketClose, tz), pointsFrom: toLocal(draw.pointsFrom, tz), plannedDraw: toLocal(draw.plannedDraw, tz), drawnAt: draw.drawnAt };
+  const view = { ...draw, bonusOpen: toLocal(draw.bonusOpen, tz), bonusClose: toLocal(draw.bonusClose, tz), ticketOpen: toLocal(draw.ticketOpen, tz), ticketClose: toLocal(draw.ticketClose, tz), pointsFrom: toLocal(draw.pointsFrom, tz), plannedDraw: toLocal(draw.plannedDraw, tz), drawnAt: draw.drawnAt,
+    entry: entryOf(draw), command: commandOf(draw), pointsSource: sourceOf(draw), minutes: draw.minutes ?? 0, replyEntry: draw.replyEntry !== false, closesAt: draw.ticketClose, current: draws.some((x) => x.id === draw.id && x.current) };
   return {
-    enabled: settings.gwEnabled, draws, draw: view, window: windowState(draw, now), bonusWindow: bonusState(draw, now), timezone: tz,
+    enabled: settings.gwEnabled, communityEnabled: Boolean(settings.communityEnabled), draws, tasks: await openTasks(now), draw: view, window: windowState(draw, now), bonusWindow: bonusState(draw, now), timezone: tz,
     tickets: rows, stats: distribution(rows), result: result ? { ...result, entries: undefined, log: undefined, entryCount: result.entries.length } : null, winners,
     overlay: await overlayView(settings, now), rewardReady: Boolean(((await db.get('config/state')) ?? {}).gwRewardId), bonusRewardReady: Boolean(((await db.get('config/state')) ?? {}).gwBonusRewardId),
   };

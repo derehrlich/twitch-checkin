@@ -27,14 +27,16 @@ export async function loadStatus() {
   return s;
 }
 
-async function syncRewards() {
+/** Rewards und Webhooks mit Twitch abgleichen. prefix steht vor der Erfolgsmeldung (z. B. „Gespeichert ✓ · “). */
+export async function syncRewards(prefix = '') {
+  if (typeof prefix !== 'string') prefix = '';
   const buttons = document.querySelectorAll('.js-sync');
   buttons.forEach((b) => { b.disabled = true; });
   try {
     const r = await api('POST', 'setup', {});
     const names = [r.reward, r.checkout, r.streak].filter(Boolean).map((x) => `„${x}“`).join(', ');
     if (r.warnings?.length) toast(`Abgleich nur teilweise geglückt: ${r.warnings.join(' · ')}`, true, 20000);
-    else toast(`Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓${r.notes?.length ? ` (${r.notes.join(' · ')})` : ''}`, false, r.notes?.length ? 12000 : undefined);
+    else toast(`${prefix}Rewards ${names}${r.soundboard ? ` und ${r.soundboard} Soundboard-Reward(s)` : ''} und Webhooks abgeglichen ✓${r.notes?.length ? ` (${r.notes.join(' · ')})` : ''}`, false, r.notes?.length ? 12000 : undefined);
     $('syncHint').classList.add('hidden');
     await loadStatus();
     document.dispatchEvent(new Event('admin:synced'));

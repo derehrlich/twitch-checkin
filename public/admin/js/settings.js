@@ -1,6 +1,7 @@
 // Einstellungsformulare: entstehen aus dem Schema, ein gemeinsames Speichern für alle Reiter.
 import { $, api, esc, fill, run, state, toast } from './core.js';
 import { CHECKS, FIELDS, SCHEMA, SYNC_KEYS } from './schema.js';
+import { syncRewards } from './status.js';
 
 // kind und empty sind Regeln für die Prüfung auf dem Server, keine HTML-Attribute
 const attrString = (attrs = {}) => Object.entries(attrs).filter(([k]) => k !== 'kind' && k !== 'empty').map(([k, v]) => `${k}="${esc(v)}"`).join(' ');
@@ -11,9 +12,11 @@ function renderItem(i) {
   return `<div><label for="${i.id}">${i.label}</label><input id="${i.id}" type="${i.type}" data-setting ${attrString(i.attrs)}></div>`;
 }
 
-// Zusammenhängende Textfelder und Zahlen stehen in einem Raster, Haken und große Textfelder in voller Breite
+// Jede Gruppe ist eine zugeklappte Karte. Hat sie als Erstes einen Schalter, zeigt die Kopfzeile „an“ oder „aus“.
+// Zusammenhängende Textfelder und Zahlen stehen in einem Raster, Haken und große Textfelder in voller Breite.
 function renderGroup(g) {
-  let html = `<section class="card"><h2>${g.title}</h2>`;
+  const sw = g.items[0]?.type === 'check' ? g.items[0].id : '';
+  let html = `<details class="card fold"><summary><span class="fold-title">${g.title}</span>${sw ? `<span class="pill" data-pill="${sw}"></span>` : ''}<span class="fold-count">${g.items.length} ${g.items.length === 1 ? 'Einstellung' : 'Einstellungen'}</span></summary><div class="fold-body">`;
   let grid = [];
   const flush = () => { if (grid.length) html += `<div class="grid2">${grid.join('')}</div>`; grid = []; };
   for (const i of g.items) {
@@ -22,7 +25,14 @@ function renderGroup(g) {
   }
   flush();
   if (g.hint) html += `<p class="muted">${g.hint}</p>`;
-  return html + '</section>';
+  return html + '</div></details>';
+}
+
+function updatePills() {
+  for (const p of document.querySelectorAll('[data-pill]')) {
+    const on = $(p.dataset.pill).checked;
+    p.textContent = on ? 'an' : 'aus'; p.classList.toggle('on', on);
+  }
 }
 
 const previews = () => Object.values(SCHEMA).flat().flatMap((g) => g.items).filter((i) => i.preview);
@@ -48,7 +58,7 @@ export function renderForms() {
 
 function onChange(e) {
   if (!e.target.matches?.('[data-setting]')) return;
-  updatePreviews();
+  updatePreviews(); updatePills();
   setDirty(true);
   const tab = e.target.closest('.tab-panel')?.dataset.panel;
   if (tab) document.querySelector(`.tabs button[data-tab="${tab}"]`)?.classList.add('dirty');
@@ -57,7 +67,7 @@ function onChange(e) {
 export function fillForms() {
   for (const f of FIELDS) $(f).value = state.settings[f] ?? '';
   for (const c of CHECKS) $(c).checked = Boolean(state.settings[c]);
-  updatePreviews();
+  updatePreviews(); updatePills();
   setDirty(false);
 }
 
@@ -76,8 +86,9 @@ export function initSettings() {
     fillForms();
     document.dispatchEvent(new Event('admin:settings'));
     const needsSync = SYNC_KEYS.some((k) => before[k] !== state.settings[k]);
-    toast(needsSync ? 'Gespeichert ✓ – bitte jetzt Rewards und Webhooks abgleichen' : 'Gespeichert ✓');
-    if (needsSync) $('syncHint').classList.remove('hidden');
+    toast('Gespeichert ✓');
+    // Betrifft die Änderung Rewards oder Webhooks, gleicht die Seite gleich selbst mit Twitch ab. Klappt das nicht, bleibt der Hinweis stehen.
+    if (needsSync) { $('syncHint').classList.remove('hidden'); await syncRewards('Gespeichert ✓ · '); }
   }));
   $('discard').addEventListener('click', () => fillForms());
 }

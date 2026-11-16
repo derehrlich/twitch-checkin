@@ -192,6 +192,9 @@ export const SCHEMA = {
       a('quoteAddedTemplate', '✅ Zitat #{n} gespeichert.', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
       a('quoteNoneTemplate', '{user}, ich kenne noch kein Zitat. Mods können mit !addquote eins anlegen.', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
     ] },
+  ],
+
+  moderation: [
     { title: 'Moderation', hint: `Löscht Nachrichten, die gegen eine Regel verstoßen, und warnt kurz im Chat. <b>Nie betroffen:</b> du und deine Mods. VIPs, Abonnenten und Stammgäste (ab der eingestellten Zahl an Check-ins) dürfen Links, Großbuchstaben, Wiederholungen und Emotes, nur gesperrte Wörter gelten für sie auch. <b>Twitch-Clips</b> darf jeder teilen. Mit <b>!permit name</b> erlauben Mods jemandem 60 Sekunden lang einen Link. Fang mit dem <b>Testmodus</b> an: Dann schreibt der Bot nur ins Protokoll (Reiter Chat, unten), was er gelöscht <i>hätte</i>. Der Bot braucht dafür neue Rechte von Twitch: einmal auf Start → „Mit Twitch verbinden“ klicken. Platzhalter der Warnung: ${code('user', 'reason', 'n')}.`, items: [
       c('modEnabled', false, 'Moderation aktivieren'),
       c('modTestMode', true, 'Testmodus: nur ins Protokoll schreiben, nichts löschen'),
@@ -242,10 +245,10 @@ export const SCHEMA = {
   ],
 
   gewinn: [
-    { title: 'Geburtstags-Ziehung: Ticket und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du darüber in der Karte „Geburtstags-Ziehung“. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
-      c('gwEnabled', false, 'Geburtstags-Ziehung einschalten (legt den Reward an und zählt die Wochenpunkte, braucht den Chat-Webhook)'),
+    { title: 'Kanalpunkte-Ticket: Reward und Texte', hint: `Zeiten, Preise, Lose-Rechnung und Gewinner pflegst du oben je Gewinnspiel. Hier stehen Schalter, der Kanalpunkte-Reward und die Chat-Texte. Nach dem Einschalten oder Ändern von Name und Preis die Rewards abgleichen. Platzhalter: ${code('user')} ${code('prize')} ${code('place')} ${code('hours')} ${code('lots')} ${code('cost')} ${code('old')}.`, items: [
+      c('gwEnabled', false, 'Gewinnspiele einschalten (legt den Ticket-Reward an, zählt Punkte und hört auf die Chat-Befehle, braucht den Chat-Webhook)'),
       t('gwRewardTitle', 'Geburtstags-Ticket', 'Reward-Name', { maxlength: 45 }), n('gwRewardCost', 500, 'Preis des Tickets (Kanalpunkte, günstig halten)', { min: 1, max: 1000000 }),
-      c('gwBonusEnabled', true, 'Mitternachts-Los anbieten (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind; das Fenster stellst du in der Karte „Geburtstags-Ziehung“ ein)'),
+      c('gwBonusEnabled', true, 'Mitternachts-Los anbieten (Extra-Los für alle, die um 0:00 am Geburtstag dabei sind; das Fenster stellst du oben im Gewinnspiel ein)'),
       t('gwBonusRewardTitle', 'Mitternachts-Los', 'Mitternachts-Los: Reward-Name', { maxlength: 45 }), n('gwBonusRewardCost', 15, 'Mitternachts-Los: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       a('gwBonusTemplate', '🌙 {user}, dein Mitternachts-Los ist drin! Du hast {lots} Extra-Los obendrauf. Alles Gute zum Geburtstag!', 'Mitternachts-Los erhalten (mit Ticket)', { user: 'Max', lots: 1 }),
       a('gwBonusNoTicketTemplate', '🌙 {user}, dein Mitternachts-Los ist gemerkt! Damit es zählt, brauchst du noch das Geburtstags-Ticket (kommt am Danke-Stream).', 'Mitternachts-Los erhalten (noch ohne Ticket)', { user: 'Max', lots: 1 }),
@@ -260,17 +263,26 @@ export const SCHEMA = {
       a('gwRedrawTemplate', '🔁 Nachgezogen: {user} gewinnt {prize} (Platz {place}). {old} hat sich nicht gemeldet. Persönlicher Link per Flüstern, {hours} Stunden Zeit.', 'Nachgezogen', { user: 'Max', prize: 'Enshrouded', place: 1, hours: 24, old: 'Anna' }),
       a('gwWhisperTemplate', 'Glückwunsch {user}! Du hast {prize} gewonnen 🎉 Dein persönlicher Link (nur für dich, {hours} Stunden gültig, bitte nicht weitergeben): {url}', 'Flüsternachricht mit dem Link', { user: 'Max', prize: 'Enshrouded', hours: 24, url: 'https://…' }),
     ] },
+    { title: 'Gewinnspiele im Chat: Texte', hint: `Für Gewinnspiele, bei denen man mit einem Chat-Befehl mitmacht. Platzhalter: ${code('name')} Name des Gewinnspiels, ${code('command')} Befehl, ${code('minutes')} Minuten bis zum Schluss, ${code('count')} Teilnehmer, ${code('user')}, ${code('lots')} Lose, ${code('prize')} Preis, ${code('place')} Platz. Ob jede Teilnahme bestätigt wird, stellst du je Gewinnspiel ein.`, items: [
+      a('gwChatOpenTemplate', '🎁 Gewinnspiel „{name}“ ist offen! Schreib {command} in den Chat, um mitzumachen.', 'Gewinnspiel geöffnet', { name: 'Gewinnspiel im Stream', command: '!gewinn', minutes: 5, count: 0 }),
+      a('gwChatEnterTemplate', '✅ {user} ist dabei ({lots} Los(e)).', 'Teilnahme bestätigt', { user: 'Max', name: 'Gewinnspiel im Stream', lots: 1 }),
+      a('gwChatCloseTemplate', '⏹️ „{name}“ ist geschlossen. {count} machen mit, gleich wird gezogen!', 'Gewinnspiel geschlossen', { name: 'Gewinnspiel im Stream', command: '!gewinn', count: 12 }),
+      a('gwWinnerPlainTemplate', '🎉 {user} gewinnt {prize}! Glückwunsch!', 'Gewinner-Ansage bei Preisen ohne Link (nur Bekanntgabe)', { user: 'Max', prize: 'Preis', place: 1, name: 'Gewinnspiel im Stream' }),
+    ] },
   ],
 
   feier: [
-    { title: 'Geburtstags-Befehl und Wochenplan-Seite', hint: `Der Befehl schreibt die Restzeit bis zur Zielzeit des Countdowns (Reiter „Geburtstagswoche“) und den Link zur Seite <code>/woche</code>. Dort steht der Wochenplan, ohne Anmeldung erreichbar. Die Seite ist nur sichtbar, solange der Befehl eingeschaltet ist. Im Plan steht ein Eintrag pro Zeile, am schönsten als „Mo 23.11. 19:00 Titel“ (Tag, Datum, Uhrzeit, Text). Platzhalter: ${code('countdown')} Restzeit, ${code('url')} Adresse der Seite, ${code('plan')} der Plan in einer Zeile (nur wenn du ihn doch im Chat willst).`, items: [
+    { title: 'Geburtstags-Befehl und Wochenplan-Seite', hint: `Der Befehl schreibt die Restzeit bis zur Zielzeit des Countdowns (Seite „Geburtstagswoche“) und den Link zur Seite <code>/woche</code>. Dort steht der Wochenplan, ohne Anmeldung erreichbar. Die Seite ist nur sichtbar, solange der Befehl eingeschaltet ist. Im Plan steht ein Eintrag pro Zeile, am schönsten als „Mo 23.11. 19:00 Titel“ (Tag, Datum, Uhrzeit, Text). Platzhalter: ${code('countdown')} Restzeit, ${code('url')} Adresse der Seite, ${code('plan')} der Plan in einer Zeile (nur wenn du ihn doch im Chat willst).`, items: [
       c('bdayEnabled', false, 'Geburtstags-Befehl einschalten (braucht den Chat-Webhook)'),
       t('bdayCommand', '!geburtstag', 'Befehl', { maxlength: 26, kind: 'command', placeholder: '!geburtstag' }),
       a('bdayTemplate', '🎂 Noch {countdown} bis Marcels Geburtstag! Das ganze Programm der Woche: {url}', 'Antwort vor dem Geburtstag', { countdown: '3 Tage 4 Std 12 Min', url: 'https://…/woche' }),
       a('bdayDoneTemplate', '🎉 Marcel hat Geburtstag! Danke, dass ihr dabei seid ❤️ Das Programm: {url}', 'Antwort nach der Zielzeit', { url: 'https://…/woche' }),
       a('bdayPlan', 'Mo 23.11. 19:00 Geburtstagswoche startet: Rückblick auf die Kanalgeschichte\nDi 24.11. 20:30 Bauabend\nMi 25.11. 19:00 Community-Tag: Adventures & Community Votes\nDo 26.11. 20:30 1.0 Story-Abend\nFr 27.11. 19:00 Community-Tag: Adventures & Community Votes\nSa 28.11. ab 19:00 Mitternachtsstream, um 0:00 Extra-Los\nSo 29.11. Geburtstag, kein Stream\nMo 30.11. ab 19:30 Danke-Stream mit Ziehung', 'Wochenplan für die Seite /woche (eine Zeile pro Eintrag, zum Beispiel: Mo 23.11. 19:00 Titel)'),
     ] },
-    { title: 'Glücksrad: Chat', hint: `Die Räder und ihre Felder pflegst du im Reiter „Geburtstagswoche“. Platzhalter: ${code('wheel')} Name des Rads, ${code('result')} Ergebnis.`, items: [
+  ],
+
+  rad: [
+    { title: 'Glücksrad: Chat', hint: `Die Räder und ihre Felder pflegst du oben auf dieser Seite. Platzhalter: ${code('wheel')} Name des Rads, ${code('result')} Ergebnis.`, items: [
       c('radChatEnabled', true, 'Ergebnis nach dem Drehen in den Chat schreiben'),
       a('radTemplate', '🎡 {wheel}: {result}!', 'Chatnachricht mit dem Ergebnis', { wheel: 'Gebäudeart', result: 'Leuchtturm' }),
     ] },

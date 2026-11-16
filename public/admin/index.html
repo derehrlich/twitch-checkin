@@ -15,6 +15,7 @@
 </head>
 <body>
 <header class="topbar">
+  <button type="button" id="burger" class="leise burger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="tabs">☰</button>
   <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Stadtwache Admin</h1></div></div>
   <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
   <button id="logout" class="ghost hidden">Abmelden</button>
@@ -32,63 +33,48 @@
   </section>
 
   <div id="app" class="hidden" style="display:grid; gap:22px;">
-    <nav id="tabs" class="tabs" role="tablist" aria-label="Bereiche">
-      <button data-tab="start" role="tab">Start</button>
-      <button data-tab="zuschauer" role="tab">Zuschauer</button>
-      <button data-tab="ereignisse" role="tab">Twitch-Ereignisse</button>
-      <button data-tab="chat" role="tab">Chat</button>
-      <button data-tab="belohnungen" role="tab">Belohnungen</button>
-      <button data-tab="tickets" role="tab">Events / Tickets</button>
-      <button data-tab="gewinn" role="tab">Gewinnspiel</button>
-      <button data-tab="feier" role="tab">Geburtstagswoche</button>
-      <button data-tab="overlays" role="tab">Overlays</button>
-      <button data-tab="medien" role="tab">Medien</button>
-      <button data-tab="system" role="tab">System</button>
-    </nav>
+    <div id="navBack" class="nav-back hidden"></div>
+    <nav id="tabs" class="tabs" aria-label="Bereiche"></nav>
 
     <div id="syncHint" class="banner hidden">
-      <span>⚠️ Die Änderungen betreffen Rewards oder Webhooks. Damit sie bei Twitch ankommen, jetzt abgleichen.</span>
+      <span>⚠️ Die Änderungen sind gespeichert, aber noch nicht bei Twitch angekommen (Rewards oder Webhooks).</span>
       <button class="js-sync">Jetzt abgleichen</button>
     </div>
 
+    <div id="pageHead" class="page-head"><span id="pageIcon" aria-hidden="true"></span><h2 id="pageTitle"></h2></div>
+
     <div class="tab-panel" data-panel="start">
       <section class="card">
-        <h2>Status</h2>
-        <div id="checks"></div>
-        <div class="row" style="margin-top:12px">
-          <a class="btn ghost" href="/api/auth/login">Mit Twitch verbinden</a>
-          <button class="js-sync">Rewards &amp; Webhooks abgleichen</button>
-        </div>
-        <p class="muted">Nach Änderungen an Reward-Namen, Preisen oder den Schaltern für Raids und Alerts die Rewards abgleichen. Die Seite weist dich darauf hin.</p>
-        <details><summary class="muted">Technische Angaben</summary>
-          <p class="muted">Twitch OAuth Redirect URL: <code id="uRedirect"></code></p>
-          <p class="muted">Webhook: <code id="uWebhook"></code></p>
-        </details>
+        <h2>Das wartet auf dich</h2>
+        <div id="dashTodo"><p class="muted">Lädt …</p></div>
       </section>
       <section class="card">
-        <h2>Überblick</h2>
+        <h2>Läuft gerade</h2>
+        <div class="tiles" id="dashLive"></div>
+      </section>
+      <section class="card">
+        <h2>Besucher</h2>
         <div class="stats" id="startStats"></div>
       </section>
-      <section class="card">
-        <h2>OBS-Overlay</h2>
-        <p>Browser-Quelle in OBS mit dieser Adresse (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
-        <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
-        <p class="muted">Diese Adresse zeigt alles in einer Quelle. Für getrennte Lautstärken in OBS nimmst du stattdessen drei Quellen (nicht zusammen mit der Adresse oben verwenden, sonst läuft alles doppelt):</p>
-        <label>Alerts (Check-in, Raid, Follow, Sub, Bits …)</label>
-        <div class="row"><input id="overlayAlertsUrl" readonly><button id="copyOverlayAlerts" class="ghost">Kopieren</button></div>
-        <label>Soundboard (Kanalpunkte-Sounds)</label>
-        <div class="row"><input id="overlaySoundsUrl" readonly><button id="copyOverlaySounds" class="ghost">Kopieren</button></div>
-        <label>Einlaufsounds (nur Ton, nichts zu sehen)</label>
-        <div class="row"><input id="overlayEntryUrl" readonly><button id="copyOverlayEntry" class="ghost">Kopieren</button></div>
-        <p class="muted">Ohne die Einlaufsound-Quelle bleibt ein Check-in mit Einlaufsound in der Alert-Quelle stumm.</p>
-        <p class="muted">Das Overlay lädt sich nach einem Update selbst neu, sobald gerade kein Alert läuft. Töne und Bilder gelten nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig.</p>
-      </section>
+      <details class="card fold" id="dashTech">
+        <summary><span class="fold-title">Verbindung zu Twitch</span><span class="pill" id="dashTechState"></span></summary>
+        <div class="fold-body">
+          <div id="checks"></div>
+          <div class="row" style="margin-top:12px">
+            <a class="btn ghost" href="/api/auth/login">Mit Twitch verbinden</a>
+            <button class="js-sync">Rewards &amp; Webhooks abgleichen</button>
+          </div>
+          <p class="muted">Nach dem Speichern gleicht die Seite Rewards und Webhooks von selbst mit Twitch ab. Der Knopf ist für den Fall, dass das einmal nicht geklappt hat.</p>
+          <details><summary class="muted">Technische Angaben</summary>
+            <p class="muted">Twitch OAuth Redirect URL: <code id="uRedirect"></code></p>
+            <p class="muted">Webhook: <code id="uWebhook"></code></p>
+          </details>
+        </div>
+      </details>
     </div>
 
     <div class="tab-panel hidden" data-panel="zuschauer">
-      <p class="muted intro">Alles rund um die Besucher: Check-in und Check-out, Meilensteine, Streaks und die Liste aller Besucher.</p>
-      <div class="banner"><span>Nach Änderungen an Reward-Namen oder Preisen die Rewards mit Twitch abgleichen.</span><button class="ghost js-sync">Rewards abgleichen</button></div>
-      <div data-schema="checkin" style="display:grid; gap:22px;"></div>
+      <p class="muted intro">Check-in und Check-out, Meilensteine, Streaks und die Liste aller Besucher.</p>
       <section class="card">
         <h2>Besucher</h2>
         <div class="stats" id="stats"></div>
@@ -123,12 +109,18 @@
         </div>
         <div id="impOut" class="muted" style="margin-top:10px"></div>
       </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="checkin" class="folds"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="ereignisse">
-      <p class="muted intro">Was der Bot tut, wenn auf Twitch etwas passiert: Follows, Subs, Bits und Raids.</p>
-      <div data-schema="alerts" style="display:grid; gap:22px;"></div>
-      <div data-schema="raids" style="display:grid; gap:22px;"></div>
+      <p class="muted intro">Was im Overlay und im Chat passiert, wenn jemand folgt, abonniert oder Bits schickt.</p>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="alerts" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="raids">
+      <p class="muted intro">Was der Bot bei einem Raid tut, und welche Kanäle schon wie oft geraidet haben.</p>
       <section class="card">
         <h2>Erfasste Raids</h2>
         <p class="muted">Alle Kanäle, für die der Bot einen Raid-Stand kennt. <b>Live</b> heißt: der Raid kam beim Bot an. <b>Nachgetragen</b> heißt: du hast den Stand von Hand eingetragen. Ein Klick auf eine Zeile übernimmt den Kanal ins Formular unten, um den Stand zu ändern.</p>
@@ -152,10 +144,11 @@
         <div class="row"><button id="raidBulkBtn" class="ghost">Alle eintragen</button></div>
         <p class="muted" id="raidBulkInfo"></p>
       </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="raids" class="folds"></div>
     </div>
 
-    <div class="tab-panel hidden" data-panel="chat">
-      <p class="muted intro">Alles, was im Twitch-Chat passiert: eigene Commands, Befehle wie !streak, Shoutout, Zitate, Moderation (Links, Spam, gesperrte Wörter) und die Chat-Leiste fürs Overlay.</p>
+    <div class="tab-panel hidden" data-panel="commands">
       <section class="card">
         <h2>Commands und Regeln</h2>
         <p>Eigene Chat-Befehle, Stichwörter und Zeitsteuerung. Jeder Command löst eine oder mehrere <b>Aktionen nacheinander</b> aus: Chat-Text, Overlay-Alert oder ein Sound aus dem Soundboard (Sounds und Alerts spielen nach der gemeinsamen Reihenfolge, nichts überlagert sich).</p>
@@ -164,7 +157,7 @@
           <li><b>Stichwort</b>: reagiert, wenn jemand ein bestimmtes Wort schreibt (nie auf deine eigenen Nachrichten).</li>
           <li><b>Zeitgesteuert</b>: z. B. alle 20 Minuten ein Alert oder Hinweis, aber nur, wenn seit dem letzten Mal mindestens so viele Chat-Nachrichten kamen (Bots und du zählen nicht). Der Takt läuft nur, solange das Overlay in OBS offen ist.</li>
         </ul>
-        <p class="muted">Braucht „Chat-Befehle“ (Reiter Chat). Die Chat-Antworten brauchen außerdem „Chat-Nachrichten“ unter System.</p>
+        <p class="muted">Braucht „Chat-Befehle“ (Seite „Befehle und Shoutout“). Die Chat-Antworten brauchen außerdem „Chat-Nachrichten“ unter System.</p>
         <div id="cmdRows"></div>
         <div class="row" style="margin-top:18px">
           <div style="flex:0 1 280px"><label for="newCmdType">Neuer Command: Auslöser</label><select id="newCmdType"><option value="command">Chat-Befehl</option><option value="keyword">Stichwort im Chat</option><option value="timer">Zeitgesteuert</option></select></div>
@@ -172,7 +165,28 @@
           <button id="addCommand">Command anlegen</button>
         </div>
       </section>
-      <div data-schema="chat" style="display:grid; gap:22px;"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="chat">
+      <p class="muted intro">Die festen Befehle wie !streak, dazu Shoutout und Zitate.</p>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="chat" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="moderation">
+      <p class="muted intro">Der Bot löscht Links, Spam und gesperrte Wörter. Neue Regeln laufen zuerst im Testmodus.</p>
+      <section class="card" id="modCard">
+        <h2>Moderation: Protokoll</h2>
+        <p class="muted">Hier steht, was der Bot zuletzt gelöscht hat (die letzten 100 Einträge). Im Testmodus steht „Test“ dabei: Die Nachricht ist stehen geblieben, der Bot hätte sie aber gelöscht. Passt eine Regel nicht, stell sie unten ein oder aus.</p>
+        <div id="modLog"></div>
+        <div class="row" style="margin-top:12px"><button id="modReload" class="ghost">Aktualisieren</button><button id="modClear" class="danger">Protokoll leeren</button></div>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="moderation" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="chatleiste">
+      <p class="muted intro">Der Twitch-Chat als Overlay im Stream, mit Farben, Glitzer und Verlauf.</p>
       <section class="card">
         <h2>Chat-Leiste (waagerechter Chat)</h2>
         <p class="muted">In OBS (oder Meld) eine Browserquelle auf <code id="chatUrl"></code> anlegen, Breite wie dein Overlay (z. B. 1920), Höhe etwa 120. Der Hintergrund ist durchsichtig. Neue Nachrichten kommen links herein und schieben die älteren nach rechts. Mit <code>?scale=1.3</code> wird alles größer. Einschalten unten bei „Chat-Leiste“, danach die Webhooks abgleichen.</p>
@@ -187,18 +201,11 @@
           <a class="btn" href="/chat-hoch?demo" target="_blank" rel="noopener">Vorschau mit Beispiel-Nachrichten</a>
         </div>
       </section>
-      <div data-schema="chatleiste" style="display:grid; gap:22px;"></div>
-      <section class="card" id="modCard">
-        <h2>Moderation: Protokoll</h2>
-        <p class="muted">Hier steht, was der Bot zuletzt gelöscht hat (die letzten 100 Einträge). Im Testmodus steht „Test“ dabei: Die Nachricht ist stehen geblieben, der Bot hätte sie aber gelöscht. Passt eine Regel nicht, stell sie oben ein oder aus.</p>
-        <div id="modLog"></div>
-        <div class="row" style="margin-top:12px"><button id="modReload" class="ghost">Aktualisieren</button><button id="modClear" class="danger">Protokoll leeren</button></div>
-      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="chatleiste" class="folds"></div>
     </div>
 
-    <div class="tab-panel hidden" data-panel="belohnungen">
-      <p class="muted intro">Dinge, die Zuschauer mit Kanalpunkten oder durch Mitmachen bekommen: Soundboard, Einlaufsound, Top des Monats, Alpakas und die Community-Rangliste.</p>
-      <h2 class="part">Soundboard</h2>
+    <div class="tab-panel hidden" data-panel="soundboard">
       <section class="card">
         <h2>Kanalpunkte-Soundboard</h2>
         <p>Jeder Eintrag ist ein eigener Kanalpunkte-Reward mit einer Sounddatei. Löst ein Zuschauer ihn ein, spielt das Overlay den Sound und zeigt kurz ein kleines Schild mit Name und Sound. Die Abklingzeit erzwingt Twitch selbst. Ein Eintrag ohne Sounddatei oder ohne Haken bei „Aktiv“ wird in Twitch ausgeschaltet.</p>
@@ -211,8 +218,12 @@
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards mit Twitch abgleichen</button></div>
         <p class="muted">Nach dem Anlegen oder Ändern von Name, Preis, Abklingzeit oder „Aktiv“ die Rewards abgleichen. Höchstens 20 Einträge, Sounds bis 1,5 MB, ein Ton endet nach spätestens 20 Sekunden.</p>
       </section>
-      <div data-schema="soundboard" style="display:grid; gap:22px;"></div>
-      <h2 class="part">Einlaufsound und Top des Monats</h2>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="soundboard" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="einlaufsound">
+      <p class="muted intro">Eigener Sound beim Check-in: gekauft mit Kanalpunkten, von dir vergeben oder gewonnen als Top des Monats.</p>
       <section class="card">
         <h2>Einlaufsound prüfen</h2>
         <p id="entryInfo" class="muted"></p>
@@ -244,8 +255,11 @@
         <div class="row" style="margin-top:12px"><button id="closeAward" class="ghost">Vormonat jetzt abschließen</button><button id="announceAward" class="ghost">Ankündigung erneut in den Chat</button></div>
         <p class="muted">Der Abschluss passiert ab dem 2. des Monats von selbst, sobald im Chat etwas los ist oder jemand die Seite öffnet. Der Knopf macht es sofort, falls der Vormonat noch nicht abgeschlossen ist. Du selbst gewinnst nie. „Ankündigung erneut in den Chat“ schreibt die Gewinner mit @ noch einmal in den Twitch-Chat (nur solange die Frist läuft; der VerwirrBot hat im Discord denselben Knopf). „Neu ziehen“ ersetzt einen Gewinner durch jemanden zufällig aus den nächstbesten und schreibt es in den Chat.</p>
       </section>
-      <div data-schema="einlaufsound" style="display:grid; gap:22px;"></div>
-      <h2 class="part">Alpakas</h2>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="einlaufsound" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="alpakas">
       <section class="card">
         <h2>Alpaka-Leiste</h2>
         <p class="muted">In OBS (oder Meld) eine Browserquelle auf <code id="alpacaUrl"></code> anlegen, Breite wie dein Overlay (z. B. 1920), Höhe etwa 120. Der Hintergrund ist durchsichtig, die Alpakas laufen am unteren Rand. Mit <code>?scale=2</code> hinter der Adresse werden sie größer, mit <code>?scale=1</code> kleiner (Standard 1,5, ein Alpaka ist dann etwa 95 Pixel hoch).</p>
@@ -253,8 +267,12 @@
           <a class="btn" href="/alpakas?demo" target="_blank" rel="noopener">Vorschau mit Beispiel-Alpakas</a>
         </div>
       </section>
-      <div data-schema="alpakas" style="display:grid; gap:22px;"></div>
-      <h2 class="part">Community-Rangliste</h2>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="alpakas" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="community">
+      <p class="muted intro">Die Monatsrangliste aus Twitch-Chat, Check-ins und Discord.</p>
       <section class="card">
         <h2>Verknüpfte Konten</h2>
         <p id="comInfo" class="muted"></p>
@@ -266,7 +284,8 @@
         <p class="muted">Verknüpft wird nur freiwillig: im Discord <code>/verknuepfen</code>, dann Anmeldung mit Twitch und ausdrückliche Zustimmung auf <code id="comUrl"></code>. Wer die Verknüpfung löschen lässt, verschwindet sofort aus der öffentlichen Rangliste. Zum Einrichten braucht es das Geheimwort <code>LINK_SECRET</code> in der Stadtwache-App und beim VerwirrBot.</p>
         <div class="row" style="margin-top:12px"><button class="js-sync">Rewards &amp; Webhooks abgleichen</button></div>
       </section>
-      <div data-schema="community" style="display:grid; gap:22px;"></div>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="community" class="folds"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="tickets">
@@ -287,89 +306,134 @@
         <div class="row"><button id="ticketAdd">Event anlegen</button></div>
         <p class="muted">Die Stadtwache legt den Kanalpunkte-Reward „Ticket: Name“ selbst in Twitch an und verwaltet ihn: Er ist nur bei „Verkauf offen“ eingeschaltet und wird pausiert, sobald alle Plätze und die Warteliste voll sind. Plätze und Preis sind nur Vorschläge, ändere sie nach Bedarf. Wer auf der Warteliste steht, hat seine Einlösung noch offen in der Twitch-Queue: Beim Nachrücken wird sie erfüllt, beim Ende des Events ohne Platz storniert (Punkte zurück). Ein Ticket-Reward hat nichts mit dem Gewinnspiel zu tun.</p>
       </section>
-      <div data-schema="tickets" style="display:grid; gap:22px;"></div>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="tickets" class="folds"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="gewinn">
-      <p class="muted intro">Sonderziehung zum Geburtstag: Ticket per Kanalpunkte, Wochenpunkte als Bonuslose, gewichtete Ziehung live im Stream, persönlicher Link für jeden Gewinner. Alles lokal auf deinem Server.</p>
-      <p id="gwHint" class="card hidden" style="padding:14px 18px">Die Geburtstags-Ziehung ist noch <b>ausgeschaltet</b>. Schalte sie unten unter „Geburtstags-Ziehung einschalten“ ein, speichere und gleiche die Rewards ab. Erst dann werden Wochenpunkte gezählt.</p>
+      <p class="muted intro">Alle Gewinnspiele an einer Stelle: schnelle Runden im Stream per Chat-Befehl oder Ziehungen über einen Zeitraum mit Kanalpunkte-Ticket. Wer aktiv war, kann Bonuslose bekommen. Mehrere Gewinnspiele können gleichzeitig laufen.</p>
+      <p id="gwHint" class="card hidden" style="padding:14px 18px">Gewinnspiele sind noch <b>ausgeschaltet</b>. Schalte sie ganz unten unter „Kanalpunkte-Ticket: Reward und Texte“ ein und speichere. Erst dann zählen Punkte und Chat-Befehle.</p>
       <section class="card">
-        <h2>Stand</h2>
+        <h2>Gewinnspiele</h2>
         <div id="gwDraws"></div>
-        <div id="gwStatus"></div>
-        <div class="row" style="margin-top:12px">
-          <button id="gwOpen">Tickets jetzt öffnen</button><button id="gwClose" class="ghost">Tickets jetzt schließen</button><button class="js-sync ghost">Rewards mit Twitch abgleichen</button>
+        <h3 style="margin-top:22px">Neues Gewinnspiel</h3>
+        <div class="tiles" id="gwNew">
+          <button type="button" class="tile" data-kind="quick"><span class="tile-head">⚡ Schnell im Stream</span><span class="muted">Mitmachen per Chat-Befehl, läuft ein paar Minuten, jeder ein Los, Gewinner wird sofort angesagt.</span></button>
+          <button type="button" class="tile" data-kind="period"><span class="tile-head">📅 Mit Zeitraum</span><span class="muted">Kanalpunkte-Ticket von/bis, Bonuslose aus den Monatspunkten, Gewinner bekommt einen persönlichen Link.</span></button>
+          <button type="button" class="tile" data-kind="simple"><span class="tile-head">🔑 Einfache Verlosung</span><span class="muted">Kanalpunkte-Ticket, ein Preis (zum Beispiel ein Key), jeder ein Los.</span></button>
+          <button type="button" class="tile" data-kind="bday"><span class="tile-head">🎂 Geburtstags-Ziehung</span><span class="muted">Drei Preise, Wochenpunkte als Bonuslose und das Mitternachts-Los.</span></button>
         </div>
-        <p class="muted">OBS-Browserquelle (1920×1080) für die Live-Ziehung: <code id="gwOverlayUrl"></code>. Sie bleibt unsichtbar, bis gezogen wird. Gewinner-Links haben die Form <code>/gewinn/&lt;Code&gt;</code>, das ist der einzige Pfad, der ohne Login von außen erreichbar sein muss.</p>
+        <p class="muted">Alles lässt sich nach dem Anlegen ändern. Die Vorlage füllt nur die Felder vor.</p>
       </section>
-      <section class="card">
-        <h2>Einstellungen der Ziehung</h2>
-        <div class="grid2">
-          <div><label for="gwName">Name</label><input id="gwName" maxlength="60"></div>
-          <div><label for="gwFrom">Wochenpunkte zählen ab</label><input id="gwFrom" type="datetime-local"></div>
-          <div><label for="gwOpenAt">Ticket-Fenster öffnet</label><input id="gwOpenAt" type="datetime-local"></div>
-          <div><label for="gwCloseAt">Ticket-Fenster schließt (leer = bis zur Ziehung)</label><input id="gwCloseAt" type="datetime-local"></div>
-          <div><label for="gwBonusOpen">Mitternachts-Los: Fenster öffnet</label><input id="gwBonusOpen" type="datetime-local"></div>
-          <div><label for="gwBonusClose">Mitternachts-Los: Fenster schließt</label><input id="gwBonusClose" type="datetime-local"></div>
-          <div><label for="gwBonusLots">Mitternachts-Los: Extra-Lose pro Person</label><input id="gwBonusLots" type="number" min="1" max="10"></div>
-          <div><label for="gwPlanned">Geplante Ziehung (nur zur Erinnerung)</label><input id="gwPlanned" type="datetime-local"></div>
-          <div><label for="gwPer">Wochenpunkte pro Bonuslos (X)</label><input id="gwPer" type="number" min="1" max="100000"></div>
-          <div><label for="gwMax">Höchstens so viele Lose pro Person</label><input id="gwMax" type="number" min="1" max="1000"></div>
-          <div><label for="gwWCheckin">Punkte je Check-in-Tag</label><input id="gwWCheckin" type="number" min="0" max="10000"></div>
-          <div><label for="gwWStreak">Streak-Bonus: Punkte je Streak-Tag</label><input id="gwWStreak" type="number" min="0" max="10000"></div>
-          <div><label for="gwWStreakCap">Streak-Bonus zählt höchstens bis Streak</label><input id="gwWStreakCap" type="number" min="0" max="365"></div>
-          <div><label for="gwWChat">Punkte je Chat-Nachricht</label><input id="gwWChat" type="number" min="0" max="10000"></div>
-          <div><label for="gwWChatCap">Chat-Nachrichten, die pro Tag zählen</label><input id="gwWChatCap" type="number" min="0" max="1000"></div>
-          <div><label for="gwWChatGap">Mindestabstand zwischen zwei Nachrichten (Sekunden)</label><input id="gwWChatGap" type="number" min="0" max="3600"></div>
-          <div><label for="gwHours">Meldefrist der Gewinner (Stunden)</label><input id="gwHours" type="number" min="1" max="720"></div>
-          <div><label for="gwAddrDays">Frist für die Adresse nach der Meldung (Tage)</label><input id="gwAddrDays" type="number" min="1" max="90"></div>
-          <div><label for="gwKeep">Adresse löschen nach „versendet“ (Tage)</label><input id="gwKeep" type="number" min="1" max="365"></div>
+
+      <div id="gwDetail" class="hidden" style="display:grid; gap:20px;">
+        <section class="card">
+          <h2 id="gwTitle">Gewinnspiel</h2>
+          <div id="gwStatus"></div>
+          <div class="row" style="margin-top:12px">
+            <button id="gwOpen">Jetzt öffnen</button><button id="gwClose" class="ghost">Jetzt schließen</button><button id="gwDraw">🎉 Jetzt ziehen (live)</button>
+          </div>
+          <p class="muted" id="gwHelp"></p>
+        </section>
+        <section class="card">
+          <h2>Teilnehmer und Lose</h2>
+          <div id="gwStats"></div>
+          <div id="gwTickets"></div>
+          <div class="row" style="margin-top:14px"><div><label for="gwBlockName">Person sperren (Twitch-Name)</label><input id="gwBlockName" maxlength="40"></div><button id="gwBlock" class="danger">Sperren</button></div>
+          <div id="gwBlocked" class="muted"></div>
+        </section>
+        <section class="card">
+          <h2>Gewinner</h2>
+          <div id="gwWinners"></div>
+          <p class="muted">Bei „Flüstern fehlgeschlagen“ kopierst du den Link und schickst ihn selbst (Discord oder Twitch). Wer sich nicht in der Frist meldet, wird automatisch ersetzt und bekommt einen neuen Link. Preise „ohne Link“ sind mit der Ansage im Chat erledigt.</p>
+        </section>
+
+        <h2 class="part">Einstellungen dieses Gewinnspiels</h2>
+        <div class="folds">
+          <details class="card fold" id="gwFoldConfig">
+            <summary><span class="fold-title">Mitmachen, Zeiten und Lose</span></summary>
+            <div class="fold-body">
+              <div class="grid2">
+                <div><label for="gwName">Name</label><input id="gwName" maxlength="60"></div>
+                <div><label for="gwEntry">So macht man mit</label><select id="gwEntry"><option value="chat">Chat-Befehl (kostenlos)</option><option value="reward">Kanalpunkte-Ticket</option></select></div>
+                <div data-if="chat"><label for="gwCommand">Chat-Befehl</label><input id="gwCommand" maxlength="26" placeholder="!gewinn"></div>
+                <div data-if="chat"><label for="gwMinutes">Nach dem Öffnen so viele Minuten offen (0 = bis du schließt)</label><input id="gwMinutes" type="number" min="0" max="1440"></div>
+                <div data-if="reward"><label for="gwOpenAt">Ticket-Fenster öffnet</label><input id="gwOpenAt" type="datetime-local"></div>
+                <div data-if="reward"><label for="gwCloseAt">Ticket-Fenster schließt (leer = bis zur Ziehung)</label><input id="gwCloseAt" type="datetime-local"></div>
+                <div><label for="gwPlanned">Geplante Ziehung (nur zur Erinnerung)</label><input id="gwPlanned" type="datetime-local"></div>
+              </div>
+              <label class="check big" data-if="chat"><input id="gwReply" type="checkbox"> Jede Teilnahme kurz im Chat bestätigen</label>
+              <h3>Lose</h3>
+              <div class="grid2">
+                <div><label for="gwSource">Gewinnchance</label><select id="gwSource"><option value="none">Jeder hat ein Los</option><option value="month">Bonuslose aus den Monatspunkten der Rangliste</option><option value="draw">Bonuslose aus der Aktivität während des Gewinnspiels</option></select></div>
+                <div data-if="points"><label for="gwPer">Punkte pro Bonuslos</label><input id="gwPer" type="number" min="1" max="100000"></div>
+                <div data-if="points"><label for="gwMax">Höchstens so viele Lose pro Person</label><input id="gwMax" type="number" min="1" max="1000"></div>
+                <div data-if="draw"><label for="gwFrom">Aktivität zählt ab</label><input id="gwFrom" type="datetime-local"></div>
+                <div data-if="draw"><label for="gwWCheckin">Punkte je Check-in-Tag</label><input id="gwWCheckin" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWStreak">Streak-Bonus: Punkte je Streak-Tag</label><input id="gwWStreak" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWStreakCap">Streak-Bonus zählt höchstens bis Streak</label><input id="gwWStreakCap" type="number" min="0" max="365"></div>
+                <div data-if="draw"><label for="gwWChat">Punkte je Chat-Nachricht</label><input id="gwWChat" type="number" min="0" max="10000"></div>
+                <div data-if="draw"><label for="gwWChatCap">Chat-Nachrichten, die pro Tag zählen</label><input id="gwWChatCap" type="number" min="0" max="1000"></div>
+                <div data-if="draw"><label for="gwWChatGap">Mindestabstand zwischen zwei Nachrichten (Sekunden)</label><input id="gwWChatGap" type="number" min="0" max="3600"></div>
+              </div>
+              <p class="muted" id="gwSourceHelp"></p>
+              <div data-if="reward">
+                <h3>Mitternachts-Los (zweiter Reward, nur wenn gewünscht)</h3>
+                <div class="grid2">
+                  <div><label for="gwBonusOpen">Fenster öffnet (leer = kein Mitternachts-Los)</label><input id="gwBonusOpen" type="datetime-local"></div>
+                  <div><label for="gwBonusClose">Fenster schließt</label><input id="gwBonusClose" type="datetime-local"></div>
+                  <div><label for="gwBonusLots">Extra-Lose pro Person</label><input id="gwBonusLots" type="number" min="1" max="10"></div>
+                </div>
+              </div>
+              <h3>Gewinner: Fristen und Versand</h3>
+              <div class="grid2">
+                <div><label for="gwHours">Meldefrist der Gewinner (Stunden)</label><input id="gwHours" type="number" min="1" max="720"></div>
+                <div><label for="gwAddrDays">Frist für die Adresse nach der Meldung (Tage)</label><input id="gwAddrDays" type="number" min="1" max="90"></div>
+                <div><label for="gwKeep">Adresse löschen nach „versendet“ (Tage)</label><input id="gwKeep" type="number" min="1" max="365"></div>
+              </div>
+              <p class="muted" id="gwCountriesRow">Versand nach: <label><input type="checkbox" class="gwCountry" value="DE"> Deutschland</label> <label><input type="checkbox" class="gwCountry" value="AT"> Österreich</label> <label><input type="checkbox" class="gwCountry" value="CH"> Schweiz</label></p>
+              <div class="row"><button id="gwSave">Speichern</button><button id="gwDelete" class="danger">Gewinnspiel löschen</button></div>
+              <p class="muted">Nach der Ziehung bleiben Lose-Rechnung und Preise gesperrt, nur Fristen, Länder, Bedingungen und Keys sind änderbar. Abos und Bits haben nie Einfluss auf die Gewinnchance.</p>
+            </div>
+          </details>
+          <details class="card fold" id="gwFoldPrizes">
+            <summary><span class="fold-title">Preise</span><span class="fold-count" id="gwPrizeCount"></span></summary>
+            <div class="fold-body">
+              <p class="muted">Reihenfolge = Platz. <b>Key:</b> Der Gewinner bekommt einen persönlichen Link und sieht dort den Key. <b>Sachpreis:</b> Link mit Adressformular. <b>Ohne Link:</b> Der Gewinner wird nur im Chat und im Overlay angesagt.</p>
+              <div id="gwPrizes"></div>
+              <div class="row"><button id="gwAddPrize" class="ghost">Preis hinzufügen</button><button id="gwSavePrizes">Preise speichern</button></div>
+            </div>
+          </details>
+          <details class="card fold">
+            <summary><span class="fold-title">Teilnahmebedingungen</span><span class="pill" id="gwTermsPill"></span></summary>
+            <div class="fold-body">
+              <textarea id="gwTerms" rows="14" maxlength="12000" style="width:100%"></textarea>
+              <label class="check big"><input id="gwTermsPub" type="checkbox"> Auf <code>/gewinn/bedingungen</code> veröffentlichen</label>
+              <div class="row"><button id="gwSaveTerms">Texte speichern</button></div>
+              <p class="muted">Das ist ein Entwurf und keine Rechtsberatung. Vor der Veröffentlichung selbst prüfen oder gegenlesen lassen. Welche Daten verarbeitet werden, steht in <code>docs/gewinnspiel.md</code>.</p>
+            </div>
+          </details>
+          <details class="card fold">
+            <summary><span class="fold-title">Probe-Ziehung, Overlay und Protokoll</span></summary>
+            <div class="fold-body">
+              <p class="muted">OBS-Browserquelle (1920×1080) für die Live-Ziehung: <code id="gwOverlayUrl"></code>. Sie bleibt unsichtbar, bis gezogen wird.</p>
+              <div class="row">
+                <div><label for="gwSeed">Fester Seed (nur für Tests, sonst leer)</label><input id="gwSeed" maxlength="64"></div>
+                <button id="gwTest" class="ghost">Probe-Ziehung (speichert nichts)</button>
+              </div>
+              <pre id="gwTestOut" class="muted" style="white-space:pre-wrap"></pre>
+              <div class="row"><button id="gwReplay" class="ghost">Overlay noch einmal abspielen</button><button id="gwHide" class="ghost">Overlay ausblenden</button><button id="gwProtocol" class="ghost">Protokoll ansehen</button></div>
+              <pre id="gwProtocolOut" style="white-space:pre-wrap; max-height:340px; overflow:auto" class="muted"></pre>
+            </div>
+          </details>
         </div>
-        <p class="muted" id="gwCountriesRow">Versand nach: <label><input type="checkbox" class="gwCountry" value="DE"> Deutschland</label> <label><input type="checkbox" class="gwCountry" value="AT"> Österreich</label> <label><input type="checkbox" class="gwCountry" value="CH"> Schweiz</label></p>
-        <div class="row"><button id="gwSave">Speichern</button></div>
-        <p class="muted">Ein Los für das Ticket, dazu ein Bonuslos je X Wochenpunkte, gedeckelt. Nach der Ziehung bleiben Gewichtung und Preise gesperrt, nur Fristen, Länder, Bedingungen und Keys sind änderbar. Abos und Bits haben keinen Einfluss.</p>
-      </section>
-      <section class="card">
-        <h2>Preise</h2>
-        <p class="muted">Reihenfolge = Platz. Bei Key-Preisen trägst du den Key ein, er erscheint nur dem Gewinner nach der Meldung (und hier im Dashboard).</p>
-        <div id="gwPrizes"></div>
-        <div class="row"><button id="gwAddPrize" class="ghost">Preis hinzufügen</button><button id="gwSavePrizes">Preise speichern</button></div>
-      </section>
-      <section class="card">
-        <h2>Teilnehmer und Lose</h2>
-        <div id="gwStats"></div>
-        <div id="gwTickets"></div>
-        <div class="row" style="margin-top:14px"><div><label for="gwBlockName">Person sperren (Twitch-Name)</label><input id="gwBlockName" maxlength="40"></div><button id="gwBlock" class="danger">Sperren</button></div>
-        <div id="gwBlocked" class="muted"></div>
-      </section>
-      <section class="card">
-        <h2>Ziehung</h2>
-        <div class="row">
-          <div><label for="gwSeed">Fester Seed (nur für Tests, sonst leer)</label><input id="gwSeed" maxlength="64"></div>
-          <button id="gwTest" class="ghost">Test-Ziehung (speichert nichts)</button>
-          <button id="gwDraw">Jetzt ziehen (live)</button>
-        </div>
-        <pre id="gwTestOut" class="muted" style="white-space:pre-wrap"></pre>
-        <div class="row"><button id="gwReplay" class="ghost">Overlay noch einmal abspielen</button><button id="gwHide" class="ghost">Overlay ausblenden</button><button id="gwProtocol" class="ghost">Protokoll ansehen</button></div>
-        <pre id="gwProtocolOut" style="white-space:pre-wrap; max-height:340px; overflow:auto" class="muted"></pre>
-      </section>
-      <section class="card">
-        <h2>Gewinner</h2>
-        <div id="gwWinners"></div>
-        <p class="muted">Bei „Flüstern fehlgeschlagen“ kopierst du den Link und schickst ihn selbst (Discord oder Twitch). Wer sich nicht in der Frist meldet, wird automatisch ersetzt und bekommt einen neuen Link.</p>
-      </section>
-      <section class="card">
-        <h2>Teilnahmebedingungen (Entwurf)</h2>
-        <textarea id="gwTerms" rows="14" maxlength="12000" style="width:100%"></textarea>
-        <label class="check big"><input id="gwTermsPub" type="checkbox"> Auf <code>/gewinn/bedingungen</code> veröffentlichen</label>
-        <div class="row"><button id="gwSaveTerms">Texte speichern</button></div>
-        <p class="muted">Das ist ein Entwurf und keine Rechtsberatung. Vor der Veröffentlichung selbst prüfen oder gegenlesen lassen. Welche Daten verarbeitet werden, steht in <code>docs/gewinnspiel.md</code>.</p>
-      </section>
-      <div data-schema="gewinn" style="display:grid; gap:22px;"></div>
+      </div>
+      <h2 class="part">Einstellungen und Texte für alle Gewinnspiele</h2>
+      <div data-schema="gewinn" class="folds"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="feier">
-      <p class="muted intro">Alles für die Geburtstagswoche: Countdown, Glücksrad und der Geburtstags-Befehl. Beide Overlays bleiben in OBS unsichtbar, bis du sie hier einblendest.</p>
+      <p class="muted intro">Countdown, Geburtstags-Befehl und die Seite mit dem Wochenplan.</p>
       <section class="card">
         <h2>Countdown</h2>
         <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="cdUrl"></code> anlegen. Mit <code>?pos=top-right</code>, <code>bottom</code>, <code>center</code> … hinter der Adresse änderst du den Platz, mit <code>?size=0.7</code> die Größe. Er kann die ganze Woche mitlaufen. Bei 0 erscheint der Text unten, dazu Konfetti, danach verschwindet er von selbst.</p>
@@ -386,6 +450,11 @@
           <a class="btn ghost" href="/countdown?demo" target="_blank" rel="noopener">Vorschau (3 Minuten)</a>
         </div>
       </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="feier" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="rad">
       <section class="card">
         <h2>Glücksrad</h2>
         <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="radUrl"></code> anlegen. Mit <code>?pos=left</code> oder <code>right</code> schiebst du es zur Seite, mit <code>?size=0.7</code> machst du es kleiner. Das Ergebnis würfelt die Stadtwache, das Overlay dreht nur dorthin. „Drehen“ blendet das Rad bei Bedarf selbst ein.</p>
@@ -418,6 +487,11 @@
           <button id="radExamples" class="ghost">Beispielräder anlegen (Gebäudeart, Baustil, Community-Aktion)</button>
         </div>
       </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="rad" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="adventure">
       <section class="card">
         <h2>Adventure-Einreichungen</h2>
         <p class="muted" id="advInfo"></p>
@@ -436,30 +510,34 @@
           <button id="advClearAll" class="danger">Liste leeren</button>
         </div>
       </section>
-      <div data-schema="adventure" style="display:grid; gap:22px;"></div>
-      <div data-schema="feier" style="display:grid; gap:22px;"></div>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="adventure" class="folds"></div>
     </div>
 
-    <div class="tab-panel hidden" data-panel="overlays">
-      <p class="muted intro">Die Seiten, die du in OBS einbindest: Abspann, Rangliste und Sport-Scoreboard. Die Adressen aller Overlays stehen auch unter „Start“.</p>
+    <div class="tab-panel hidden" data-panel="obs">
+      <p class="muted intro">Alle Adressen, die du in OBS als Browserquelle einträgst, an einer Stelle.</p>
       <section class="card">
-        <h2>Abspann und Rangliste ansehen</h2>
-        <p class="muted"><b>Abspann:</b> In OBS eine eigene Szene „Stream-Ende“ mit einer Browserquelle (1920×1080) auf <code id="creditsUrl"></code> anlegen und „Browser aktualisieren, wenn Szene aktiv wird“ einschalten. Beim Wechsel in die Szene laufen die Namen des heutigen Streams durch.<br>
-        <b>Rangliste:</b> Die Seite <code id="boardUrl"></code> zeigt die Bestenlisten. Für ein Twitch-Panel legst du unter deinem Kanal im Bereich „Info“ ein Panel an (Bild + Link) und trägst diese Adresse als Link ein. Als OBS-Quelle geht <code id="boardOverlayUrl"></code>.</p>
-        <div class="row">
-          <a class="btn" href="/abspann?demo" target="_blank" rel="noopener">Abspann mit Beispieldaten</a>
-          <a class="btn ghost" href="/abspann" target="_blank" rel="noopener">Abspann von heute</a>
-          <a class="btn ghost" href="/rangliste" target="_blank" rel="noopener">Rangliste öffnen</a>
-        </div>
+        <h2>OBS-Overlay</h2>
+        <p>Browser-Quelle in OBS mit dieser Adresse (Breite 1920, Höhe 1080, „Audio über OBS steuern“ aktivieren):</p>
+        <div class="row"><input id="overlayUrl" readonly><button id="copyOverlay" class="ghost">Kopieren</button></div>
+        <p class="muted">Diese Adresse zeigt alles in einer Quelle. Für getrennte Lautstärken in OBS nimmst du stattdessen drei Quellen (nicht zusammen mit der Adresse oben verwenden, sonst läuft alles doppelt):</p>
+        <label>Alerts (Check-in, Raid, Follow, Sub, Bits …)</label>
+        <div class="row"><input id="overlayAlertsUrl" readonly><button id="copyOverlayAlerts" class="ghost">Kopieren</button></div>
+        <label>Soundboard (Kanalpunkte-Sounds)</label>
+        <div class="row"><input id="overlaySoundsUrl" readonly><button id="copyOverlaySounds" class="ghost">Kopieren</button></div>
+        <label>Einlaufsounds (nur Ton, nichts zu sehen)</label>
+        <div class="row"><input id="overlayEntryUrl" readonly><button id="copyOverlayEntry" class="ghost">Kopieren</button></div>
+        <p class="muted">Ohne die Einlaufsound-Quelle bleibt ein Check-in mit Einlaufsound in der Alert-Quelle stumm.</p>
+        <p class="muted">Das Overlay lädt sich nach einem Update selbst neu, sobald gerade kein Alert läuft. Töne und Bilder gelten nach wenigen Sekunden, ein Neuladen in OBS ist nicht nötig.</p>
       </section>
       <section class="card">
-        <h2>Twitch-Panel mit Rangliste</h2>
-        <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://stadtwache.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
-        <div class="row">
-          <a class="btn" href="/stadtwache-panel.zip" download>Extension-Zip herunterladen</a>
-          <a class="btn ghost" href="https://dev.twitch.tv/console/extensions" target="_blank" rel="noopener">Twitch-Entwicklerkonsole</a>
-        </div>
+        <h2>Alle weiteren Overlays</h2>
+        <p class="muted">Jede Zeile ist eine eigene Browserquelle in OBS. Was ein Overlay zeigt und wie du es einstellst, steht auf der jeweiligen Seite.</p>
+        <div id="obsList"></div>
       </section>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="startscreen">
       <section class="card">
         <h2>Startbildschirm („Gleich geht’s los“)</h2>
         <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="ssUrl"></code> anlegen, am besten als eigene Szene „Startbildschirm“ (oder ganz unten in deiner Gaming-/Talking-Szene, hinter Rahmen und Kamera). Sie bleibt unsichtbar, bis du sie hier startest. Mit <code>?rahmen</code> hinter der Adresse bleibt Platz für deine Holzleiste unten und die Kamera unten rechts, mit <code>?bg=0</code> ist der Hintergrund durchsichtig (dein Waldbild bleibt stehen). Beides geht zusammen: <code id="ssUrl2"></code>.</p>
@@ -490,6 +568,9 @@
           <a class="btn ghost" href="/startscreen?demo&rahmen" target="_blank" rel="noopener">Vorschau mit Rahmen</a>
         </div>
       </section>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="pause">
       <section class="card">
         <h2>Pause-Overlay</h2>
         <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="pauseUrl"></code> anlegen. Sie bleibt unsichtbar, bis eine Pause läuft. Mit <code>?pos=top</code>, <code>bottom</code> … hinter der Adresse änderst du den Platz (Standard: Mitte), mit <code>?size=0.7</code> die Größe. Im Chat startest du sie mit <code id="pauseCmd"></code> und beendest sie mit <code id="pauseEndCmd"></code> (Einstellungen unten, Befehle sind erst nach dem Einschalten aktiv).</p>
@@ -504,8 +585,34 @@
           <a class="btn ghost" href="/pause?demo" target="_blank" rel="noopener">Vorschau</a>
         </div>
       </section>
-      <div data-schema="pause" style="display:grid; gap:22px;"></div>
-      <div data-schema="abspann" style="display:grid; gap:22px;"></div>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="pause" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="abspann">
+      <section class="card">
+        <h2>Abspann und Rangliste ansehen</h2>
+        <p class="muted"><b>Abspann:</b> In OBS eine eigene Szene „Stream-Ende“ mit einer Browserquelle (1920×1080) auf <code id="creditsUrl"></code> anlegen und „Browser aktualisieren, wenn Szene aktiv wird“ einschalten. Beim Wechsel in die Szene laufen die Namen des heutigen Streams durch.<br>
+        <b>Rangliste:</b> Die Seite <code id="boardUrl"></code> zeigt die Bestenlisten. Für ein Twitch-Panel legst du unter deinem Kanal im Bereich „Info“ ein Panel an (Bild + Link) und trägst diese Adresse als Link ein. Als OBS-Quelle geht <code id="boardOverlayUrl"></code>.</p>
+        <div class="row">
+          <a class="btn" href="/abspann?demo" target="_blank" rel="noopener">Abspann mit Beispieldaten</a>
+          <a class="btn ghost" href="/abspann" target="_blank" rel="noopener">Abspann von heute</a>
+          <a class="btn ghost" href="/rangliste" target="_blank" rel="noopener">Rangliste öffnen</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Twitch-Panel mit Rangliste</h2>
+        <p class="muted">Normale Twitch-Panels zeigen nur ein festes Bild mit Link. <b>Sofort</b> geht ein Panel mit Link auf die Seite <code id="boardUrl2"></code>. <b>Live im Panel</b> (Anwesende, Chatter, Streaks in drei Reitern) geht mit einer eigenen <b>Panel-Extension</b>, die du in der Twitch-Entwicklerkonsole anlegst. Achtung: Im Teststatus sehen nur du und Testkonten sie, für alle Zuschauer braucht sie die Twitch-Prüfung. Das Zip ist auf <code>https://stadtwache.netlify.app</code> eingestellt. Die Anleitung steht in <a href="https://github.com/derehrlich/twitch-checkin/blob/main/docs/twitch-panel.md" target="_blank" rel="noopener">docs/twitch-panel.md</a>.</p>
+        <div class="row">
+          <a class="btn" href="/stadtwache-panel.zip" download>Extension-Zip herunterladen</a>
+          <a class="btn ghost" href="https://dev.twitch.tv/console/extensions" target="_blank" rel="noopener">Twitch-Entwicklerkonsole</a>
+        </div>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="abspann" class="folds"></div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="sport">
       <section class="card">
         <h2>Sport-Scoreboard</h2>
         <p class="muted">Das Scoreboard zeigt die unten eingetragenen Einheiten aufbereitet: Gesamtzeit, Ø Herzfrequenz, Strecke und Kalorien, dazu die letzten Einheiten. In OBS eine Browserquelle (1920×1080) auf <code id="sportUrl"></code> anlegen. Es bleibt unsichtbar, bis du auf „Einblenden“ klickst. Mit <code>?pos=top</code> hinter der Adresse steht es oben statt unten.</p>
@@ -551,8 +658,35 @@
       </section>
     </div>
 
+    <div class="tab-panel hidden" data-panel="tests">
+      <section class="card">
+        <h2>Tests</h2>
+        <p class="muted">Schickt Beispiel-Ereignisse ans Overlay oder in den Chat. Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung. Soundboard-Einträge testest du auf der Seite „Soundboard“.</p>
+        <div class="grid2">
+          <div><label for="testUser">Name für den Test</label><input id="testUser" value="TestUser"></div>
+          <div><label for="testCount">Zahl (Besuch Nr., Monate, Bits ÷ 10, Raider, Meilenstein)</label><input id="testCount" type="number" min="1" value="7"></div>
+        </div>
+        <div class="testgroup"><h3>Check-in und Check-out</h3><div class="row">
+          <button class="ghost" data-test="overlay">Check-in im Overlay</button><button class="ghost" data-test="chat">Check-in im Chat</button>
+          <button class="ghost" data-test="checkout">Check-out im Overlay</button><button class="ghost" data-test="checkout-chat">Check-out im Chat</button>
+        </div></div>
+        <div class="testgroup"><h3>Meilenstein und Streak</h3><div class="row">
+          <button class="ghost" data-test="milestone">Meilenstein im Overlay</button><button class="ghost" data-test="milestone-chat">Meilenstein im Chat</button>
+          <button class="ghost" data-test="rescue">Streak-Rettung</button>
+        </div></div>
+        <div class="testgroup"><h3>Alerts</h3><div class="row">
+          <button class="ghost" data-test="alert-follow">Follow</button><button class="ghost" data-test="alert-sub">Sub</button><button class="ghost" data-test="alert-resub">Resub</button>
+          <button class="ghost" data-test="alert-gift">Gift-Subs</button><button class="ghost" data-test="alert-cheer">Bits</button>
+        </div></div>
+        <div class="testgroup"><h3>Raid</h3><div class="row">
+          <div><label for="testRaider">Kanalname des Raiders (leer = dein Kanal)</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
+          <button class="ghost" data-test="raid">Raid im Overlay</button><button class="ghost" data-test="raid-chat">Raid im Chat</button>
+        </div></div>
+      </section>
+    </div>
+
     <div class="tab-panel hidden" data-panel="system">
-      <p class="muted intro">Technik im Hintergrund: Updates, Sicherung, allgemeine Einstellungen und die Test-Knöpfe.</p>
+      <p class="muted intro">Updates, Sicherung, Störungs-Meldungen und allgemeine Einstellungen.</p>
       <section class="card" id="updateCard">
         <h2>Updates</h2>
         <p class="muted">Läuft gerade: <b id="updVersion">…</b>. Ein Klick auf den Knopf schaut nach, ob es eine neuere Version gibt, lädt sie und startet die Stadtwache neu. Dabei ist die Seite etwa eine halbe Minute nicht erreichbar, die Daten bleiben erhalten.</p>
@@ -562,7 +696,6 @@
         </div>
         <p class="muted hidden" id="updSetup">Noch nicht eingerichtet: Dafür muss in CasaOS die App „Watchtower“ laufen und in der Stadtwache-App <code>WATCHTOWER_URL</code> und <code>WATCHTOWER_TOKEN</code> stehen (Anleitung: <code>docs/casaos.md</code>).</p>
       </section>
-      <div data-schema="allgemein" style="display:grid; gap:22px;"></div>
       <section class="card" id="healthCard">
         <h2>Störungs-Meldungen: Stand</h2>
         <div id="healthInfo"></div>
@@ -587,30 +720,8 @@
         </div>
         <p class="muted" id="restoreInfo"></p>
       </section>
-      <section class="card">
-        <h2>Tests</h2>
-        <p class="muted">Schickt Beispiel-Ereignisse ans Overlay oder in den Chat. Tests ändern keine Zähler. Das Overlay fragt etwa alle 3 Sekunden nach, die Animation startet also mit kurzer Verzögerung. Soundboard-Einträge testest du im Reiter „Soundboard“.</p>
-        <div class="grid2">
-          <div><label for="testUser">Name für den Test</label><input id="testUser" value="TestUser"></div>
-          <div><label for="testCount">Zahl (Besuch Nr., Monate, Bits ÷ 10, Raider, Meilenstein)</label><input id="testCount" type="number" min="1" value="7"></div>
-        </div>
-        <div class="testgroup"><h3>Check-in und Check-out</h3><div class="row">
-          <button class="ghost" data-test="overlay">Check-in im Overlay</button><button class="ghost" data-test="chat">Check-in im Chat</button>
-          <button class="ghost" data-test="checkout">Check-out im Overlay</button><button class="ghost" data-test="checkout-chat">Check-out im Chat</button>
-        </div></div>
-        <div class="testgroup"><h3>Meilenstein und Streak</h3><div class="row">
-          <button class="ghost" data-test="milestone">Meilenstein im Overlay</button><button class="ghost" data-test="milestone-chat">Meilenstein im Chat</button>
-          <button class="ghost" data-test="rescue">Streak-Rettung</button>
-        </div></div>
-        <div class="testgroup"><h3>Alerts</h3><div class="row">
-          <button class="ghost" data-test="alert-follow">Follow</button><button class="ghost" data-test="alert-sub">Sub</button><button class="ghost" data-test="alert-resub">Resub</button>
-          <button class="ghost" data-test="alert-gift">Gift-Subs</button><button class="ghost" data-test="alert-cheer">Bits</button>
-        </div></div>
-        <div class="testgroup"><h3>Raid</h3><div class="row">
-          <div><label for="testRaider">Kanalname des Raiders (leer = dein Kanal)</label><input id="testRaider" placeholder="z. B. dein eigener Kanal"></div>
-          <button class="ghost" data-test="raid">Raid im Overlay</button><button class="ghost" data-test="raid-chat">Raid im Chat</button>
-        </div></div>
-      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="allgemein" class="folds"></div>
     </div>
   </div>
 </main>
