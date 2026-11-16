@@ -464,6 +464,24 @@
       <div data-schema="poll" class="folds"></div>
     </div>
 
+    <div class="tab-panel hidden" data-panel="level">
+      <p class="muted intro">Aus allen Punkten (alle Monate zusammen) wird eine Stufe mit Titel im Bau-Thema, vom Zaungast bis zum Dorfältesten. Wer eine Stufe erreicht hat, verliert sie nie wieder. Der VerwirrBot kann dazu Rollen im Discord vergeben (Dashboard des Bots → Community).</p>
+      <p id="lvHint" class="card hidden" style="padding:14px 18px">Das Dorf-Level ist noch <b>ausgeschaltet</b>. Schalte es unten unter „Dorf-Level“ ein und speichere.</p>
+      <section class="card">
+        <h2>Stufen</h2>
+        <div id="lvTable"></div>
+        <p class="muted" id="lvInfo"></p>
+        <div class="row"><button id="lvRefresh" class="ghost">Neu berechnen</button></div>
+        <p class="muted">Titel und Punkte änderst du unten in den Einstellungen (eine Zeile pro Stufe: <code>Punkte | Titel</code>). Die Punkte werden wie in der Community-Rangliste gerechnet (Gewichte stehen auf der Seite „Rangliste“): Chat-Nachrichten, aktive Tage, Check-ins und Bonus aus allen Monaten.</p>
+      </section>
+      <section class="card">
+        <h2>Die Besten (verknüpfte Konten)</h2>
+        <div id="lvTop"></div>
+      </section>
+      <h2 class="part">Einstellungen und Texte</h2>
+      <div data-schema="level" class="folds"></div>
+    </div>
+
     <div class="tab-panel hidden" data-panel="meine">
       <p class="muted intro">Eine persönliche Seite für jeden Zuschauer: Streak, Besuche, Zeit im Stream, nächster Meilenstein, Rang im Monat und Einlaufsound an einem Ort. Das motiviert zum Mitmachen. Jeder sieht nur die eigenen Zahlen.</p>
       <section class="card">

@@ -2169,7 +2169,7 @@ await test('Zitate: speichern und löschen nur Mods, anzeigen alle, !so nur Mods
   await handleChat(msg('!addquote Das war Absicht', true), s);
   assert.equal(chats().at(-1), '✅ Zitat #1 gespeichert.');
   await handleChat(msg('!quote 1'), s);
-  assert.match(chats().at(-1), /^💬 Zitat #1: „Das war Absicht“ \(\d\d\.\d\d\.\d{4}\)$/);
+  assert.match(chats().at(-1), /^💬 Zitat #1: „Das war Absicht“ \(\d{1,2}\.\d{1,2}\.\d{4}\)$/);
   await handleChat(msg('!quote'), s);
   assert.match(chats().at(-1), /Zitat #1/);
   await handleChat(msg('!delquote 1'), s); // kein Mod
@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'meine', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'meine', 'level', 'discord', 'plan', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -2426,7 +2426,7 @@ await test('Glitzer-Reward: Kauf schaltet Glitzer frei (befristet, verlängerbar
   const t0 = Date.now();
   const out = await redeem('gl-1');
   assert.equal(statusOf('gl-1'), 'FULFILLED');
-  assert.match(out[0], /^✨ Glitzi glitzert jetzt bis \d\d\.\d\d\.\d{4}! Mit !glitter/);
+  assert.match(out[0], /^✨ Glitzi glitzert jetzt bis \d{1,2}\.\d{1,2}\.\d{4}! Mit !glitter/);
   const st = await db.get('chatstyle/gv1');
   assert.equal(st.glitter, true); assert.ok(Math.abs(st.glitterUntil - (t0 + 30 * 86_400_000)) < 5000, '30 Tage');
   await say('mein Glitzer'); assert.equal((await last()).s, true, 'Nachricht glitzert');
@@ -2502,7 +2502,7 @@ await test('Verlauf-Reward: wie Glitzer, aber getrennt (eigene Dauer, !verlauf, 
   const t0 = Date.now();
   const out = await redeem('gr-1', state.gradientRewardId);
   assert.equal(statusOf('gr-1'), 'FULFILLED');
-  assert.match(out[0], /^🌈 Verlaufi hat jetzt einen Farbverlauf bis \d\d\.\d\d\.\d{4}! Mit !verlauf/);
+  assert.match(out[0], /^🌈 Verlaufi hat jetzt einen Farbverlauf bis \d{1,2}\.\d{1,2}\.\d{4}! Mit !verlauf/);
   let st = await db.get('chatstyle/vv1');
   assert.equal(st.gradient, true); assert.ok(Math.abs(st.gradientUntil - (t0 + 14 * 86_400_000)) < 5000, '14 Tage');
   assert.equal(st.glitterUntil, undefined, 'Glitzer bleibt ungekauft');
@@ -3095,7 +3095,7 @@ await test('Sicherung: Tickets, Glücksrad, Statistik, Mediakit usw. sind dabei;
   assert.ok(!Object.keys(file.entries).some((k) => k.startsWith('gwaddr/') || k.startsWith('seen/') || k.startsWith('bot/') || k === 'config/tokens'), 'Adressen, kurzlebiges und Tokens bleiben draußen');
 
   // Eine Datei aus der Zeit vor den neuen Bereichen (Version 1, ohne Liste der Bereiche)
-  const NEW = ['ticket/', 'rad/', 'adv/', 'countdown/', 'chatstyle/', 'quote/', 'counter/', 'bonus/', 'bonuskey/', 'rescue/', 'stat/', 'mediakit/', 'poll/'];
+  const NEW = ['ticket/', 'rad/', 'adv/', 'countdown/', 'chatstyle/', 'quote/', 'counter/', 'bonus/', 'bonuskey/', 'rescue/', 'stat/', 'mediakit/', 'poll/', 'level/'];
   const old = { format: 'stadtwache-backup', version: 1, created: '2026-01-01T00:00:00Z', media: false, entries: Object.fromEntries(Object.entries(file.entries).filter(([k]) => !NEW.some((p) => k.startsWith(p)))) };
   assert.equal((await api('POST', 'backup', { backup: old, confirm: true })).status, 200);
   for (const k of fresh) assert.deepEqual(await db.get(k), { marker: k }, `bleibt beim Einspielen einer älteren Datei: ${k}`);
@@ -3507,7 +3507,7 @@ await test('Meine Stadtwache: ohne Login nichts, nur eigene Zahlen, Streak, Meil
   const neu = await (await get(viewer('777', 'Neu'))).json();
   assert.deepEqual([neu.visits.count, neu.visits.streak.current, neu.visits.today, neu.visits.next, neu.month.rank, neu.month.wouldRank], [0, 0, false, { at: 10, left: 10 }, null, null]);
   assert.equal(neu.entrySound.status, 'none');
-  assert.deepEqual(Object.keys(me).sort(), ['enabled', 'entrySound', 'loggedIn', 'month', 'name', 'visits']);
+  assert.deepEqual(Object.keys(me).sort(), ['enabled', 'entrySound', 'level', 'loggedIn', 'month', 'name', 'visits']);
 
   // Anmeldung führt zurück auf /meine (andere Ziele werden nicht akzeptiert), Abmelden löscht den Cookie
   const login = await authFn(new Request(BASE + '/api/auth/viewer?next=/meine'));
@@ -3529,6 +3529,150 @@ await test('Meine Stadtwache: ohne Login nichts, nur eigene Zahlen, Streak, Meil
   for (const k of ['user/501', `cmonth/${month}/501`, `cmonth/${month}/601`, `cmonth/${month}/602`, `bonus/${month}/501`, 'checked/' + days[2] + '/501']) await db.delete(k);
   await com.removeLink({ discordId: '700000000000000001' }); await com.removeLink({ discordId: '700000000000000002' }); await com.removeLink({ discordId: '700000000000000003' });
   forgetBoard();
+});
+
+await test('Dorf-Level: Tabelle, Punkte über alle Monate, Stufe geht nie verloren, !level, Aufstieg beim Check-in, Meine Seite, Bot-Schnittstelle', async () => {
+  const lv = await import('../netlify/lib/belohnungen/level.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const { handleRedemption } = await import('../netlify/lib/zuschauer/checkin.mjs');
+  const { makeViewerSession } = await import('../netlify/lib/kern/http.mjs');
+  const meine = (await import('../netlify/functions/meine.mjs')).default;
+  const communityFn = (await import('../netlify/functions/community.mjs')).default;
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const chats = () => calls.filter((c) => c.path.endsWith('/chat/messages')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).message);
+  const msg = (text, id, name) => ({ broadcaster_user_id: '999', chatter_user_id: id, chatter_user_name: name, badges: [], message_id: crypto.randomUUID(), message: { text } });
+
+  // Tabelle lesen: sortiert, erste Stufe bei 0, Ungültiges fliegt raus, zu wenig Gültiges = Standard
+  const t = lv.parseTable('500 | Polier\n0 | Zaungast\nkaputt\n100 | Geselle\n100 | Doppelt\n-5 | Minus');
+  assert.deepEqual(t, [{ n: 1, points: 0, title: 'Zaungast' }, { n: 2, points: 100, title: 'Geselle' }, { n: 3, points: 500, title: 'Polier' }]);
+  assert.equal(lv.parseTable('50 | Erster\n200 | Zweiter')[0].points, 0, 'die erste Stufe beginnt immer bei 0');
+  assert.equal(lv.parseTable('Unsinn').length, 10, 'ungültig: Standardtabelle'); assert.equal(lv.parseTable(Array.from({ length: 30 }, (_, i) => `${i * 10} | S${i}`).join('\n')).length, 20, 'höchstens 20 Stufen');
+  const lf = lv.levelFor(t, 250);
+  assert.deepEqual([lf.n, lf.title, lf.next, Math.round(lf.progress * 100)], [2, 'Geselle', { n: 3, title: 'Polier', at: 500, left: 250 }, 38]);
+  assert.deepEqual([lv.levelFor(t, 9999).n, lv.levelFor(t, 9999).next, lv.levelFor(t, 9999).progress], [3, null, 1]);
+  assert.equal(lv.levelFor(t, 10, 3).n, 3, 'eine schon erreichte Stufe bleibt');
+
+  await api('PUT', 'settings', { levelEnabled: false, communityEnabled: true, chatEnabled: true, chatCommands: true, commandCooldown: 0, levelTable: '0 | Zaungast\n100 | Hilfsarbeiter\n300 | Handlanger\n600 | Maurerlehrling', levelUpChat: true });
+  let settings = await getSettings();
+  // Mia: Punkte aus zwei Monaten zusammen (Twitch-Chat, Tage, Check-ins, Bonus), Discord nur mit Verknüpfung
+  await db.set('user/801', { name: 'Mia', count: 6, first: '2026-01-01T10:00:00Z', last: '2026-11-01T10:00:00Z', days: ['2026-09-03', '2026-10-05', '2026-10-06'], sessions: {} });
+  await db.set('cmonth/2026-09/801', { name: 'Mia', msgs: 50, days: 2, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  await db.set('cmonth/2026-10/801', { name: 'Mia', msgs: 30, days: 1, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  await db.set('bonus/2026-10/801', { points: 40, items: [] });
+  lv.forgetLevels();
+  const w = (x) => settings[x];
+  const expected = (50 * w('communityWeightMsg') + 2 * w('communityWeightDay') + 1 * w('communityWeightCheckin')) + (30 * w('communityWeightMsg') + 1 * w('communityWeightDay') + 2 * w('communityWeightCheckin') + 40);
+  assert.equal(await lv.lifetimePoints(settings, '801'), expected, 'alle Monate zusammen');
+  await com.saveLink({ discordId: '800000000000000801', discordName: 'M', twitchId: '801', twitchName: 'Mia' });
+  await db.set('dmonth/2026-10/800000000000000801', { msgs: 20, days: 2 });
+  assert.equal(await lv.lifetimePoints(settings, '801'), expected + 20 * w('communityWeightMsg') + 2 * w('communityWeightDay'), 'Discord zählt bei Verknüpften mit');
+
+  // Ausgeschaltet: kein Befehl, kein Feld
+  await handleChat(msg('!level', '801', 'Mia'), settings);
+  const n0 = chats().length;
+  assert.equal((await (await meine(new Request(BASE + '/api/meine', { headers: { cookie: `viewer=${encodeURIComponent(makeViewerSession({ id: '801', name: 'Mia' }))}` } }))).json()).level ?? null, null);
+  await api('PUT', 'settings', { levelEnabled: true, meineEnabled: true }); settings = await getSettings(); lv.forgetLevels();
+  const points = await lv.lifetimePoints(settings, '801');
+  const want = lv.levelFor(lv.parseTable(settings.levelTable), points);
+
+  // !level: Stufe, Punkte, nächster Schritt, und die Stufe wird gemerkt
+  await handleChat(msg('!level', '801', 'Mia'), settings);
+  assert.match(chats().at(-1), new RegExp(`^🏗️ Mia, du bist Level ${want.n}: ${want.title} mit ${points} Punkten\\. ${want.next ? `Noch ${want.next.left} Punkte bis ${want.next.title}\\.` : 'Höchste Stufe erreicht'}`));
+  assert.equal((await db.get('level/801')).n, want.n);
+  assert.ok(chats().length > n0);
+
+  // Stufe geht nie verloren: Punkte sinken (andere Gewichte), das Level bleibt
+  await api('PUT', 'settings', { communityWeightMsg: 0, communityWeightDay: 0, communityWeightCheckin: 0 }); settings = await getSettings();
+  const low = await lv.levelOf(settings, '801');
+  assert.deepEqual([low.points, low.n], [40, want.n], 'nur der Bonus ist übrig, die erreichte Stufe bleibt');
+  await api('PUT', 'settings', { communityWeightMsg: 1, communityWeightDay: 10, communityWeightCheckin: 20 }); settings = await getSettings();
+
+  // Aufstieg beim Check-in: neue Person ohne Level, bekommt beim Einlösen die Meldung (und nur einmal)
+  await db.set('cmonth/2026-10/802', { name: 'Ben', msgs: 400, days: 20, lastDay: null, dayMsgs: 0, lastAt: 0 }); lv.forgetLevels();
+  const redeem = (rid) => handleRedemption({ id: rid, user_id: '802', user_name: 'Ben', reward: { id: 'rw-lv' } }, settings);
+  const n1 = chats().length;
+  await redeem('lv-1');
+  const up = chats().slice(n1).find((m) => m.startsWith('🧱'));
+  assert.match(up, /^🧱 Ben ist jetzt Level \d: \w+! 🎉$/);
+  const n2 = chats().length; await redeem('lv-2'); // zweiter Check-in am selben Tag zählt nicht
+  assert.ok(!chats().slice(n2).some((m) => m.startsWith('🧱')), 'kein zweites Mal');
+  assert.equal((await db.get('level/802')).n >= 2, true);
+  await api('PUT', 'settings', { levelUpChat: false }); await db.delete('level/802'); await db.delete('checked/' + (await db.list('checked/')).find((k) => k.endsWith('/802'))?.split('/')[1] + '/802').catch(() => {});
+
+  // Meine Seite: Level mit Fortschritt
+  const me = await (await meine(new Request(BASE + '/api/meine', { headers: { cookie: `viewer=${encodeURIComponent(makeViewerSession({ id: '801', name: 'Mia' }))}` } }))).json();
+  assert.deepEqual([me.level.n, me.level.title, me.level.points, me.level.total], [want.n, want.title, points, 4]);
+  assert.ok(me.level.progress >= 0 && me.level.progress <= 1);
+
+  // Bot-Schnittstelle: nur mit Geheimwort, Stufen und verknüpfte Personen (nur IDs und Zahlen, keine Namen)
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const ask = (secret) => communityFn(new Request(BASE + '/api/community/levels', { headers: secret ? { authorization: `Bearer ${secret}` } : {} }));
+  assert.equal((await ask()).status, 401); assert.equal((await ask('falsch')).status, 401);
+  lv.forgetLevels();
+  const bot = await (await ask('geheimwort-12345')).json();
+  assert.equal(bot.enabled, true); assert.deepEqual(bot.levels.map((l) => l.title), ['Zaungast', 'Hilfsarbeiter', 'Handlanger', 'Maurerlehrling']);
+  const mine = bot.people.find((p) => p.discordId === '800000000000000801');
+  assert.deepEqual(mine, { discordId: '800000000000000801', level: want.n >= 1 ? lv.levelFor(lv.parseTable(settings.levelTable), await lv.lifetimePoints(settings, '801'), 0).n : 1, points: await lv.lifetimePoints(settings, '801') });
+  assert.ok(!JSON.stringify(bot).includes('Mia'), 'keine Namen an den Bot');
+  await api('PUT', 'settings', { levelEnabled: false }); lv.forgetLevels();
+  assert.deepEqual((await (await ask('geheimwort-12345')).json()).people, [], 'ausgeschaltet: keine Personen');
+  delete process.env.LINK_SECRET;
+
+  // Admin-Ansicht
+  await api('PUT', 'settings', { levelEnabled: true }); lv.forgetLevels();
+  const av = await (await api('GET', 'level')).json();
+  assert.equal(av.levels.length, 4); assert.equal(av.levels.reduce((a, l) => a + l.people, 0), av.linked);
+  assert.equal((await admin(adminReq('GET', 'level'))).status, 401);
+  await api('PUT', 'settings', { levelEnabled: false, meineEnabled: false, communityEnabled: false });
+  for (const k of ['user/801', 'cmonth/2026-09/801', 'cmonth/2026-10/801', 'cmonth/2026-10/802', 'bonus/2026-10/801', 'dmonth/2026-10/800000000000000801', 'level/801', 'level/802']) await db.delete(k);
+  await com.removeLink({ discordId: '800000000000000801' }); lv.forgetLevels();
+});
+
+await test('!discord und !plan: Link aus den Einstellungen, Plan vom Bot (nur mit Geheimwort), heute/morgen, Vergangenes fällt weg, veralteter Plan', async () => {
+  const plan = await import('../netlify/lib/chat/plan.mjs');
+  const communityFn = (await import('../netlify/functions/community.mjs')).default;
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const chats = () => calls.filter((c) => c.path.endsWith('/chat/messages')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).message);
+  const say = async (text) => handleChat({ broadcaster_user_id: '999', chatter_user_id: 'p1', chatter_user_name: 'Zuschauer', badges: [], message_id: crypto.randomUUID(), message: { text } }, await getSettings());
+  await db.delete('bot/plan');
+
+  // Ausgeschaltet: keine Antwort
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0, discordCmdEnabled: false, planCmdEnabled: false });
+  const n0 = chats().length; await say('!discord'); await say('!plan'); assert.equal(chats().length, n0);
+  // !discord
+  await api('PUT', 'settings', { discordCmdEnabled: true, discordInvite: 'https://discord.gg/testlink' });
+  await say('!discord'); assert.match(chats().at(-1), /^💬 Unser Discord: https:\/\/discord\.gg\/testlink /);
+
+  // !plan ohne Plan vom Bot
+  await api('PUT', 'settings', { planCmdEnabled: true });
+  await say('!plan'); assert.match(chats().at(-1), /^📅 Den aktuellen Streamplan findest du in https:\/\/discord\.gg\/testlink\.$/);
+
+  // Der Bot schickt den Plan: nur mit Geheimwort, Ungültiges wird verworfen
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const post = (secret, items) => communityFn(new Request(BASE + '/api/community/plan', { method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' }, body: JSON.stringify({ items }) }));
+  const settings = await getSettings();
+  const now = Date.UTC(2030, 5, 12, 14, 0); // Mittwoch 12.6.2030, 16:00 in Berlin
+  const items = [
+    { date: '2030-06-12', time: '10:00', text: 'Schon vorbei' }, { date: '2030-06-12', time: '15:30', text: 'Läuft noch' }, { date: '2030-06-12', time: '20:00', text: 'Bauabend' },
+    { date: '2030-06-13', time: '', text: 'Ganztägig <b>' }, { date: '2030-06-14', time: '19:00', text: 'Enshrouded' }, { date: '2030-06-30', time: '19:00', text: 'Viel später' },
+    { date: 'kaputt', time: '19:00', text: 'Ohne Datum' }, { date: '2030-06-15', time: '25:99', text: 'Zeit kaputt' }, { date: '2030-06-15', time: '19:00', text: '   ' },
+  ];
+  assert.equal((await post('falsch', items)).status, 401);
+  assert.deepEqual(await (await post('geheimwort-12345', items)).json(), { ok: true, saved: 7 });
+  delete process.env.LINK_SECRET;
+  const stored = await plan.getPlan();
+  assert.equal(stored.items.find((i) => i.text.startsWith('Zeit kaputt')).time, '', 'ungültige Uhrzeit wird zur leeren Zeit');
+
+  await db.set('bot/plan', { ...stored, at: now });
+  assert.equal(plan.planText(await plan.getPlan(), settings, now), '📅 Streamplan: heute 20:00 Bauabend · heute 15:30 Läuft noch · morgen Ganztägig <b> · Fr 14.06. 19:00 Enshrouded · Sa 15.06. Zeit kaputt'.replace('heute 20:00 Bauabend · heute 15:30 Läuft noch', 'heute 15:30 Läuft noch · heute 20:00 Bauabend'), 'Vergangenes fällt weg, heute und morgen als Wort, Fr 14.06. mit Datum, höchstens 5, später als 7 Tage nicht');
+  assert.ok(!plan.planText(await plan.getPlan(), settings, now).includes('Schon vorbei') && !plan.planText(await plan.getPlan(), settings, now).includes('Viel später'));
+  // nichts im Plan und veralteter Plan
+  assert.match(plan.planText({ at: now, items: [{ date: '2030-01-01', time: '', text: 'alt' }] }, settings, now), /^📅 Gerade steht kein Stream im Plan\. Schau in https:\/\/discord\.gg\/testlink vorbei\.$/);
+  assert.match(plan.planText({ at: now - 4 * 86_400_000, items: stored.items }, settings, now), /Den aktuellen Streamplan findest du/, 'älter als 3 Tage: der Bot meldet sich nicht mehr');
+  await db.delete('bot/plan');
+  await api('PUT', 'settings', { discordCmdEnabled: false, planCmdEnabled: false });
 });
 
 await test('Mediakit: CSV (deutsch, ohne Einnahmen), Quelle, Kriterien, Veröffentlichung, öffentliche Seite mit Platzhaltern und Maskierung', async () => {

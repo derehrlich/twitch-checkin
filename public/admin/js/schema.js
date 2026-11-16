@@ -130,7 +130,6 @@ export const SCHEMA = {
     { title: 'Hinweise im Chat', hint: `Platzhalter: ${code('user')} Name, ${code('url')} Adresse der Seite, ${code('month')} Monat, ${code('list')} Plätze, ${code('me')} eigener Platz. Der Tipp erscheint nach dem Check-in, höchstens einmal im Monat und nur bei Unverknüpften.`, items: [
       c('communityTip', true, 'Beim Check-in einmal im Monat einen Tipp zur Verknüpfung schreiben'),
       c('clipHintEnabled', true, 'Unter geteilten Clips einen Hinweis schreiben (nur wenn der Ersteller noch nicht verknüpft ist)'),
-      t('discordInvite', 'https://discord.gg/qxPqqhYwtJ', 'Discord-Einladungslink für den Clip-Hinweis', { maxlength: 200, placeholder: 'https://discord.gg/…' }),
       a('clipHintTemplate', '🎬 Starker Clip, {creator}! Komm ins Dorf ({discord}) und tippe hier !verknuepfen: Dann kannst du im Discord ClipMaster werden und bekommst Bonuspunkte für die Rangliste. 🏆', 'Hinweis unter einem Clip', { creator: 'Fan', user: 'Max', discord: 'https://discord.gg/…' }),
       a('communityTipTemplate', '💡 {user}, du bist noch nicht in der Monatsrangliste: verknüpfe dein Discord mit /verknuepfen oder tippe !verknuepfen. Dein Name wird nur gezeigt, wenn du das selbst tust.', 'Tipp nach dem Check-in', { user: 'Max', url: 'https://…/verknuepfen' }),
       a('communityLinkTemplate', '🔗 {user}, verknüpfe dein Twitch- und Discord-Konto, dann erscheinst du in der Monatsrangliste: tippe im Discord /verknuepfen und folge dem Link. Mehr dazu: {url}', 'Antwort auf den Befehl', { user: 'Max', url: 'https://…/verknuepfen' }),
@@ -191,6 +190,17 @@ export const SCHEMA = {
       a('quoteTemplate', '💬 Zitat #{n}: „{text}“ ({date})', 'Anzeige eines Zitats', { n: 3, text: 'Das war Absicht!', by: 'Max', date: '11.11.2026' }),
       a('quoteAddedTemplate', '✅ Zitat #{n} gespeichert.', 'Antwort nach dem Speichern', { n: 4, user: 'Max' }),
       a('quoteNoneTemplate', '{user}, ich kenne noch kein Zitat. Mods können mit !addquote eins anlegen.', 'Antwort, wenn es noch kein Zitat gibt', { user: 'Max' }),
+    ] },
+    { title: 'Discord-Link und Streamplan', hint: `<b>!discord</b> schreibt den Einladungslink zu deinem Discord-Server in den Chat. <b>!plan</b> schreibt die nächsten Streams aus dem Kalender des VerwirrBots (der Bot schickt den Plan alle paar Minuten an die Stadtwache, ohne den Bot gibt es keinen Plan). Platzhalter: ${code('url')} Einladungslink, ${code('plan')} die nächsten Streams.`, items: [
+      c('discordCmdEnabled', false, '!discord einschalten'),
+      t('discordCommand', '!discord', 'Befehl für den Discord-Link', { maxlength: 26, kind: 'command', placeholder: '!discord' }),
+      t('discordInvite', 'https://discord.gg/qxPqqhYwtJ', 'Einladungslink zu deinem Discord-Server (auch für den Clip-Hinweis im Chat)', { maxlength: 200, placeholder: 'https://discord.gg/…' }),
+      a('discordTemplate', '💬 Unser Discord: {url} – Streamplan, Gewinnspiele und die Dorfgemeinschaft.', 'Antwort auf !discord', { url: 'https://discord.gg/abc123' }),
+      c('planCmdEnabled', false, '!plan einschalten (der Plan kommt vom VerwirrBot)'),
+      t('planCommand', '!plan', 'Befehl für den Streamplan', { maxlength: 26, kind: 'command', placeholder: '!plan' }),
+      a('planTemplate', '📅 Streamplan: {plan}', 'Antwort auf !plan', { plan: 'heute 19:00 Bauabend · Fr 20:00 Enshrouded', url: 'https://discord.gg/abc123' }),
+      a('planNoneTemplate', '📅 Gerade steht kein Stream im Plan. Schau in {url} vorbei.', 'Antwort, wenn nichts im Plan steht', { url: 'unserem Discord' }),
+      a('planUnknownTemplate', '📅 Den aktuellen Streamplan findest du in {url}.', 'Antwort, wenn der Plan nicht vorliegt (Bot nicht erreichbar)', { url: 'unserem Discord' }),
     ] },
   ],
 
@@ -355,6 +365,17 @@ export const SCHEMA = {
       c('meineEnabled', false, '„Meine Stadtwache“ einschalten'),
       t('meineCommand', '!meine', 'Chat-Befehl, der den Link zur Seite schreibt', { maxlength: 26, kind: 'command', placeholder: '!meine' }),
       a('meineTemplate', '{user}, deine persönliche Seite mit Streak, Besuchen, Rang und Einlaufsound: {url}', 'Chatnachricht mit dem Link', { user: 'Max', url: 'https://…/meine' }),
+    ] },
+  ],
+
+  level: [
+    { title: 'Dorf-Level', hint: `Aus allen Punkten (alle Monate zusammen, gerechnet wie in der Community-Rangliste) wird eine Stufe mit Titel. Ein erreichtes Level geht nie wieder verloren. Der VerwirrBot kann dazu Rollen im Discord vergeben (nur für verknüpfte Konten). Stufen: eine Zeile pro Stufe, <code>Punkte | Titel</code>, die erste beginnt bei 0, höchstens ${20} Stufen. Platzhalter: ${code('user')} ${code('level')} Nummer, ${code('title')} Titel, ${code('points')} Punkte, ${code('next')} Satz zur nächsten Stufe.`, items: [
+      c('levelEnabled', false, 'Dorf-Level einschalten'),
+      a('levelTable', '0 | Zaungast\n100 | Hilfsarbeiter\n300 | Handlanger\n600 | Maurerlehrling\n1000 | Geselle\n1600 | Vorarbeiter\n2500 | Polier\n4000 | Bauleiter\n6000 | Baumeister\n10000 | Dorfältester', 'Stufen (Punkte | Titel)', {}),
+      t('levelCommand', '!level', 'Befehl für das eigene Level', { maxlength: 26, kind: 'command', placeholder: '!level' }),
+      a('levelTemplate', '🏗️ {user}, du bist Level {level}: {title} mit {points} Punkten. {next}', 'Antwort auf !level', { user: 'Max', level: 4, title: 'Maurerlehrling', points: 650, next: 'Noch 350 Punkte bis Geselle.' }),
+      c('levelUpChat', true, 'Aufstieg im Chat feiern (beim Check-in)'),
+      a('levelUpTemplate', '🧱 {user} ist jetzt Level {level}: {title}! 🎉', 'Aufstieg (Chat)', { user: 'Max', level: 5, title: 'Geselle', points: 1020, next: '' }),
     ] },
   ],
 

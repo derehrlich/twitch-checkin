@@ -41,6 +41,7 @@
   </section>
   <div id="me" class="hidden" style="display:grid; gap:18px">
     <section class="card"><h2 id="hello">Hallo</h2><div class="stats" id="tiles"></div></section>
+    <section class="card hidden" id="lvCard"><h2>Dein Dorf-Level</h2><div id="lv"></div></section>
     <section class="card" id="mileCard"><h2>Nächster Meilenstein</h2><div id="mile"></div></section>
     <section class="card" id="monthCard"><h2 id="monthTitle">Rangliste</h2><div id="month"></div></section>
     <section class="card" id="entryCard"><h2>Dein Einlaufsound</h2><div id="entry"></div></section>
@@ -70,6 +71,14 @@ async function load() {
   tile(tiles, nf.format(v.count), 'Besuche');
   tile(tiles, v.minutes ? dur(v.minutes) : '–', 'Zeit im Stream');
   tile(tiles, v.today ? '✅ ja' : 'noch nicht', 'Heute eingecheckt');
+  $('lvCard').classList.toggle('hidden', !me.level);
+  const lvBox = $('lv'); lvBox.replaceChildren();
+  if (me.level) {
+    const l = me.level;
+    el('p', 'big', `Level ${l.n} von ${l.total}: ${l.title}`, lvBox);
+    if (l.next) { const p = el('progress', '', null, lvBox); p.max = 100; p.value = Math.round(l.progress * 100); p.setAttribute('aria-label', 'Fortschritt zum nächsten Level'); el('p', 'muted', `${nf.format(l.points)} Punkte · noch ${nf.format(l.next.left)} bis Level ${l.next.n} (${l.next.title})`, lvBox); }
+    else el('p', 'muted', `${nf.format(l.points)} Punkte · höchste Stufe erreicht 🏆`, lvBox);
+  }
   const mile = $('mile'); mile.replaceChildren();
   if (v.count === 0) el('p', 'muted', 'Du hast noch keinen Check-in. Löse im nächsten Stream den Check-in-Reward ein, dann zählt dein erster Besuch.', mile);
   else if (v.next) { el('p', 'big', `Noch ${v.next.left} ${v.next.left === 1 ? 'Besuch' : 'Besuche'} bis zum ${v.next.at}. Meilenstein`, mile); const p = el('progress', '', null, mile); p.max = v.next.at; p.value = v.count; p.setAttribute('aria-label', 'Fortschritt zum nächsten Meilenstein'); el('p', 'muted', `${v.count} von ${v.next.at}${v.first ? ` · dabei seit ${fmtDate(v.first)}` : ''}`, mile); }

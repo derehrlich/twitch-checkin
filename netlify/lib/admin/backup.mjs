@@ -10,7 +10,7 @@ import { backupStatus, runBackupNow } from '../system/autobackup.mjs';
 const FORMAT = 'stadtwache-backup';
 // Stand der Sicherung bis Version 1. Ältere Dateien kennen die neueren Bereiche nicht: Beim Einspielen werden nur Bereiche geleert, die die Datei selbst enthält.
 const LEGACY_PREFIXES = ['user/', 'checked/', 'checkout/', 'streamday/', 'raid/', 'chatuser/', 'entrysound/', 'link/', 'cmonth/', 'dmonth/', 'award/', 'awardsound/', 'sport/', 'alpaca-color/', 'gw/', 'gwcode/', 'startscreen/'];
-const DATA_PREFIXES = [...LEGACY_PREFIXES, 'ticket/', 'rad/', 'adv/', 'countdown/', 'chatstyle/', 'quote/', 'counter/', 'bonus/', 'bonuskey/', 'rescue/', 'stat/', 'mediakit/', 'poll/'];
+const DATA_PREFIXES = [...LEGACY_PREFIXES, 'ticket/', 'rad/', 'adv/', 'countdown/', 'chatstyle/', 'quote/', 'counter/', 'bonus/', 'bonuskey/', 'rescue/', 'stat/', 'mediakit/', 'poll/', 'level/'];
 const DATA_KEYS = ['config/settings', 'config/soundboard', 'config/state', 'config/catalog', 'config/commands'];
 const MEDIA_PREFIXES = ['sound/', 'image/', 'soundboard/', 'entrysound-file/', 'catalog/', 'startbg/'];
 const inScope = (key, media, prefixes = DATA_PREFIXES) => DATA_KEYS.includes(key) || [...prefixes, ...(media ? MEDIA_PREFIXES : [])].some((p) => key.startsWith(p));
