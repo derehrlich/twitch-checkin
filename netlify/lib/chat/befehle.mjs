@@ -1,4 +1,4 @@
-// Die festen Chat-Befehle des Bots (!streak, !top, !verknuepfen, !rangliste, !so, !quote, !addquote, !delquote).
+// Die festen Chat-Befehle des Bots (!streak, !top, !verknuepfen, !rangliste, !so, !quote, !addquote, !delquote, !pause, !umfrage …).
 // Ein neuer Befehl braucht nur eine Zeile in BEFEHLE, Dedupe, Abklingzeit, Rollenprüfung und das Senden erledigt `fuehreAus`.
 //   id      interner Name
 //   wort    liefert das Befehlswort aus den Einstellungen (z. B. '!streak')
@@ -17,6 +17,7 @@ import { PERMIT_SECONDS, permit } from './moderation.mjs';
 import { submitFromTwitch } from '../belohnungen/adventures.mjs';
 import { birthdayReply } from '../overlays/countdown.mjs';
 import * as pause from '../overlays/pause.mjs';
+import * as poll from '../overlays/umfrage.mjs';
 import { cancelByUser, confirmByUser, ingameByUser, modCommand, mySeat, sweepOffers, ticketsInfo } from '../belohnungen/tickets.mjs';
 
 const minutesOf = (u) => Object.values(u.sessions ?? {}).reduce((s, x) => s + (x.minutes ?? 0), 0);
@@ -104,6 +105,8 @@ export const BEFEHLE = [
     id: 'pauseende', wort: (s) => s.pauseEndCommand, aktiv: (s) => s.pauseEnabled, rolle: 'mod',
     async run({ settings }) { const was = await pause.stop(); return was.active && settings.pauseChat ? pause.endReply(settings) : null; },
   },
+  { id: 'umfrage', wort: (s) => s.pollCommand, aktiv: (s) => s.pollEnabled, rolle: 'mod', run: ({ e, args, settings }) => poll.chatStart(e, args, settings) },
+  { id: 'umfrageende', wort: (s) => s.pollEndCommand, aktiv: (s) => s.pollEnabled, rolle: 'mod', run: ({ settings }) => poll.chatEnd(settings) },
   { id: 'adventure', wort: (s) => s.advCommand, aktiv: (s) => s.advEnabled, run: async ({ e, args, settings }) => (await submitFromTwitch(settings, e, args)).reply },
   { id: 'tickets', wort: (s) => s.ticketsCommand, aktiv: (s) => s.ticketsEnabled, run: ({ settings }) => ticketsInfo(settings) },
   { id: 'platz', wort: (s) => s.ticketSeatCommand, aktiv: (s) => s.ticketsEnabled, run: async ({ e, settings }) => { await sweepOffers(settings); return mySeat(e.chatter_user_id, e.chatter_user_name, settings); } },

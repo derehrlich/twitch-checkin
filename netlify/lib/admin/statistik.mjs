@@ -1,5 +1,5 @@
 // /api/admin/stats und /api/admin/mediakit: Twitch-Statistik und Mediakit (alles hinter dem Admin-Login).
-//   GET stats | GET stats/<id> (Verlauf eines Streams) | DELETE stats/<id> | POST stats/check (jetzt messen)
+//   GET stats | GET stats/<id> (Rückblick auf einen Stream) | DELETE stats/<id> | POST stats/check (jetzt messen)
 //   GET mediakit | PUT mediakit (Angaben) | POST mediakit/csv { text } | DELETE mediakit/csv | GET mediakit/preview
 import { json } from '../kern/http.mjs';
 import { getSettings } from '../kern/settings.mjs';
@@ -14,7 +14,7 @@ export async function statsRoute({ route, method }) {
     const r = await stats.statTick(settings);
     return r.error ? json({ error: `Messung fehlgeschlagen: ${r.error}` }, 502) : json(await stats.adminView(settings));
   }
-  if (route[1] && method === 'GET') { const s = await stats.sessionCurve(route[1]); return s ? json(s) : json({ error: 'Nicht gefunden' }, 404); }
+  if (route[1] && method === 'GET') { const s = await stats.reviewOf(route[1], settings); return s ? json(s) : json({ error: 'Nicht gefunden' }, 404); }
   if (route[1] && method === 'DELETE') return (await stats.deleteSession(route[1])) ? json(await stats.adminView(settings)) : json({ error: 'Nicht gefunden' }, 404);
 }
 

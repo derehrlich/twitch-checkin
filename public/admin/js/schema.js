@@ -334,6 +334,22 @@ export const SCHEMA = {
     ] },
   ],
 
+  poll: [
+    { title: 'Umfragen', hint: `Mods und du starten im Chat mit <code>!umfrage 3 Welches Spiel? | Enshrouded | Satisfactory</code> (die Zahl vorn sind Minuten und ist optional, ohne Antworten gibt es „Ja“ und „Nein“, höchstens 6 Antworten). Der Chat stimmt mit der Zahl ab (<code>1</code> oder <code>!1</code>). Beenden mit dem Beenden-Befehl oder im Admin. Platzhalter: ${code('question')} Frage, ${code('options')} Antworten mit Nummer, ${code('minutes')} Minuten, ${code('result')} Ergebnis mit Prozent, ${code('winner')} Gewinner (bei Gleichstand beide), ${code('total')} Stimmen, ${code('user')}. Die Anzeige im Stream (Browserquelle <code>/umfrage</code>) steht auf der Seite „Umfragen“.`, items: [
+      c('pollEnabled', false, 'Umfragen einschalten (Chat-Befehle brauchen „Chat-Befehle“ und „Chat-Nachrichten“, die Stimmen zählen auch ohne)'),
+      t('pollCommand', '!umfrage', 'Befehl: Umfrage starten (nur Mods)', { maxlength: 26, kind: 'command', placeholder: '!umfrage' }),
+      t('pollEndCommand', '!umfrageende', 'Befehl: Umfrage beenden (nur Mods)', { maxlength: 26, kind: 'command', placeholder: '!umfrageende' }),
+      n('pollMinutes', 2, 'So lange läuft eine Umfrage, wenn nichts anderes angegeben ist (Minuten)', { min: 1, max: 60 }),
+      n('pollShowSeconds', 30, 'So lange bleibt das Ergebnis nach dem Ende im Stream stehen (Sekunden)', { min: 5, max: 300 }),
+      c('pollChat', true, 'Start und Ergebnis im Chat schreiben'),
+      a('pollStartTemplate', '📊 Umfrage: {question} Schreib die Zahl in den Chat: {options}. Du hast {minutes} Min.', 'Umfrage startet (Chat)', { question: 'Welches Spiel als Nächstes?', options: '1 = Enshrouded · 2 = Satisfactory', minutes: 2 }),
+      a('pollResultTemplate', '📊 Ergebnis „{question}“: {result}. Vorn liegt: {winner}!', 'Ergebnis (Chat)', { question: 'Welches Spiel als Nächstes?', result: 'Enshrouded 12 (63 %) · Satisfactory 7 (37 %)', winner: 'Enshrouded', total: 19 }),
+      a('pollNoVotesTemplate', '📊 Die Umfrage „{question}“ ist vorbei, aber niemand hat abgestimmt.', 'Niemand hat abgestimmt', { question: 'Welches Spiel als Nächstes?' }),
+      a('pollUsageTemplate', '{user}, so geht es: !umfrage 3 Welches Spiel? | Enshrouded | Satisfactory (die Zahl vorn sind Minuten, ohne Antworten gibt es Ja und Nein).', 'Falsch benutzt', { user: 'Max' }),
+      a('pollBusyTemplate', '{user}, es läuft schon eine Umfrage. Beenden geht mit !umfrageende.', 'Es läuft schon eine Umfrage', { user: 'Max' }),
+    ] },
+  ],
+
   statistik: [
     { title: 'Twitch-Statistik', hint: 'Die Stadtwache fragt jede Minute bei Twitch nach, ob du live bist, und merkt sich dann die Zuschauerzahl, dazu Follower und Abos. Die Zahlen stehen nur hier im Admin und, wenn du es veröffentlichst, als Kennzahlen im Mediakit. Es wird nichts in den Chat geschrieben.', items: [
       c('statsEnabled', false, 'Zuschauer, Follower und Abos messen'),

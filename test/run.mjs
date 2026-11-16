@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -3272,6 +3272,175 @@ await test('Twitch-Statistik: misst nur wenn eingeschaltet, Streams mit Lücke, 
     assert.equal((await (await api('GET', 'stats')).json()).error, null);
   } finally { globalThis.fetch = realFetch; }
   await api('PUT', 'settings', { statsEnabled: false });
+});
+
+await test('Stream-Rückblick: Chat-Zähler im Speicher, Ereignisse im Zeitraum, Check-ins, Vergleich, Spitze, Löschen', async () => {
+  const st = await import('../netlify/lib/statistik/stats.mjs');
+  const { streamDay } = await import('../netlify/lib/zuschauer/checkin.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  await api('PUT', 'settings', { statsEnabled: true, creditsIgnore: 'nightbot' });
+  const settings = await getSettings();
+  for (const k of await db.list('stat/')) await db.delete(k); // sauberer Stand
+  st.resetChatCounter();
+  const realFetch = globalThis.fetch;
+  let live = null;
+  globalThis.fetch = async (url, init) => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/helix/streams')) return new Response(JSON.stringify({ data: live ? [{ viewer_count: live, title: 'Turmbau', game_name: 'Enshrouded' }] : [] }), { status: 200 });
+    if (u.pathname.endsWith('/channels/followers')) return new Response(JSON.stringify({ total: 200, data: [] }), { status: 200 });
+    if (u.pathname.endsWith('/helix/subscriptions')) return new Response(JSON.stringify({ total: 4, data: [] }), { status: 200 });
+    return realFetch(url, init);
+  };
+  const T0 = Date.UTC(2030, 8, 2, 18, 0), MIN = 60_000, day = streamDay(settings, new Date(T0));
+  try {
+    // Zwei frühere Streams mit Ø 10 Zuschauern als Vergleich
+    for (const [i, d] of [[1, 3], [2, 5]]) {
+      const id = String(T0 - d * 86_400_000).padStart(15, '0');
+      await db.set(`stat/session/${id}`, { id, startedAt: new Date(T0 - d * 86_400_000).toISOString(), lastSeen: T0 - d * 86_400_000 + 60 * MIN, endedAt: new Date(T0 - d * 86_400_000 + 60 * MIN).toISOString(), samples: 10, sumViewers: 100, peak: 15, curve: [], title: `früher ${i}` });
+    }
+    st.countStreamChat('u1', 'Anna'); // vor dem Start: noch kein Stream, wird nicht gezählt
+    live = 10; await st.statTick(settings, T0);
+    for (let i = 0; i < 5; i++) st.countStreamChat('u1', 'Anna');
+    for (let i = 0; i < 3; i++) st.countStreamChat('u2', 'Ben');
+    st.countStreamChat('u3', 'Cem'); for (let i = 0; i < 9; i++) st.countStreamChat('nb', 'Nightbot');
+    live = 20; await st.statTick(settings, T0 + MIN); // sichert den Zähler
+    live = 30; await st.statTick(settings, T0 + 2 * MIN);
+    const id = (await db.get('stat/live')).id;
+    assert.deepEqual((await db.get(`stat/chat/${id}`)).users.u1, { name: 'Anna', n: 5 });
+    st.countStreamChat('u2', 'Ben'); live = null; await st.statTick(settings, T0 + 3 * MIN); // Stream aus, letzte Nachrichten werden noch gesichert
+    assert.equal((await db.get(`stat/chat/${id}`)).users.u2.n, 4);
+    st.countStreamChat('u9', 'Spaet'); await st.statTick(settings, T0 + 20 * MIN); // Stream ist vorbei: nichts mehr zählen
+    assert.equal((await db.get(`stat/chat/${id}`)).users.u9, undefined);
+
+    // Ereignisse und Check-ins des Stream-Tags
+    const ev = (n, x) => db.set(`log/${day}/${n}`, x);
+    await ev('a1', { t: T0 + 5 * MIN, type: 'follow', user: 'F1' }); await ev('a2', { t: T0 + 6 * MIN, type: 'follow', user: 'F2' });
+    await ev('a3', { t: T0 + 7 * MIN, type: 'sub', user: 'S1' }); await ev('a4', { t: T0 + 8 * MIN, type: 'gift', user: 'G1', total: 3 });
+    await ev('a5', { t: T0 + 9 * MIN, type: 'cheer', user: 'B1', bits: 200 }); await ev('a6', { t: T0 + 10 * MIN, type: 'raid', user: 'Raiderin', viewers: 14 });
+    await ev('a7', { t: T0 - 5 * 3_600_000, type: 'follow', user: 'Vorher' }); // lange vor dem Stream
+    for (const u of ['u1', 'u2', 'u3']) await db.set(`checked/${day}/${u}`, 1);
+
+    const r = await st.reviewOf(id, settings, T0 + 30 * MIN);
+    assert.deepEqual([r.title, r.game, r.minutes, r.peak, r.avg, r.open], ['Turmbau', 'Enshrouded', 2, 30, 20, false]);
+    assert.equal(r.peakMinute, 2); assert.deepEqual(r.curve.at(-1), [2, 30]);
+    assert.deepEqual(r.chat, { measured: true, chatters: 3, messages: 10, top: [{ name: 'Anna', n: 5 }, { name: 'Ben', n: 4 }, { name: 'Cem', n: 1 }] }, 'Nightbot steht auf der Ignorierliste');
+    assert.equal(r.checkins, 3);
+    assert.deepEqual(r.events, { follows: 2, subs: 1, gifts: 3, bits: 200, raids: [{ name: 'Raiderin', viewers: 14 }] });
+    assert.deepEqual(r.compare, { streams: 2, avg: 10, percent: 100 }, 'doppelt so viele wie sonst');
+    assert.deepEqual([r.followersStart, r.followersEnd, r.subsTotal], [200, 200, 4]);
+
+    // Über die Admin-Schnittstelle: ohne Login nichts, mit Login der Rückblick, der letzte Stream steht gleich in der Übersicht
+    assert.equal((await admin(adminReq('GET', `stats/${id}`))).status, 401);
+    assert.deepEqual((await (await api('GET', `stats/${id}`)).json()).chat.top[0], { name: 'Anna', n: 5 });
+    const v = await (await api('GET', 'stats')).json();
+    assert.equal(v.latest.id, id); assert.equal(v.latest.events.raids[0].name, 'Raiderin');
+    // Ältere Streams ohne Chat-Zähler: „nicht gemessen“ statt Null
+    const old = await (await api('GET', `stats/${String(T0 - 3 * 86_400_000).padStart(15, '0')}`)).json();
+    assert.deepEqual(old.chat, { measured: false, chatters: 0, messages: 0, top: [] });
+    assert.deepEqual(old.compare, { streams: 1, avg: 10, percent: 0 }, 'verglichen wird nur mit früheren Streams');
+    assert.equal((await (await api('GET', `stats/${String(T0 - 5 * 86_400_000).padStart(15, '0')}`)).json()).compare, null, 'der erste Stream hat keinen Vergleich');
+
+    // Löschen räumt den Zähler mit auf
+    assert.equal((await api('DELETE', `stats/${id}`)).status, 200);
+    assert.equal(await db.get(`stat/chat/${id}`), null);
+  } finally { globalThis.fetch = realFetch; for (const k of await db.list('stat/')) await db.delete(k); for (const k of await db.list(`log/${day}/`)) await db.delete(k); for (const k of await db.list(`checked/${day}/`)) await db.delete(k); }
+  await api('PUT', 'settings', { statsEnabled: false });
+});
+
+await test('Umfragen: Befehl nur für Mods, Zahl im Chat stimmt ab und ist änderbar, Ende nach Zeit mit Ergebnis, Gleichstand, Overlay ohne Namen, Admin', async () => {
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const poll = await import('../netlify/lib/overlays/umfrage.mjs');
+  const pollFn = (await import('../netlify/functions/umfrage.mjs')).default;
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const chats = () => calls.filter((c) => c.path.endsWith('/chat/messages')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).message); // Texte mit „=“ gibt der Test-Twitch als Rohtext weiter
+  const msg = (text, who = 'v1', name = 'Viewer', mod = false) => ({ broadcaster_user_id: '999', chatter_user_id: who, chatter_user_name: name, badges: mod ? [{ set_id: 'moderator' }] : [], message_id: crypto.randomUUID(), message: { text } });
+  const view = async () => (await pollFn(new Request(BASE + '/api/umfrage'))).json();
+  assert.equal((await admin(adminReq('GET', 'umfrage'))).status, 401, 'nur mit Login');
+  assert.equal((await admin(adminReq('POST', 'umfrage/start', { question: 'x' }))).status, 401);
+  await poll.hide();
+
+  const s0 = await getSettings();
+  assert.deepEqual(poll.parseArgs('Spielen wir?', s0), { question: 'Spielen wir?', options: ['Ja', 'Nein'], minutes: s0.pollMinutes });
+  assert.deepEqual(poll.parseArgs('3 Welches Spiel? | Enshrouded | Satisfactory', s0), { question: 'Welches Spiel?', options: ['Enshrouded', 'Satisfactory'], minutes: 3 });
+  assert.equal(poll.parseArgs('5min Pause? | jetzt | später', s0).minutes, 5);
+  assert.deepEqual(poll.parseArgs('99 Spiele?', s0), { question: '99 Spiele?', options: ['Ja', 'Nein'], minutes: s0.pollMinutes }, 'über 60 ist keine Minutenzahl');
+
+  // Ausgeschaltet passiert nichts
+  await api('PUT', 'settings', { pollEnabled: false, chatEnabled: true, chatCommands: true, commandCooldown: 0, pollChat: true, pollMinutes: 2, pollShowSeconds: 30, creditsIgnore: 'nightbot' });
+  await handleChat(msg('!umfrage Test?', 'm1', 'Moddi', true), await getSettings());
+  assert.equal((await poll.getState()).status, 'idle');
+  await api('PUT', 'settings', { pollEnabled: true });
+  const s = await getSettings();
+
+  // Nur Mods starten
+  const n0 = chats().length;
+  await handleChat(msg('!umfrage Wollen wir?'), s);
+  assert.equal((await poll.getState()).status, 'idle'); assert.equal(chats().length, n0, 'Zuschauer werden still ignoriert');
+  await handleChat(msg('!umfrage 3 Welches Spiel? | Enshrouded | Satisfactory', 'm1', 'Moddi', true), s);
+  let st = await poll.getState();
+  assert.deepEqual([st.status, st.question, st.options.map((o) => o.label), st.minutes], ['open', 'Welches Spiel?', ['Enshrouded', 'Satisfactory'], 3]);
+  assert.match(chats().at(-1), /Umfrage: Welches Spiel\? .*1 = Enshrouded · 2 = Satisfactory.* 3 Min/);
+  await handleChat(msg('!umfrage Noch eine?', 'm1', 'Moddi', true), s);
+  assert.match(chats().at(-1), /läuft schon eine Umfrage/); assert.equal((await poll.getState()).question, 'Welches Spiel?');
+
+  // Abstimmen: eine Stimme pro Person, neu wählen ersetzt, falsche Zahlen und Bots zählen nicht
+  for (const [id, text] of [['v1', '1'], ['v2', '2'], ['v3', '!1'], ['v4', '1'], ['v5', '2']]) await handleChat(msg(text, id, 'Zuschauer ' + id), s);
+  await handleChat(msg('2', 'v1', 'Zuschauer v1'), s); // v1 überlegt es sich anders
+  await handleChat(msg('2', 'v2', 'Zuschauer v2'), s); // dieselbe Stimme noch einmal: bleibt eine
+  await handleChat(msg('5', 'v6', 'Zuschauer v6'), s); await handleChat(msg('ich nehme 1', 'v7', 'Zuschauer v7'), s); await handleChat(msg('1', 'nb', 'Nightbot'), s);
+  st = await poll.getState();
+  assert.deepEqual([st.options[0].votes, st.options[1].votes, st.total], [2, 3, 5]);
+
+  // Viele gleichzeitige Stimmen gehen nicht verloren
+  await Promise.all(Array.from({ length: 30 }, (_, i) => poll.vote(`bulk${i}`, (i % 2) + 1)));
+  st = await poll.getState();
+  assert.deepEqual([st.options[0].votes, st.options[1].votes, st.total], [17, 18, 35]);
+  assert.equal((await poll.vote('bulk0', 7)).reason, 'range');
+
+  // Overlay: Frage, Antworten, Prozent, nie die Namen
+  let v = await view();
+  assert.deepEqual([v.show, v.status, v.question, v.total], [true, 'open', 'Welches Spiel?', 35]);
+  assert.deepEqual(v.options.map((o) => [o.label, o.votes, o.percent, o.win]), [['Enshrouded', 17, 49, false], ['Satisfactory', 18, 51, false]]);
+  assert.ok(!JSON.stringify(v).includes('bulk') && !JSON.stringify(v).includes('v1'), 'keine Namen oder IDs');
+
+  // Ende nach Ablauf: genau eine Ergebnis-Nachricht, danach keine Stimmen mehr, Stimmen werden gelöscht
+  assert.equal(await poll.tick(s, st.endsAt - 1000), null, 'vorher läuft sie noch');
+  const n1 = chats().length;
+  const closed = await poll.tick(s, st.endsAt + 1);
+  assert.equal(closed.status, 'closed');
+  assert.match(chats().at(-1), /Ergebnis „Welches Spiel\?“: Enshrouded 17 \(49 %\) · Satisfactory 18 \(51 %\)\. Vorn liegt: Satisfactory!/); assert.equal(chats().length, n1 + 1);
+  assert.equal(await poll.tick(s, st.endsAt + 5000), null); assert.equal(chats().length, n1 + 1, 'nur einmal ansagen');
+  assert.deepEqual(await poll.vote('spaet', 1, st.endsAt + 5000), { ok: false, reason: 'closed' });
+  assert.equal((await db.list(`poll/vote/${st.id}/`)).length, 0, 'Stimmen sind aufgeräumt');
+  v = await poll.publicView(s, st.endsAt + 10_000);
+  assert.deepEqual([v.show, v.status, v.options.map((o) => o.win)], [true, 'closed', [false, true]]);
+  assert.equal((await poll.publicView(s, closed.closedAt + 31_000)).show, false, 'nach 30 Sekunden verschwindet das Ergebnis');
+
+  // Admin: starten, Fehler, Gleichstand mit !umfrageende, niemand hat abgestimmt, Ausblenden
+  assert.equal((await api('POST', 'umfrage/start', { question: '' })).status, 400);
+  assert.equal((await api('POST', 'umfrage/start', { question: 'Eine?', optionsText: 'A' })).status, 400);
+  assert.equal((await api('POST', 'umfrage/start', { question: 'Gleich?', optionsText: 'A\na' })).status, 400, 'Antworten müssen verschieden sein');
+  const big = await (await api('POST', 'umfrage/start', { question: 'Viele?', optionsText: 'a\nb\nc\nd\ne\nf\ng\nh', minutes: 1 })).json();
+  assert.equal(big.state.options.length, 6, 'höchstens 6 Antworten'); assert.equal((await api('POST', 'umfrage/start', { question: 'Noch eine?' })).status, 409);
+  await api('POST', 'umfrage/end', {}); assert.match(chats().at(-1), /niemand hat abgestimmt/);
+  const tie = await (await api('POST', 'umfrage/start', { question: 'Gleichstand?', optionsText: 'A\nB', minutes: 1 })).json();
+  assert.equal(tie.state.options.length, 2); await poll.vote('t1', 1); await poll.vote('t2', 2);
+  await handleChat(msg('!umfrageende', 'm1', 'Moddi', true), s);
+  assert.match(chats().at(-1), /Gleichstand: A und B/);
+  const noOpts = await (await api('POST', 'umfrage/start', { question: 'Ohne Antworten?' })).json();
+  assert.deepEqual(noOpts.state.options.map((o) => o.label), ['Ja', 'Nein'], 'ohne Antworten gibt es Ja und Nein');
+  await poll.vote('h1', 1); await api('POST', 'umfrage/hide', {});
+  assert.equal((await view()).show, false); assert.equal((await poll.getState()).status, 'idle'); assert.equal((await db.list(`poll/vote/${noOpts.state.id}/`)).length, 0);
+  const admin1 = await (await api('GET', 'umfrage')).json();
+  assert.equal(admin1.state, null); assert.equal(admin1.history.length, 3, 'drei beendete Umfragen, die ausgeblendete zählt nicht'); assert.match(admin1.history[0].result, /A 1 \(50 %\) · B 1 \(50 %\)/);
+
+  // Ohne Chat-Ausgabe bleibt der Chat ruhig, die Umfrage läuft trotzdem
+  await api('PUT', 'settings', { pollChat: false });
+  const n2 = chats().length;
+  await handleChat(msg('!umfrage Still?', 'm1', 'Moddi', true), await getSettings());
+  assert.equal(chats().length, n2); assert.equal((await poll.getState()).status, 'open');
+  await poll.hide();
+  await api('PUT', 'settings', { pollEnabled: false, pollChat: true, creditsIgnore: '' });
 });
 
 await test('Mediakit: CSV (deutsch, ohne Einnahmen), Quelle, Kriterien, Veröffentlichung, öffentliche Seite mit Platzhaltern und Maskierung', async () => {

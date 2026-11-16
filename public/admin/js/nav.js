@@ -8,7 +8,7 @@ export const NAV = [
   ['Chat', [['commands', '💬', 'Eigene Commands'], ['chat', '❗', 'Befehle und Shoutout'], ['moderation', '🛡️', 'Moderation'], ['chatleiste', '🗨️', 'Chat im Stream']]],
   ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste']]],
   ['Zahlen', [['statistik', '📈', 'Twitch-Statistik'], ['mediakit', '📰', 'Mediakit']]],
-  ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
+  ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['umfrage', '📊', 'Umfragen'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
   ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
   ['Verwaltung', [['medien', '🎵', 'Töne und Bilder'], ['tests', '🧪', 'Tests'], ['system', '⚙️', 'System']]],
 ];
@@ -22,7 +22,7 @@ const OVERLAYS = [
   ['Alpaka-Leiste', '/alpakas', '1920 × 120', 'alpakas'], ['Startbildschirm', '/startscreen', '1920 × 1080', 'startscreen'],
   ['Pause', '/pause', '1920 × 1080', 'pause'], ['Abspann', '/abspann', '1920 × 1080', 'abspann'], ['Rangliste', '/rangliste?overlay', 'frei', 'abspann'],
   ['Sport-Scoreboard', '/sport', '1920 × 1080', 'sport'], ['Countdown', '/countdown', '1920 × 1080', 'feier'],
-  ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'],
+  ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'], ['Umfrage', '/umfrage', '1920 × 1080', 'umfrage'],
   ['Mediakit (öffentliche Seite)', '/mediakit', 'Browser', 'mediakit'],
 ];
 

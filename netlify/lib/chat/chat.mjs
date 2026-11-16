@@ -5,6 +5,8 @@ import { clipById, sendChat } from '../kern/twitch.mjs';
 import { countChat, recordChatter } from '../overlays/credits.mjs';
 import { countCommunityChat, linkByTwitch, secretSet } from '../belohnungen/community.mjs';
 import { countChat as countGewinnChat, handleGewinnChat } from '../belohnungen/gewinn.mjs';
+import { countStreamChat } from '../statistik/stats.mjs';
+import { vote as votePoll } from '../overlays/umfrage.mjs';
 import { ensureAward } from '../belohnungen/award.mjs';
 import { touchAlpaca } from '../belohnungen/alpaca.mjs';
 import { recordChatMessage } from './chatlog.mjs';
@@ -53,9 +55,12 @@ export async function handleChat(e, settings) {
   if (settings.awardEnabled) await ensureAward(settings).catch((err) => console.warn('Monatsabschluss fehlgeschlagen:', err.message)); // schließt den Vormonat einmalig ab
   if (counted && settings.communityEnabled) await countCommunityChat(id, name, settings).catch((err) => console.warn('Community-Zählung fehlgeschlagen:', err.message));
 
+  if (counted && settings.statsEnabled) countStreamChat(id, name); // für den Stream-Rückblick (nur Zahlen, im Speicher)
   if (counted && settings.gwEnabled) await countGewinnChat(id, name, settings).catch((err) => console.warn('Wochenpunkte fehlgeschlagen:', err.message));
 
   const text = String(e.message?.text ?? '').trim();
+  // Umfrage: eine Zahl (1 oder !1) ist eine Stimme, solange eine Umfrage läuft. Die Nachricht läuft danach ganz normal weiter.
+  if (settings.pollEnabled && /^!?[1-6]$/.test(text) && !ignore.includes(String(name).toLowerCase())) await votePoll(id, text.slice(-1)).catch((err) => console.warn('Stimme fehlgeschlagen:', err.message));
   await recordChatMessage(e, settings).catch((err) => console.warn('Chat-Overlay fehlgeschlagen:', err.message));
   if (settings.chatCommands) {
     // Eigene Commands, Stichwörter und die Aktivität für zeitgesteuerte Regeln (siehe commands.mjs)

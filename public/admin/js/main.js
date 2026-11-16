@@ -25,6 +25,7 @@ import { initNav } from './nav.js';
 import { initStart, loadStart } from './start.js';
 import { initStats, loadStats } from './statistik.js';
 import { initMediakit, loadMediakit } from './mediakit.js';
+import { initPoll, loadPoll } from './umfrage.js';
 
 function showLogin(disabled) {
   $('login').classList.remove('hidden'); $('app').classList.add('hidden'); $('logout').classList.add('hidden');
@@ -34,7 +35,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadStartscreen(), loadUpdate(), loadAutoBackup(), loadStart(), loadStats(), loadMediakit()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadStartscreen(), loadUpdate(), loadAutoBackup(), loadStart(), loadStats(), loadMediakit(), loadPoll()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -49,7 +50,7 @@ initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); ini
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
-initStart(); initStats(); initMediakit(); initNav();
+initStart(); initStats(); initMediakit(); initPoll(); initNav();
 
 $('logout').addEventListener('click', run(async () => { await api('POST', 'logout', {}); showLogin(false); }));
 $('loginForm').addEventListener('submit', run(async (e) => {
