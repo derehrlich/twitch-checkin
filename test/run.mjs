@@ -2599,7 +2599,7 @@ await test('Störungs-Meldungen: Probleme erkennen, erst beim zweiten Mal melden
   await put({ chatOverlayEnabled: false, glitterEnabled: false, gradientEnabled: false, alpacaEnabled: false, modEnabled: false });
   assert.equal((await admin(adminReq('POST', 'setup', {}, cookie))).status, 200);
   for (const x of subs) x.status = 'enabled'; // Twitch bestätigt neue Anmeldungen nach wenigen Sekunden
-  await db.delete('health/state'); await db.delete('config/backup-state');
+  await db.delete('health/state'); await db.delete('config/backup-state'); await db.delete('bot/seen'); await db.delete('stat/state'); // sauberer Stand: kein Bot gesehen
   const sent = () => calls.filter((c) => c.path.startsWith('/api/webhooks/')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).content);
   const T = Date.now();
   let n0 = sent().length;
@@ -3036,6 +3036,85 @@ await test('Gewinnspiel: Mitternachts-Los (Fenster, einmalig, Extra-Los nur mit 
   await gw.gewinnTick(settings, at('00:10')); assert.equal(paused(), false, 'im Fenster aktiv');
   await gw.gewinnTick(settings, at('00:40')); assert.equal(paused(), true, 'danach pausiert');
   await api('PUT', 'settings', { gwEnabled: false });
+});
+
+await test('Störungs-Meldung: stiller VerwirrBot (Lebenszeichen), Statistik misst nicht mehr, ausschaltbar', async () => {
+  const gh = await import('../netlify/lib/system/gesundheit.mjs');
+  const comm = (await import('../netlify/lib/belohnungen/community.mjs'));
+  const communityFn = (await import('../netlify/functions/community.mjs')).default;
+  const put = (b) => admin(adminReq('PUT', 'settings', b, cookie));
+  await db.delete('bot/seen'); await db.delete('stat/state');
+  await put({ healthBotWatch: true, statsEnabled: false });
+  const T = Date.now(), MIN = 60_000;
+  assert.equal((await gh.collect(await getSettings(), T)).bot, undefined, 'noch nie gesehen: kein Alarm (Bot gibt es vielleicht gar nicht)');
+
+  // Ein Abruf mit dem Geheimwort ist das Lebenszeichen, ein falsches Geheimwort zählt nicht
+  process.env.LINK_SECRET = 'geheimwort-12345';
+  const ask = (secret) => communityFn(new Request(BASE + '/api/community/gewinn/dm', { headers: { authorization: `Bearer ${secret}` } }));
+  assert.equal((await ask('falsch')).status, 401); assert.equal(await db.get('bot/seen'), null, 'falsches Geheimwort: kein Lebenszeichen');
+  assert.equal((await ask('geheimwort-12345')).status, 200);
+  const seen = (await db.get('bot/seen')).at;
+  assert.ok(Math.abs(seen - Date.now()) < 5000);
+  delete process.env.LINK_SECRET;
+
+  assert.equal((await gh.collect(await getSettings(), seen + 14 * MIN)).bot, undefined, 'unter 15 Minuten: noch in Ordnung');
+  assert.match((await gh.collect(await getSettings(), seen + 20 * MIN)).bot, /seit 20 Minuten nicht mehr gemeldet/);
+  assert.match((await gh.collect(await getSettings(), seen + 5 * 3_600_000)).bot, /seit 5 Stunden/);
+  await comm.noteBotSeen(seen + 19 * MIN); // meldet sich wieder
+  assert.equal((await gh.collect(await getSettings(), seen + 20 * MIN)).bot, undefined, 'wieder da: Entwarnung');
+  await db.set('bot/seen', { at: seen });
+  await put({ healthBotWatch: false });
+  assert.equal((await gh.collect(await getSettings(), seen + 3_600_000)).bot, undefined, 'ausgeschaltet: keine Meldung');
+
+  // Das Dashboard zeigt es auch ohne Discord-Webhook
+  await put({ healthBotWatch: true });
+  const h = await (await admin(adminReq('GET', 'health', null, cookie))).json();
+  assert.ok(Array.isArray(h.problems), 'die Admin-Ansicht liefert die Probleme auch ohne Discord-Webhook');
+
+  // Statistik: Messfehler und Stillstand
+  await db.delete('bot/seen');
+  await put({ statsEnabled: true });
+  await db.set('stat/state', { checkedAt: T, error: 'Twitch antwortet nicht' });
+  assert.match((await gh.collect(await getSettings(), T)).stats, /schlägt fehl \(Twitch antwortet nicht\)/);
+  await db.set('stat/state', { checkedAt: T, error: null });
+  assert.equal((await gh.collect(await getSettings(), T + 5 * MIN)).stats, undefined);
+  assert.match((await gh.collect(await getSettings(), T + 30 * MIN)).stats, /seit 30 Minuten nicht mehr gemessen/);
+  await put({ statsEnabled: false });
+  assert.equal((await gh.collect(await getSettings(), T + 30 * MIN)).stats, undefined, 'ausgeschaltet: keine Meldung');
+  await db.delete('stat/state'); await put({ healthBotWatch: true });
+});
+
+await test('Sicherung: Tickets, Glücksrad, Statistik, Mediakit usw. sind dabei; eine ältere Datei löscht sie beim Einspielen nicht', async () => {
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const fresh = ['ticket/event/t1', 'rad/wheel/r1', 'adv/entry/a1', 'countdown/config', 'chatstyle/9', 'quote/1', 'counter/c1', 'bonus/2030-01/7', 'bonuskey/clip1', 'rescue/7/2030-01-01', 'stat/session/000000000000001', 'mediakit/config', 'poll/state'];
+  for (const k of fresh) await db.set(k, { marker: k });
+  await db.set('gwaddr/w1', { geheim: 1 }); await db.set('bot/seen', { at: 1 }); await db.set('seen/x', 1);
+  const file = await (await api('GET', 'backup')).json();
+  assert.equal(file.version, 2); assert.ok(file.prefixes.includes('ticket/') && file.prefixes.includes('stat/'));
+  for (const k of fresh) assert.deepEqual(file.entries[k], { marker: k }, `in der Sicherung: ${k}`);
+  assert.ok(!Object.keys(file.entries).some((k) => k.startsWith('gwaddr/') || k.startsWith('seen/') || k.startsWith('bot/') || k === 'config/tokens'), 'Adressen, kurzlebiges und Tokens bleiben draußen');
+
+  // Eine Datei aus der Zeit vor den neuen Bereichen (Version 1, ohne Liste der Bereiche)
+  const NEW = ['ticket/', 'rad/', 'adv/', 'countdown/', 'chatstyle/', 'quote/', 'counter/', 'bonus/', 'bonuskey/', 'rescue/', 'stat/', 'mediakit/', 'poll/'];
+  const old = { format: 'stadtwache-backup', version: 1, created: '2026-01-01T00:00:00Z', media: false, entries: Object.fromEntries(Object.entries(file.entries).filter(([k]) => !NEW.some((p) => k.startsWith(p)))) };
+  assert.equal((await api('POST', 'backup', { backup: old, confirm: true })).status, 200);
+  for (const k of fresh) assert.deepEqual(await db.get(k), { marker: k }, `bleibt beim Einspielen einer älteren Datei: ${k}`);
+  assert.deepEqual(await db.get('gwaddr/w1'), { geheim: 1 }); assert.deepEqual(await db.get('seen/x'), 1);
+
+  // Die aktuelle Datei ersetzt dagegen auch diese Bereiche: Neueres verschwindet, Gesichertes kommt zurück
+  await db.set('ticket/event/t2', { marker: 'neu' }); await db.delete('rad/wheel/r1');
+  assert.equal((await api('POST', 'backup', { backup: file, confirm: true })).status, 200);
+  assert.equal(await db.get('ticket/event/t2'), null); assert.deepEqual(await db.get('rad/wheel/r1'), { marker: 'rad/wheel/r1' });
+
+  // Eine manipulierte Liste kann keine fremden Bereiche leeren (nur bekannte Bereiche zählen)
+  const realTokens = await db.get('config/tokens');
+  await db.set('config/tokens', { geheim: 'bleibt' });
+  const tricky = { ...old, version: 2, prefixes: ['config/', 'seen/', 'gwaddr/'], entries: { ...old.entries, 'seen/y': 1 } };
+  const res = await api('POST', 'backup', { backup: tricky, confirm: true });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await db.get('config/tokens'), { geheim: 'bleibt' }); assert.deepEqual(await db.get('gwaddr/w1'), { geheim: 1 }); assert.equal(await db.get('seen/y'), null, 'Einträge außerhalb des Bereichs werden nicht übernommen');
+  await db.set('config/tokens', realTokens);
+  for (const k of [...fresh, 'gwaddr/w1', 'bot/seen', 'seen/x']) await db.delete(k);
 });
 
 await test('Gewinnspiel-Verwaltung: Chat-Befehl, mehrere gleichzeitig, Minuten-Fenster, Monatspunkte als Lose, Preis ohne Link, Löschen', async () => {

@@ -41,6 +41,9 @@ export function verifyLinkToken(token) {
   } catch { return null; }
 }
 
+// Lebenszeichen des VerwirrBots: Er ruft die Stadtwache etwa jede Minute ab. Die Störungs-Meldungen schlagen Alarm, wenn es still wird (bot/seen).
+export const noteBotSeen = (now = Date.now()) => db.set('bot/seen', { at: now });
+
 export const botAuthorized = (req) => secretSet() && safeEqual((req.headers.get('authorization') ?? '').replace(/^Bearer /, ''), process.env.LINK_SECRET);
 
 // ---- Verknüpfungen

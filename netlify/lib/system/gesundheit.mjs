@@ -1,6 +1,7 @@
 // Störungs-Meldungen: prüft regelmäßig, ob die Stadtwache gesund ist, und meldet Probleme per Discord-Webhook.
 // Geprüft wird: von Twitch widerrufene Webhooks, ungültige Twitch-Verbindung, fehlende oder kaputte Webhook-Anmeldungen
-// und eine fehlgeschlagene nächtliche Sicherung. Eine Meldung kommt erst, wenn das Problem bei zwei Prüfungen
+// eine fehlgeschlagene nächtliche Sicherung, ein stiller VerwirrBot (er ruft die Stadtwache jede Minute ab) und eine Twitch-Statistik,
+// die nicht mehr misst. Eine Meldung kommt erst, wenn das Problem bei zwei Prüfungen
 // hintereinander da war (kurze Aussetzer bleiben still), danach höchstens einmal am Tag erneut, und eine
 // „wieder in Ordnung“-Nachricht, wenn es weg ist.
 //   health/state   { problems: { <schlüssel>: { text, label, seen, notifiedAt } } }
@@ -12,10 +13,13 @@ import { subscriptionState } from '../admin/status.mjs';
 export const NOTIFY_AFTER = 2; // so viele Prüfungen hintereinander, dann wird gemeldet
 export const REMIND_MS = 24 * 3_600_000;
 const STATE_KEY = 'health/state';
-const LABELS = { revoked: 'Twitch-Webhooks (widerrufen)', token: 'Twitch-Verbindung', subs: 'Twitch-Webhooks', backup: 'Nächtliche Sicherung' };
+export const BOT_SILENT_MS = 15 * 60_000; // so lange darf der VerwirrBot still sein
+export const STATS_STALE_MS = 10 * 60_000; // so lange darf die Statistik-Messung pausieren
+const LABELS = { revoked: 'Twitch-Webhooks (widerrufen)', token: 'Twitch-Verbindung', subs: 'Twitch-Webhooks', backup: 'Nächtliche Sicherung', bot: 'VerwirrBot', stats: 'Twitch-Statistik' };
+const ago = (ms) => { const m = Math.round(ms / 60_000); return m < 120 ? `${m} Minuten` : m < 2880 ? `${Math.round(m / 60)} Stunden` : `${Math.round(m / 1440)} Tagen`; };
 
 /** Was ist gerade nicht in Ordnung? { schlüssel: Text }. Leer = alles gut. */
-export async function collect(settings = null) {
+export async function collect(settings = null, now = Date.now()) {
   settings ??= await getSettings();
   const problems = {};
   const state = (await db.get('config/state')) ?? {};
@@ -35,6 +39,16 @@ export async function collect(settings = null) {
   if (process.env.LOCAL_STORE_DIR && settings.backupAutoEnabled) {
     const b = await db.get('config/backup-state');
     if (b?.lastError && (!b.lastOk || (b.lastErrorAt ?? '') > b.lastOk)) problems.backup = `Die nächtliche Sicherung ist fehlgeschlagen: ${String(b.lastError).slice(0, 150)}`;
+  }
+  // Der Bot ruft jede Minute die Stadtwache ab (Gewinner-Links). Wurde er schon einmal gesehen und ist jetzt lange still, läuft er vermutlich nicht mehr.
+  if (settings.healthBotWatch) {
+    const seen = await db.get('bot/seen');
+    if (seen && now - seen.at > BOT_SILENT_MS) problems.bot = `Der VerwirrBot hat sich seit ${ago(now - seen.at)} nicht mehr gemeldet. Bitte in CasaOS prüfen, ob die App „VerwirrBot“ noch läuft. Wird er nicht mehr gebraucht, kannst du diese Meldung unten bei „Störungen an Discord melden“ ausschalten.`;
+  }
+  if (settings.statsEnabled && tokenOk) {
+    const st = await db.get('stat/state');
+    if (st?.error) problems.stats = `Die Messung der Twitch-Statistik schlägt fehl (${String(st.error).slice(0, 120)}).`;
+    else if (st?.checkedAt && now - st.checkedAt > STATS_STALE_MS) problems.stats = `Die Twitch-Statistik hat seit ${ago(now - st.checkedAt)} nicht mehr gemessen. Bitte die Stadtwache neu starten.`;
   }
   return problems;
 }
@@ -58,7 +72,7 @@ export async function sendDiscord(url, text) {
 export async function healthTick(now = Date.now()) {
   const settings = await getSettings();
   if (!settings.healthEnabled || !validHook(settings.healthDiscordWebhook)) return null;
-  const problems = await collect(settings);
+  const problems = await collect(settings, now);
   const old = ((await db.get(STATE_KEY)) ?? {}).problems ?? {};
   const next = {}, lines = [];
   for (const [key, text] of Object.entries(problems)) {
