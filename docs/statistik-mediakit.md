@@ -12,6 +12,15 @@ Wichtig: Gemessen wird erst ab dem Einschalten. Für die Zeit davor kannst du im
 
 Die Zahlen stehen nur im Admin. Es wird nichts in den Chat und nichts nach Discord geschrieben.
 
+## Rückblick auf jeden Stream
+Oben auf der Seite **Zahlen → Twitch-Statistik** steht der Rückblick auf deinen letzten Stream, nur für dich (nichts geht in den Chat oder nach Discord):
+- Dauer, Ø Zuschauer (mit Vergleich zu den bis zu 10 Streams davor), Rekord und wann er war, neue Follower, Check-ins am Stream-Tag
+- die **aktivsten Chatter** (Anzahl der Nachrichten, nie der Inhalt) und wie viele insgesamt geschrieben haben
+- was sonst passiert ist: neue Follower, Abos, verschenkte Abos, Bits und **Raids**
+- die Zuschauerzahl über die Zeit
+
+In der Liste darunter öffnet „Rückblick“ den Rückblick auf einen älteren Stream. Die Chatter werden erst ab dem Update gezählt, bei älteren Streams steht dort „noch nicht gezählt“. Gezählt wird nur, solange die Messung eingeschaltet ist und du live bist. Der Bot (du) und die Namen auf der Ignorierliste des Abspanns zählen nicht.
+
 ## Mediakit
 Eine öffentliche Seite mit deinen Kennzahlen, Zeitplan, Zielgruppe und Partnerformaten, zum Beispiel für Anfragen von Firmen.
 1. **Zahlen:** Entweder die eigene Messung (letzte 30 Tage) oder ein Twitch-Export. Export: Twitch Creator-Dashboard → Statistiken → „Analysen und Einnahmen nach Tag“ als CSV. Auf der Mediakit-Seite hochladen. Gelesen werden nur Streamzeiten, Zuschauer und Follower, **keine Einnahmen**, und die Datei selbst wird nicht gespeichert.

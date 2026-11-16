@@ -350,6 +350,14 @@ export const SCHEMA = {
     ] },
   ],
 
+  meine: [
+    { title: '„Meine Stadtwache“ (persönliche Seite)', hint: `Zuschauer melden sich auf <code>/meine</code> mit Twitch an (ohne Berechtigungen, Twitch bestätigt nur, wer sie sind) und sehen nur ihre eigenen Zahlen: Besuche, Streak, Zeit im Stream, nächster Meilenstein, Punkte und Rang im Monat und ihren Einlaufsound. Der Befehl schreibt den Link in den Chat. Platzhalter: ${code('user')} ${code('url')}. Die Seite muss ohne Cloudflare Access erreichbar sein.`, items: [
+      c('meineEnabled', false, '„Meine Stadtwache“ einschalten'),
+      t('meineCommand', '!meine', 'Chat-Befehl, der den Link zur Seite schreibt', { maxlength: 26, kind: 'command', placeholder: '!meine' }),
+      a('meineTemplate', '{user}, deine persönliche Seite mit Streak, Besuchen, Rang und Einlaufsound: {url}', 'Chatnachricht mit dem Link', { user: 'Max', url: 'https://…/meine' }),
+    ] },
+  ],
+
   statistik: [
     { title: 'Twitch-Statistik', hint: 'Die Stadtwache fragt jede Minute bei Twitch nach, ob du live bist, und merkt sich dann die Zuschauerzahl, dazu Follower und Abos. Die Zahlen stehen nur hier im Admin und, wenn du es veröffentlichst, als Kennzahlen im Mediakit. Es wird nichts in den Chat geschrieben.', items: [
       c('statsEnabled', false, 'Zuschauer, Follower und Abos messen'),

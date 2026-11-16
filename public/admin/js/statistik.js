@@ -11,7 +11,7 @@ const plus = (n) => (n == null ? '–' : `${n > 0 ? '+' : ''}${fmtNum(n)}`);
 
 const hm = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')} Std`;
 function reviewHtml(r) {
-  const cmp = r.compare ? (r.compare.percent === 0 ? 'so viele wie sonst' : `${r.compare.percent > 0 ? '▲' : '▼'} ${Math.abs(r.compare.percent)} % ${r.compare.percent > 0 ? 'mehr' : 'weniger'} als sonst (Ø ${fmtNum(r.compare.avg)} in den ${r.compare.streams} Streams davor)`) : 'noch kein Vergleich möglich';
+  const cmp = r.compare ? (r.compare.percent === 0 ? 'so viele wie sonst' : `${r.compare.percent > 0 ? '▲' : '▼'} ${Math.abs(r.compare.percent)} % ${r.compare.percent > 0 ? 'über' : 'unter'} sonst (Ø ${fmtNum(r.compare.avg)})`) : 'noch kein Vergleich möglich';
   const sentence = `${r.open ? 'Du bist gerade live' : `Du warst ${dur(r.minutes)} live`}${r.game ? ` mit ${esc(r.game)}` : ''}. Im Schnitt schauten ${fmtNum(r.avg)} zu, am meisten waren ${r.peak} da${r.peakMinute != null && r.minutes > 2 ? ` (${hm(r.peakMinute)} nach dem Start)` : ''}.`;
   const e = r.events, followers = r.followerPlus;
   const tiles = stat(dur(r.minutes), 'Dauer') + `<div class="stat"><b>${fmtNum(r.avg)}</b><span class="muted">Ø Zuschauer<br>${cmp}</span></div>` + stat(r.peak, 'Rekord') + stat(plus(followers), 'neue Follower') + stat(r.checkins, 'Check-ins am Stream-Tag') + stat(r.chat.measured ? r.chat.chatters : '–', r.chat.measured ? `Chatter (${fmtNum(r.chat.messages)} Nachrichten)` : 'Chatter');

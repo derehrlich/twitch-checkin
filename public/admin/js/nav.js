@@ -6,7 +6,7 @@ export const NAV = [
   ['', [['start', '🏠', 'Start']]],
   ['Stream', [['zuschauer', '✅', 'Check-in und Besucher'], ['ereignisse', '🔔', 'Alerts'], ['raids', '⚔️', 'Raids']]],
   ['Chat', [['commands', '💬', 'Eigene Commands'], ['chat', '❗', 'Befehle und Shoutout'], ['moderation', '🛡️', 'Moderation'], ['chatleiste', '🗨️', 'Chat im Stream']]],
-  ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste']]],
+  ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste'], ['meine', '🙋', 'Meine Stadtwache']]],
   ['Zahlen', [['statistik', '📈', 'Twitch-Statistik'], ['mediakit', '📰', 'Mediakit']]],
   ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['umfrage', '📊', 'Umfragen'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
   ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
@@ -22,7 +22,7 @@ const OVERLAYS = [
   ['Alpaka-Leiste', '/alpakas', '1920 × 120', 'alpakas'], ['Startbildschirm', '/startscreen', '1920 × 1080', 'startscreen'],
   ['Pause', '/pause', '1920 × 1080', 'pause'], ['Abspann', '/abspann', '1920 × 1080', 'abspann'], ['Rangliste', '/rangliste?overlay', 'frei', 'abspann'],
   ['Sport-Scoreboard', '/sport', '1920 × 1080', 'sport'], ['Countdown', '/countdown', '1920 × 1080', 'feier'],
-  ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'], ['Umfrage', '/umfrage', '1920 × 1080', 'umfrage'],
+  ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'], ['Umfrage', '/umfrage', '1920 × 1080', 'umfrage'], ['Meine Stadtwache (Zuschauer-Seite)', '/meine', 'Browser', 'meine'],
   ['Mediakit (öffentliche Seite)', '/mediakit', 'Browser', 'mediakit'],
 ];
 
@@ -103,6 +103,7 @@ export function initNav() {
     + '</tbody></table></div>';
   $('obsList').addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Kopiert ✓')); });
 
+  $('meineUrl').textContent = location.origin + '/meine';
   buildIndex();
   showTab(location.hash.slice(1));
 }

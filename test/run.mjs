@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'meine', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -3441,6 +3441,94 @@ await test('Umfragen: Befehl nur für Mods, Zahl im Chat stimmt ab und ist ände
   assert.equal(chats().length, n2); assert.equal((await poll.getState()).status, 'open');
   await poll.hide();
   await api('PUT', 'settings', { pollEnabled: false, pollChat: true, creditsIgnore: '' });
+});
+
+await test('Meine Stadtwache: ohne Login nichts, nur eigene Zahlen, Streak, Meilenstein, Monat mit Rang und Hypothese, Einlaufsound, Befehl, ausschaltbar', async () => {
+  const meine = (await import('../netlify/functions/meine.mjs')).default;
+  const authFn = (await import('../netlify/functions/auth.mjs')).default;
+  const { makeViewerSession } = await import('../netlify/lib/kern/http.mjs');
+  const com = await import('../netlify/lib/belohnungen/community.mjs');
+  const { forgetBoard } = await import('../netlify/lib/zuschauer/meine.mjs');
+  const { streamDay } = await import('../netlify/lib/zuschauer/checkin.mjs');
+  const { handleChat } = await import('../netlify/lib/chat/chat.mjs');
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  const viewer = (id, name) => `viewer=${encodeURIComponent(makeViewerSession({ id, name }))}`;
+  const get = async (ck, path = '/api/meine') => meine(new Request(BASE + path, { headers: ck ? { cookie: ck } : {} }));
+  const mia = viewer('501', 'Mia');
+
+  await api('PUT', 'settings', { meineEnabled: false, communityEnabled: true, entrySoundEnabled: false, milestoneLevels: '10,25,50' });
+  assert.deepEqual(await (await get(mia)).json(), { loggedIn: false, enabled: false }, 'ausgeschaltet: auch mit Login nichts');
+  await api('PUT', 'settings', { meineEnabled: true });
+  assert.deepEqual(await (await get()).json(), { loggedIn: false, enabled: true });
+  assert.equal((await (await get('viewer=abc.def')).json()).loggedIn, false, 'gefälschte Anmeldung zählt nicht');
+  assert.equal((await get(mia, '/api/meine/xyz')).status, 404);
+
+  // Mia: drei Stream-Tage in Folge bis heute, 12 Besuche, 2 Stunden im Stream
+  const settings = await getSettings();
+  const dayAgo = (n) => streamDay(settings, new Date(Date.now() - n * 86_400_000));
+  const days = [dayAgo(2), dayAgo(1), dayAgo(0)];
+  for (const d of days) await db.setIfNew(`streamday/${d}`, 1);
+  await db.set('checked/' + days[2] + '/501', 1);
+  await db.set('user/501', { name: 'Mia', count: 12, first: '2029-01-05T19:00:00Z', last: new Date().toISOString(), days, sessions: { a: { minutes: 90 }, b: { minutes: 30 } } });
+  const month = com.monthOf(settings);
+  const checkins = days.filter((d) => d.startsWith(month)).length;
+  await db.set(`cmonth/${month}/501`, { name: 'Mia', msgs: 40, days: 3, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  // Zwei verknüpfte Personen in der Rangliste: Alpha weit vorn, Beta weit hinten
+  await com.saveLink({ discordId: '700000000000000001', discordName: 'A', twitchId: '601', twitchName: 'Alpha' });
+  await com.saveLink({ discordId: '700000000000000002', discordName: 'B', twitchId: '602', twitchName: 'Beta' });
+  await db.set(`cmonth/${month}/601`, { name: 'Alpha', msgs: 5000, days: 20, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  await db.set(`cmonth/${month}/602`, { name: 'Beta', msgs: 3, days: 1, lastDay: null, dayMsgs: 0, lastAt: 0 });
+  forgetBoard();
+
+  let me = await (await get(mia)).json();
+  assert.deepEqual([me.loggedIn, me.name, me.visits.count, me.visits.minutes, me.visits.today, me.visits.streak.current], [true, 'Mia', 12, 120, true, 3]);
+  assert.ok(me.visits.streak.record >= 3);
+  assert.deepEqual(me.visits.next, { at: 25, left: 13 }, 'nächster Meilenstein');
+  const points = 40 * settings.communityWeightMsg + 3 * settings.communityWeightDay + checkins * settings.communityWeightCheckin;
+  const rows = (await com.monthBoard(settings, month)).rows; // enthält auch Verknüpfte aus früheren Tests
+  assert.ok(rows.findIndex((r) => r.name === 'Alpha') < rows.findIndex((r) => r.name === 'Beta') && !rows.some((r) => r.twitchId === '501'), 'Alpha vor Beta, Mia (noch nicht verknüpft) fehlt');
+  assert.deepEqual([me.month.points, me.month.linked, me.month.rank, me.month.total], [points, false, null, rows.length]);
+  assert.equal(me.month.wouldRank, rows.filter((r) => r.points > points).length + 1, 'Ohne Verknüpfung nur die Hypothese');
+  assert.ok(me.month.wouldRank >= 2 && me.month.wouldRank <= rows.length, 'hinter Alpha, vor Beta');
+  assert.deepEqual(me.month.parts, { msgs: 40, days: 3, checkins, bonus: 0 }); assert.equal(me.entrySound, null, 'Einlaufsound aus');
+  assert.ok(!JSON.stringify(me).includes('Alpha') && !JSON.stringify(me).includes('601') && !JSON.stringify(me).includes('Beta'), 'keine Daten anderer Personen');
+
+  // Verknüpft: Platz in der Rangliste, dazu Bonuspunkte
+  await com.saveLink({ discordId: '700000000000000003', discordName: 'M', twitchId: '501', twitchName: 'Mia' });
+  await db.set(`bonus/${month}/501`, { points: 40, items: [] });
+  forgetBoard();
+  me = await (await get(mia)).json();
+  const rows2 = (await com.monthBoard(settings, month)).rows;
+  assert.deepEqual([me.month.linked, me.month.rank, me.month.total, me.month.wouldRank, me.month.parts.bonus, me.month.points], [true, rows2.findIndex((r) => r.twitchId === '501') + 1, rows2.length, null, 40, points + 40]);
+  assert.equal(me.month.rank, rows2.filter((r) => r.points > points + 40).length + 1, 'Platz = Anzahl besserer Personen + 1'); assert.ok(me.month.rank >= 2, 'Alpha liegt vorn');
+
+  // Neue Person ohne Daten, Einlaufsound an
+  await api('PUT', 'settings', { entrySoundEnabled: true });
+  const neu = await (await get(viewer('777', 'Neu'))).json();
+  assert.deepEqual([neu.visits.count, neu.visits.streak.current, neu.visits.today, neu.visits.next, neu.month.rank, neu.month.wouldRank], [0, 0, false, { at: 10, left: 10 }, null, null]);
+  assert.equal(neu.entrySound.status, 'none');
+  assert.deepEqual(Object.keys(me).sort(), ['enabled', 'entrySound', 'loggedIn', 'month', 'name', 'visits']);
+
+  // Anmeldung führt zurück auf /meine (andere Ziele werden nicht akzeptiert), Abmelden löscht den Cookie
+  const login = await authFn(new Request(BASE + '/api/auth/viewer?next=/meine'));
+  assert.match(login.headers.get('set-cookie'), /viewer_next=(%2F|\/)meine/);
+  assert.match((await authFn(new Request(BASE + '/api/auth/viewer?next=https://boese.example'))).headers.get('set-cookie'), /viewer_next=(%2F|\/)einlaufsound/);
+  const out = await meine(new Request(BASE + '/api/meine/logout', { method: 'POST' }));
+  assert.match(out.headers.get('set-cookie'), /^viewer=; .*Max-Age=0/);
+
+  // Chat-Befehl schreibt den Link, nur wenn eingeschaltet
+  const chats = () => calls.filter((c) => c.path.endsWith('/chat/messages')).map((c) => (typeof c.body === 'string' ? JSON.parse(c.body) : c.body).message);
+  await api('PUT', 'settings', { chatEnabled: true, chatCommands: true, commandCooldown: 0 });
+  const n0 = chats().length;
+  await handleChat({ broadcaster_user_id: '999', chatter_user_id: '501', chatter_user_name: 'Mia', badges: [], message_id: crypto.randomUUID(), message: { text: '!meine' } }, await getSettings());
+  assert.match(chats().at(-1), /^Mia, deine persönliche Seite .*https:\/\/beispiel\.netlify\.app\/meine$/); assert.equal(chats().length, n0 + 1);
+  await api('PUT', 'settings', { meineEnabled: false });
+  await handleChat({ broadcaster_user_id: '999', chatter_user_id: '501', chatter_user_name: 'Mia', badges: [], message_id: crypto.randomUUID(), message: { text: '!meine' } }, await getSettings());
+  assert.equal(chats().length, n0 + 1, 'ausgeschaltet: keine Antwort');
+  await api('PUT', 'settings', { entrySoundEnabled: false, communityEnabled: false });
+  for (const k of ['user/501', `cmonth/${month}/501`, `cmonth/${month}/601`, `cmonth/${month}/602`, `bonus/${month}/501`, 'checked/' + days[2] + '/501']) await db.delete(k);
+  await com.removeLink({ discordId: '700000000000000001' }); await com.removeLink({ discordId: '700000000000000002' }); await com.removeLink({ discordId: '700000000000000003' });
+  forgetBoard();
 });
 
 await test('Mediakit: CSV (deutsch, ohne Einnahmen), Quelle, Kriterien, Veröffentlichung, öffentliche Seite mit Platzhaltern und Maskierung', async () => {
