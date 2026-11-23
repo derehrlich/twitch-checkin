@@ -5,6 +5,7 @@ import { getSettings } from '../lib/kern/settings.mjs';
 import { handleCheckout, handleRedemption, handleRescue } from '../lib/zuschauer/checkin.mjs';
 import { handleRaid } from '../lib/ereignisse/raid.mjs';
 import { handleAlert } from '../lib/ereignisse/alerts.mjs';
+import { handleLicht } from '../lib/ereignisse/licht.mjs';
 import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
 import { eventByReward, handleTicket } from '../lib/belohnungen/tickets.mjs';
@@ -57,6 +58,7 @@ export default async (req) => {
       try {
         const settings = await getSettings();
         if (settings.creditsEnabled) await logEvent(subType, e, msgId, settings).catch((err) => console.warn('Abspann-Eintrag fehlgeschlagen:', err.message));
+        handleLicht(subType, e, settings); // Lichtshow in Home Assistant, unabhängig von den Alerts
         await (subType === 'channel.raid' ? handleRaid(e, settings) : handleAlert(subType, e, settings));
       } catch (err) {
         console.error(`${subType} fehlgeschlagen:`, err);

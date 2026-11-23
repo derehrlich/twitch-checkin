@@ -227,6 +227,13 @@ export const SCHEMA = {
     ] },
   ],
 
+  licht: [
+    { title: 'Lichtshows (Home Assistant)', hint: 'Bei Raid, Follow, Sub (auch Resub und Gift-Sub) und Bits löst die Stadtwache einen Aufruf in Home Assistant aus. Farben und Dauer der Shows stellst du in Home Assistant ein. Die Stadtwache muss im Heimnetz laufen. Adresse mit <code>http://</code> und Port, z. B. <code>http://192.168.1.50:8123</code>. Zum Ausprobieren erst speichern, dann die Knöpfe oben nutzen.', items: [
+      c('lichtEnabled', false, 'Lichtshows einschalten'),
+      t('lichtUrl', '', 'Adresse von Home Assistant', { maxlength: 120, empty: true, placeholder: 'http://192.168.1.50:8123' }),
+    ] },
+  ],
+
   pause: [
     { title: 'Pause: Chat-Befehle', hint: `Das Overlay <code>/pause</code> erscheint, sobald du <code>!pause</code> schreibst, und verschwindet bei <code>!weiter</code>. Beides dürfen nur du und Mods. Beispiele: <code>!pause Kurz Trinkpause</code> oder mit Minuten <code>!pause 5 Kurz Trinkpause</code>. Ohne Text steht der Standardtext da. Platzhalter: ${code('text')} der Pausentext, ${code('minutes')} Minuten (leer, wenn du keine genannt hast).`, items: [
       c('pauseEnabled', false, 'Pause-Befehle einschalten (braucht den Chat-Webhook)'),
