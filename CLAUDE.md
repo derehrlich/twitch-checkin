@@ -106,3 +106,6 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Ein ewiger Einlaufsound hat `validUntil` 2999-12-31 und `permanent: true`; `fmtDate` zeigt „unbegrenzt“.
 - Neu gezogene Gewinner haben eine eigene Frist (`winner.deadline`), die Auswahl-Frist gilt also je Gewinner.
 - Streaks werden nicht gespeichert, sondern in `computeStreak` (`netlify/lib/zuschauer/streak.mjs`) aus den Besuchstagen berechnet. Von Hand übernommene Streaks (Admin → Besucher → „Streaks übernehmen“, `POST /api/admin/users/streaks`) liegen als `user.streakImport = { count, asOf }` am Nutzer und werden dort mit eingerechnet, nicht in den Besuchen.
+
+## Lichtshows (Home Assistant)
+- `netlify/lib/ereignisse/licht.mjs`: `twitch-webhook.mjs` ruft bei Raid, Follow, Sub/Resub/Gift-Sub (Beschenkte einzeln nicht) und Bits genau einen POST auf den passenden HA-Webhook (`SHOWS`), ohne zu warten, Fehler nur loggen. Unabhängig von den Alerts. Einstellungen `lichtEnabled` (standardmäßig aus) und `lichtUrl` (oder Umgebungsvariable `HA_URL`), Schema-Schlüssel `licht` auf der Seite „Alerts“, Test-Knöpfe über `POST /api/admin/licht/test`. Farben und Dauer liegen nur in Home Assistant. Die Stadtwache muss im Heimnetz laufen (Webhooks sind `local_only`).

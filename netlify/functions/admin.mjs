@@ -22,6 +22,7 @@ import { tickets } from '../lib/admin/tickets.mjs';
 import { feier } from '../lib/admin/feier.mjs';
 import { adventure } from '../lib/admin/adventure.mjs';
 import { pauseRoute } from '../lib/admin/pause.mjs';
+import { licht } from '../lib/admin/licht.mjs';
 import { mediakitRoute, statsRoute } from '../lib/admin/statistik.mjs';
 import { umfrageRoute } from '../lib/admin/umfrage.mjs';
 import { levelRoute } from '../lib/admin/level.mjs';
@@ -55,6 +56,7 @@ const ROUTES = {
   feier,
   adventure,
   pause: pauseRoute,
+  licht,
   stats: statsRoute,
   mediakit: mediakitRoute,
   umfrage: umfrageRoute,

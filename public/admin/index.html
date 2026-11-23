@@ -115,8 +115,18 @@
 
     <div class="tab-panel hidden" data-panel="ereignisse">
       <p class="muted intro">Was im Overlay und im Chat passiert, wenn jemand folgt, abonniert oder Bits schickt.</p>
+      <section class="card">
+        <h2>Lichtshows testen</h2>
+        <p class="muted">Löst die Show in Home Assistant einmal aus (Adresse unten unter „Lichtshows“ eintragen und speichern).</p>
+        <div class="row">
+          <button class="ghost" data-licht="raid">⚔️ Raid-Show</button>
+          <button class="ghost" data-licht="follow">💜 Follow-Show</button>
+          <button class="ghost" data-licht="sub">🌈 Sub/Bits-Show</button>
+        </div>
+      </section>
       <h2 class="part">Einstellungen und Texte</h2>
       <div data-schema="alerts" class="folds"></div>
+      <div data-schema="licht" class="folds"></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="raids">

@@ -3980,5 +3980,27 @@ await test('Adventure-Einreichung: Twitch und Discord in einer Liste, Duplikate,
   delete process.env.LINK_SECRET;
 });
 
+await test('Lichtshows: richtige Show je Event, ein Aufruf, Fehler stürzen nie ab', async () => {
+  const licht = await import('../netlify/lib/ereignisse/licht.mjs');
+  assert.equal(licht.showFor('channel.raid', {}), 'raid');
+  assert.equal(licht.showFor('channel.follow', {}), 'follow');
+  for (const t of ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift', 'channel.cheer']) assert.equal(licht.showFor(t, {}), 'sub', t);
+  assert.equal(licht.showFor('channel.subscribe', { is_gift: true }), null, 'Beschenkte lösen nichts aus');
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  let fail = false;
+  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); calls.push({ url: String(url), method: init?.method }); if (fail) throw new Error('weg'); return new Response('', { status: 200 }); };
+  try {
+    licht.handleLicht('channel.raid', {}, { lichtEnabled: false, lichtUrl: 'http://ha.test:8123' });
+    assert.equal(calls.length, 0, 'ausgeschaltet: kein Aufruf');
+    licht.handleLicht('channel.raid', {}, { lichtEnabled: true, lichtUrl: 'http://ha.test:8123/' });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(calls, [{ url: 'http://ha.test:8123/api/webhook/twitch-raid-p4x8m2k7', method: 'POST' }]);
+    fail = true;
+    assert.equal((await licht.triggerShow('follow', { lichtUrl: 'http://ha.test:8123' })).ok, false, 'Fehler wird nur gemeldet');
+    assert.equal((await licht.triggerShow('follow', {})).ok, false, 'ohne Adresse kein Aufruf');
+  } finally { globalThis.fetch = realFetch; }
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);
