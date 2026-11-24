@@ -232,12 +232,13 @@ export const SCHEMA = {
       c('lichtEnabled', false, 'Lichtshows einschalten'),
       t('lichtUrl', '', 'Adresse von Home Assistant', { maxlength: 120, empty: true, placeholder: 'http://192.168.1.50:8123' }),
     ] },
-    { title: 'Licht-Effekte per Kanalpunkte', hint: `Drei Rewards (Feuer, Nordlicht, Sternenhimmel): Wer einlöst, schaltet den Effekt in Home Assistant ein. Es läuft immer nur ein Effekt. Nach einer Einlösung sind alle drei für die Sperrzeit pausiert, wer in der Zeit trotzdem einlöst, bekommt die Punkte zurück. Wie lange der Effekt selbst läuft, stellst du in Home Assistant am Timer „Twitch Licht-Effekt Dauer“ ein, die Sperrzeit sollte mindestens so lang sein. Braucht die Lichtshows oben. Danach auf Start die Rewards abgleichen. Platzhalter: ${code('user')} ${code('effect')} ${code('minutes')}.`, items: [
+    { title: 'Licht-Effekte per Kanalpunkte', hint: `Drei Rewards (Feuer, Nordlicht, Rotlicht): Wer einlöst, schaltet den Effekt in Home Assistant ein, und nach der Effektdauer fällt das Licht auf die Standardfarbe zurück. Es läuft immer nur ein Effekt. Nach einer Einlösung sind alle drei (und die Party) für die Sperrzeit pausiert, wer in der Zeit trotzdem einlöst, bekommt die Punkte zurück. Die Sperre dauert mindestens so lange wie der Effekt. Braucht die Lichtshows oben. Danach auf Start die Rewards abgleichen. Platzhalter: ${code('user')} ${code('effect')} ${code('minutes')}.`, items: [
       c('lichtRewardsEnabled', false, 'Licht-Effekte als Kanalpunkte-Rewards anbieten'),
-      n('lichtSperreMinuten', 5, 'Sperrzeit nach einer Einlösung (Minuten)', { min: 1, max: 240 }),
+      n('lichtEffektMinuten', 5, 'So lange läuft ein Effekt, danach zurück zur Standardfarbe (Minuten)', { min: 1, max: 60 }),
+      n('lichtSperreMinuten', 5, 'Sperrzeit nach einer Einlösung, bevor der nächste Effekt möglich ist (Minuten)', { min: 1, max: 240 }),
       t('lichtReward1Title', 'Licht: Feuer', 'Feuer: Reward-Name', { maxlength: 45 }), n('lichtReward1Cost', 1000, 'Feuer: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       t('lichtReward2Title', 'Licht: Nordlicht', 'Nordlicht: Reward-Name', { maxlength: 45 }), n('lichtReward2Cost', 1000, 'Nordlicht: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
-      t('lichtReward3Title', 'Licht: Sternenhimmel', 'Sternenhimmel: Reward-Name', { maxlength: 45 }), n('lichtReward3Cost', 1000, 'Sternenhimmel: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
+      t('lichtReward3Title', 'Licht: Rotlicht', 'Rotlicht: Reward-Name', { maxlength: 45 }), n('lichtReward3Cost', 1000, 'Rotlicht: Preis (Kanalpunkte)', { min: 1, max: 1000000 }),
       a('lichtRewardTemplate', '💡 {user} taucht das Licht in {effect}!', 'Chatnachricht beim Start des Effekts', { user: 'Max', effect: 'Feuer' }),
       a('lichtBusyTemplate', '{user}, es läuft gerade schon ein Licht-Effekt 💡 Versuch es in etwa {minutes} Min. noch einmal. Deine Punkte bekommst du zurück.', 'Nachricht, wenn gerade ein Effekt läuft (Punkte werden erstattet)', { user: 'Max', minutes: 3 }),
     ] },

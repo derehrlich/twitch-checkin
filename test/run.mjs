@@ -4006,14 +4006,15 @@ await test('Licht-Effekte per Kanalpunkte: Rewards, immer nur ein Effekt, Sperrz
   const lr = await import('../netlify/lib/ereignisse/lichtreward.mjs');
   const realFetch = globalThis.fetch;
   const ha = [];
+  const haBodies = [];
   let haFail = false;
-  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); ha.push(String(url)); if (haFail) throw new Error('weg'); return new Response('', { status: 200 }); };
+  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); ha.push(String(url)); haBodies.push(init?.body ? JSON.parse(init.body) : null); if (haFail) throw new Error('weg'); return new Response('', { status: 200 }); };
   try {
     assert.equal((await admin(adminReq('PUT', 'settings', { lichtEnabled: true, lichtUrl: 'http://ha.test:8123', lichtRewardsEnabled: true, lichtSperreMinuten: 5 }, cookie))).status, 200);
     const setupRes = await admin(adminReq('POST', 'setup', {}, cookie));
     const setup = await setupRes.json();
     assert.equal(setupRes.status, 200, JSON.stringify(setup));
-    assert.deepEqual(setup.licht, ['Licht: Feuer', 'Licht: Nordlicht', 'Licht: Sternenhimmel']);
+    assert.deepEqual(setup.licht, ['Licht: Feuer', 'Licht: Nordlicht', 'Licht: Rotlicht']);
     const state = await db.get('config/state');
     const ids = [1, 2, 3].map((n) => state[`lichtRewardId${n}`]);
     assert.ok(ids.every(Boolean), 'drei Rewards angelegt');
@@ -4029,6 +4030,8 @@ await test('Licht-Effekte per Kanalpunkte: Rewards, immer nur ein Effekt, Sperrz
 
     const say = await redeem('lx-1', 'l1', 'Lena', ids[0]);
     assert.deepEqual(ha, ['http://ha.test:8123/api/webhook/twitch-fx-fire-d4k9p2x7'], 'Feuer löst den Feuer-Webhook aus');
+    assert.deepEqual(haBodies[0], { seconds: 300 }, 'Effektdauer (5 Minuten) geht an Home Assistant');
+    assert.ok((await db.get(lr.LOCK_KEY)).until - Date.now() > 300_000, 'die Sperre dauert mindestens so lange wie der Effekt');
     assert.equal(statusOf('lx-1'), 'FULFILLED');
     assert.match(say[0], /Lena taucht das Licht in Feuer/);
     assert.ok(ids.every((id) => pausedOf(id) === true), 'alle drei Rewards sind pausiert');
@@ -4060,8 +4063,8 @@ await test('Licht-Effekte per Kanalpunkte: Rewards, immer nur ein Effekt, Sperrz
     haFail = false;
     await redeem('lx-4', 'l3', 'Nora', ids[2]);
     assert.equal(statusOf('lx-4'), 'FULFILLED');
-    assert.equal(ha.at(-1), 'http://ha.test:8123/api/webhook/twitch-fx-stars-r5h2w9n4');
-    await db.set(lr.LOCK_KEY, { until: 0, fx: 'stars', paused: false });
+    assert.equal(ha.at(-1), 'http://ha.test:8123/api/webhook/twitch-fx-red-s7n4k2d8');
+    await db.set(lr.LOCK_KEY, { until: 0, fx: 'red', paused: false });
 
     // ausgeschaltet: Punkte zurück
     await admin(adminReq('PUT', 'settings', { lichtRewardsEnabled: false }, cookie));
