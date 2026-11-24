@@ -1,10 +1,19 @@
 // Lichtshows in Home Assistant: bei Raid, Follow, Sub/Resub/Gift-Sub und Bits genau ein Webhook-Aufruf (POST, ohne Body).
 // Farben und Dauer der Shows stehen in Home Assistant, hier wird nur der passende Webhook ausgelöst.
 // Adresse: Einstellung „lichtUrl“ (Admin → Alerts) oder Umgebungsvariable HA_URL, z. B. http://192.168.1.50:8123
+// Kanalpunkte-Effekte: je Effekt ein eigener Reward (Schlüssel lichtRewardId<n> in config/state) und ein eigener HA-Webhook.
+// Die Szene selbst (Fire, Aurora, Starry Sky) und die Dauer stehen in Home Assistant (Automation „Twitch: Licht-Effekte“, Timer).
+export const EFFEKTE = [
+  { key: 'fire', n: 1, name: 'Feuer', path: '/api/webhook/twitch-fx-fire-d4k9p2x7', color: '#E8561A' },
+  { key: 'aurora', n: 2, name: 'Nordlicht', path: '/api/webhook/twitch-fx-aurora-m8v3c6t1', color: '#2FBF8F' },
+  { key: 'stars', n: 3, name: 'Sternenhimmel', path: '/api/webhook/twitch-fx-stars-r5h2w9n4', color: '#3B4BC8' },
+];
+
 export const SHOWS = {
   raid: '/api/webhook/twitch-raid-p4x8m2k7',
   follow: '/api/webhook/twitch-follow-q9w3n6t5',
   sub: '/api/webhook/twitch-sub-h7c2v8r4',
+  ...Object.fromEntries(EFFEKTE.map((x) => [x.key, x.path])),
 };
 
 // Welche Show gehört zu welchem EventSub-Ereignis? null = keine Show.

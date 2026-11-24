@@ -6,6 +6,7 @@ import { handleCheckout, handleRedemption, handleRescue } from '../lib/zuschauer
 import { handleRaid } from '../lib/ereignisse/raid.mjs';
 import { handleAlert } from '../lib/ereignisse/alerts.mjs';
 import { handleLicht } from '../lib/ereignisse/licht.mjs';
+import { effektFor, handleLichtReward } from '../lib/ereignisse/lichtreward.mjs';
 import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
 import { eventByReward, handleTicket } from '../lib/belohnungen/tickets.mjs';
@@ -68,6 +69,18 @@ export default async (req) => {
       return new Response(null, { status: 204 });
     }
     const state = (await db.get('config/state')) ?? {};
+    const lichtFx = effektFor(state, e.reward.id); // Licht-Effekt per Kanalpunkte
+    if (lichtFx) {
+      if (!(await db.setIfNew(`seen/${e.id}`, Date.now()))) return new Response(null, { status: 204 });
+      try {
+        await handleLichtReward({ id: e.id, user_id: e.user_id, user_name: e.user_name, reward: e.reward }, lichtFx, await getSettings());
+      } catch (err) {
+        console.error('Licht-Effekt fehlgeschlagen:', err);
+        await db.delete(`seen/${e.id}`);
+        return text('error', 500);
+      }
+      return new Response(null, { status: 204 });
+    }
     // Nur die eigenen Check-in/Check-out-Rewards zählen; ohne gespeicherte IDs (Einrichtung fehlt) passiert nichts
     const isCheckin = Boolean(state.rewardId) && e.reward.id === state.rewardId;
     const isCheckout = Boolean(state.checkoutRewardId) && e.reward.id === state.checkoutRewardId;
