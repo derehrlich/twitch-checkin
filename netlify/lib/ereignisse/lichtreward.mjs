@@ -1,4 +1,4 @@
-// Licht-Effekte per Kanalpunkte: drei Rewards (Feuer, Nordlicht, Sternenhimmel). Eine Einlösung löst in Home Assistant den Effekt aus.
+// Licht-Effekte per Kanalpunkte: drei Rewards (Feuer, Nordlicht, Rotlicht). Eine Einlösung löst in Home Assistant den Effekt aus.
 // Dazu die Party: ein Soundboard-Eintrag mit Haken „party“ spielt den Sound und startet die Party-Szene, so lange der Sound dauert.
 // Es läuft immer nur ein Effekt (oder eine Party): nach einer Einlösung sind alle diese Rewards für die eingestellte Sperrzeit
 // (bei der Party mindestens so lange wie der Sound) pausiert, und eine Einlösung innerhalb der Sperrzeit bekommt die Punkte zurück.
@@ -14,6 +14,9 @@ import { EFFEKTE, PARTY, triggerShow } from './licht.mjs';
 export const LOCK_KEY = 'licht/lock';
 export const rewardKey = (fx) => `lichtRewardId${fx.n}`;
 export const effektFor = (state, rewardId) => EFFEKTE.find((x) => state[rewardKey(x)] && state[rewardKey(x)] === rewardId);
+// So lange läuft ein Effekt (Einstellung in Minuten); die Sperre dauert mindestens so lange plus eine halbe Minute
+export const effektSeconds = (settings) => Math.round(settings.lichtEffektMinuten * 60);
+export const effektLock = (settings) => Math.max(settings.lichtSperreMinuten * 60_000, (effektSeconds(settings) + 30) * 1000);
 export const effektTitle = (settings, fx) => settings[`lichtReward${fx.n}Title`];
 
 let chain = Promise.resolve(); // ein Server-Prozess: Einlösungen laufen nacheinander, so startet nie ein zweiter Effekt
@@ -47,13 +50,13 @@ export const handleLichtReward = (redemption, fx, settings, now = Date.now()) =>
     await say(settings, settings.lichtBusyTemplate, { user, minutes });
     return { ok: false, reason: 'busy' };
   }
-  const r = await triggerShow(fx.key, settings);
+  const r = await triggerShow(fx.key, settings, { seconds: effektSeconds(settings) });
   if (!r.ok) { await refund(r.error); return { ok: false, reason: 'ha' }; }
-  await db.set(LOCK_KEY, { until: now + settings.lichtSperreMinuten * 60_000, fx: fx.key, paused: false });
+  await db.set(LOCK_KEY, { until: now + effektLock(settings), fx: fx.key, paused: false });
   await setRedemptionStatus(id, reward.id, 'FULFILLED');
   await say(settings, settings.lichtRewardTemplate, { user, effect: fx.name });
   await setPaused(true); // alle drei Rewards sind in Twitch bis zum Ende der Sperre nicht kaufbar
-  await db.set(LOCK_KEY, { until: now + settings.lichtSperreMinuten * 60_000, fx: fx.key, paused: true });
+  await db.set(LOCK_KEY, { until: now + effektLock(settings), fx: fx.key, paused: true });
   return { ok: true, fx: fx.key };
 });
 

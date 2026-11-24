@@ -180,7 +180,7 @@ export async function ensureRewards(settings, entry = null) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gradientRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.gradientRewardId;
   }
-  // Licht-Effekte (Feuer, Nordlicht, Sternenhimmel): eine Einlösung startet die Szene in Home Assistant
+  // Licht-Effekte (Feuer, Nordlicht, Rotlicht): eine Einlösung startet die Szene in Home Assistant
   const lichtRewards = [];
   for (const fx of EFFEKTE) {
     const key = `lichtRewardId${fx.n}`;
