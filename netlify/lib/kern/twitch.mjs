@@ -1,4 +1,5 @@
 import { db } from './store.mjs';
+import { EFFEKTE } from '../ereignisse/licht.mjs';
 
 export const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:write:chat', 'moderator:manage:shoutouts', 'moderator:read:followers', 'channel:read:subscriptions', 'bits:read', 'user:read:chat', 'user:bot', 'channel:bot', 'moderator:manage:chat_messages', 'moderator:manage:banned_users', 'user:manage:whispers'];
 
@@ -179,6 +180,17 @@ export async function ensureRewards(settings, entry = null) {
     await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state.gradientRewardId }, body: { is_enabled: false } }).catch(() => {});
     delete state.gradientRewardId;
   }
+  // Licht-Effekte (Feuer, Nordlicht, Sternenhimmel): eine Einlösung startet die Szene in Home Assistant
+  const lichtRewards = [];
+  for (const fx of EFFEKTE) {
+    const key = `lichtRewardId${fx.n}`;
+    if (settings.lichtRewardsEnabled) {
+      lichtRewards.push(await make({ stateKey: key, title: settings[`lichtReward${fx.n}Title`], cost: settings[`lichtReward${fx.n}Cost`], prompt: `💡 Das Licht im Stream wechselt auf „${fx.name}“. Es läuft immer nur ein Effekt, danach gibt es eine Pause, bis der nächste möglich ist.`, color: fx.color, syncPrompt: true }));
+    } else if (state[key]) {
+      await helix('PATCH', 'channel_points/custom_rewards', { query: { broadcaster_id: user_id, id: state[key] }, body: { is_enabled: false } }).catch(() => {});
+      delete state[key];
+    }
+  }
   // Geburtstags-Ticket (Sonderziehung)
   let gewinn = null;
   if (settings.gwEnabled) {
@@ -196,7 +208,7 @@ export async function ensureRewards(settings, entry = null) {
     delete state.gwBonusRewardId; delete state.gwBonusPaused;
   }
   await db.set('config/state', state);
-  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient, gewinn, gewinnBonus };
+  return { checkin, checkout, streak, entryBuy, entryExtend, alpaca, glitter, gradient, gewinn, gewinnBonus, lichtRewards };
 }
 
 // Soundboard: legt je aktivem Eintrag einen Reward an oder passt ihn an (Name, Preis, Abklingzeit), schaltet Einträge

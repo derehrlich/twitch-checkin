@@ -92,7 +92,7 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - `!discord` (nutzt die Einstellung `discordInvite`, die es schon für den Clip-Hinweis gibt) und `!plan` (`netlify/lib/chat/plan.mjs`, Plan vom Bot per `POST /api/community/plan` in `bot/plan`, nicht in der Sicherung, älter als 3 Tage = „Plan nicht verfügbar“), Einstellungen in der Gruppe „Discord-Link und Streamplan“ im Schema-Schlüssel `chat`.
 
 ## Tests
-- `npm ci && npm test` (aktuell 142 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
+- `npm ci && npm test` (aktuell 145 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.
 
 ## Stolperfallen
@@ -109,3 +109,5 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 
 ## Lichtshows (Home Assistant)
 - `netlify/lib/ereignisse/licht.mjs`: `twitch-webhook.mjs` ruft bei Raid, Follow, Sub/Resub/Gift-Sub (Beschenkte einzeln nicht) und Bits genau einen POST auf den passenden HA-Webhook (`SHOWS`), ohne zu warten, Fehler nur loggen. Unabhängig von den Alerts. Einstellungen `lichtEnabled` (standardmäßig aus) und `lichtUrl` (oder Umgebungsvariable `HA_URL`), Schema-Schlüssel `licht` auf der Seite „Alerts“, Test-Knöpfe über `POST /api/admin/licht/test`. Farben und Dauer liegen nur in Home Assistant. Die Stadtwache muss im Heimnetz laufen (Webhooks sind `local_only`).
+- **Licht-Effekte per Kanalpunkte** (`netlify/lib/ereignisse/lichtreward.mjs`, Tabelle `EFFEKTE` in `licht.mjs`): drei Rewards (Feuer, Nordlicht, Sternenhimmel, Schlüssel `lichtRewardId1..3` in `config/state`, Schalter `lichtRewardsEnabled`, Sperrzeit `lichtSperreMinuten`), je ein eigener HA-Webhook. Immer nur ein Effekt: nach einer Einlösung sind alle drei Rewards pausiert (`licht/lock`), `lichtTick` in `server.mjs` gibt sie alle 30 Sekunden nach Ablauf frei, Einlösungen in der Sperre und bei HA-Fehlern bekommen die Punkte zurück. Szene (Fire, Aurora, Starry Sky) und Dauer liegen in Home Assistant (Automation „Twitch: Licht-Effekte (Kanalpunkte)“, Timer `timer.twitch_licht_effekt_dauer`, Text `input_text.twitch_licht_effekt_aktuell`). Die Alert-Automation kehrt nach einer Show zum laufenden Effekt zurück, sonst zur Standardfarbe Rot.
+- **Party-Szene** (Soundboard-Eintrag mit Haken `party`, `handleParty` in `lichtreward.mjs`, `soundSeconds` misst der Browser beim Hochladen): spielt den Sound und ruft den HA-Webhook `PARTY` mit Body `{ seconds }` (5 bis 120 s). In Home Assistant (Automation „Twitch: Party-Szene (Sound)“): Tiles und Bulb „Dance Party“, beide Desktoplampen blinken im Takt, danach Zustand von vorher. Teilt sich die Sperre `licht/lock` mit den drei Effekten (mindestens Sound-Länge plus 30 s). Ohne `lichtEnabled` spielt der Eintrag nur den Sound.

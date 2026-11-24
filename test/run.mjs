@@ -4002,5 +4002,142 @@ await test('Lichtshows: richtige Show je Event, ein Aufruf, Fehler stürzen nie 
   } finally { globalThis.fetch = realFetch; }
 });
 
+await test('Licht-Effekte per Kanalpunkte: Rewards, immer nur ein Effekt, Sperrzeit, Freigabe, Fehler gibt Punkte zurück', async () => {
+  const lr = await import('../netlify/lib/ereignisse/lichtreward.mjs');
+  const realFetch = globalThis.fetch;
+  const ha = [];
+  let haFail = false;
+  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); ha.push(String(url)); if (haFail) throw new Error('weg'); return new Response('', { status: 200 }); };
+  try {
+    assert.equal((await admin(adminReq('PUT', 'settings', { lichtEnabled: true, lichtUrl: 'http://ha.test:8123', lichtRewardsEnabled: true, lichtSperreMinuten: 5 }, cookie))).status, 200);
+    const setupRes = await admin(adminReq('POST', 'setup', {}, cookie));
+    const setup = await setupRes.json();
+    assert.equal(setupRes.status, 200, JSON.stringify(setup));
+    assert.deepEqual(setup.licht, ['Licht: Feuer', 'Licht: Nordlicht', 'Licht: Sternenhimmel']);
+    const state = await db.get('config/state');
+    const ids = [1, 2, 3].map((n) => state[`lichtRewardId${n}`]);
+    assert.ok(ids.every(Boolean), 'drei Rewards angelegt');
+    for (const id of ids) assert.ok(subs.some((x) => x.condition.reward_id === id), 'Webhook für den Reward');
+
+    const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+    const pausedOf = (id) => calls.filter((c) => c.method === 'PATCH' && c.path.endsWith('/custom_rewards') && c.query.id === id && c.body && 'is_paused' in c.body).at(-1)?.body.is_paused;
+    const redeem = async (id, userId, name, reward) => {
+      const before = chats().length;
+      await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption(id, userId, name, reward) }));
+      return chats().slice(before);
+    };
+
+    const say = await redeem('lx-1', 'l1', 'Lena', ids[0]);
+    assert.deepEqual(ha, ['http://ha.test:8123/api/webhook/twitch-fx-fire-d4k9p2x7'], 'Feuer löst den Feuer-Webhook aus');
+    assert.equal(statusOf('lx-1'), 'FULFILLED');
+    assert.match(say[0], /Lena taucht das Licht in Feuer/);
+    assert.ok(ids.every((id) => pausedOf(id) === true), 'alle drei Rewards sind pausiert');
+    assert.equal((await db.get(lr.LOCK_KEY)).paused, true);
+
+    // gleichzeitig ein zweiter Effekt: kein zweiter Aufruf, Punkte zurück
+    const busy = await redeem('lx-2', 'l2', 'Max', ids[1]);
+    assert.equal(ha.length, 1, 'es läuft nur ein Effekt');
+    assert.equal(statusOf('lx-2'), 'CANCELED');
+    assert.match(busy[0], /Max, es läuft gerade schon ein Licht-Effekt/);
+    // doppelte Zustellung derselben Einlösung zählt nicht doppelt
+    await redeem('lx-2', 'l2', 'Max', ids[1]);
+    assert.equal(ha.length, 1);
+
+    // Sperrzeit noch nicht vorbei: Rewards bleiben pausiert
+    assert.equal(await lr.lichtTick(Date.now() + 2 * 60_000), false);
+    assert.ok(ids.every((id) => pausedOf(id) === true));
+    // nach der Sperrzeit wieder frei
+    assert.equal(await lr.lichtTick(Date.now() + 6 * 60_000), true);
+    assert.ok(ids.every((id) => pausedOf(id) === false), 'Rewards wieder freigegeben');
+    assert.equal(await lr.lichtTick(Date.now() + 7 * 60_000), false, 'nur einmal freigeben');
+    await db.set(lr.LOCK_KEY, { until: 0, fx: 'fire', paused: false });
+
+    // Home Assistant nicht erreichbar: Punkte zurück, keine Sperre
+    haFail = true;
+    await redeem('lx-3', 'l3', 'Nora', ids[2]);
+    assert.equal(statusOf('lx-3'), 'CANCELED');
+    assert.equal((await db.get(lr.LOCK_KEY)).until, 0, 'ohne Erfolg keine Sperre');
+    haFail = false;
+    await redeem('lx-4', 'l3', 'Nora', ids[2]);
+    assert.equal(statusOf('lx-4'), 'FULFILLED');
+    assert.equal(ha.at(-1), 'http://ha.test:8123/api/webhook/twitch-fx-stars-r5h2w9n4');
+    await db.set(lr.LOCK_KEY, { until: 0, fx: 'stars', paused: false });
+
+    // ausgeschaltet: Punkte zurück
+    await admin(adminReq('PUT', 'settings', { lichtRewardsEnabled: false }, cookie));
+    await redeem('lx-5', 'l4', 'Ole', ids[0]);
+    assert.equal(statusOf('lx-5'), 'CANCELED');
+    await admin(adminReq('POST', 'setup', {}, cookie));
+    assert.equal((await db.get('config/state')).lichtRewardId1, undefined, 'Rewards werden beim Ausschalten abgeschaltet');
+    assert.equal(rewards.find((r) => r.id === ids[0]).is_enabled, false);
+  } finally {
+    globalThis.fetch = realFetch;
+    await admin(adminReq('PUT', 'settings', { lichtEnabled: false, lichtRewardsEnabled: false }, cookie));
+    await db.delete(lr.LOCK_KEY);
+  }
+});
+
+await test('Party-Szene: Soundboard-Eintrag spielt Sound, startet Party mit Länge, teilt die Sperre mit den Effekten', async () => {
+  const lr = await import('../netlify/lib/ereignisse/lichtreward.mjs');
+  assert.equal(lr.partySeconds({ soundSeconds: 500 }), 120, 'höchstens 120 s');
+  assert.equal(lr.partySeconds({ soundSeconds: 1 }), 5, 'mindestens 5 s');
+  assert.equal(lr.partySeconds({}), 20, 'ohne Länge 20 s');
+  const realFetch = globalThis.fetch;
+  const ha = [];
+  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); ha.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null }); return new Response('', { status: 200 }); };
+  let partyId = null;
+  try {
+    assert.equal((await admin(adminReq('PUT', 'settings', { lichtEnabled: true, lichtUrl: 'http://ha.test:8123', lichtRewardsEnabled: true, lichtSperreMinuten: 5 }, cookie))).status, 200);
+    const entry = await (await admin(adminReq('POST', 'soundboard', { title: 'Party!', cost: 200 }, cookie))).json();
+    partyId = entry.id;
+    const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVE'), Buffer.alloc(40)]);
+    const up = await (await admin(adminReq('POST', `soundboard/${entry.id}/sound`, { name: 'party.wav', data: wav.toString('base64'), seconds: 12.4 }, cookie))).json();
+    assert.equal(up.soundSeconds, 12, 'Länge vom Browser gemerkt');
+    assert.equal((await (await admin(adminReq('PUT', `soundboard/${entry.id}`, { party: true }, cookie))).json()).party, true);
+    const setupRes = await admin(adminReq('POST', 'setup', {}, cookie));
+    assert.equal(setupRes.status, 200, JSON.stringify(await setupRes.json()));
+    const rewardId = (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).find((e) => e.id === entry.id).rewardId;
+    assert.ok(rewardId, 'Reward angelegt');
+    const fireId = (await db.get('config/state')).lichtRewardId1;
+
+    const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+    const pausedOf = (id) => calls.filter((c) => c.method === 'PATCH' && c.path.endsWith('/custom_rewards') && c.query.id === id && c.body && 'is_paused' in c.body).at(-1)?.body.is_paused;
+    const redeem = async (id, userId, name, reward) => {
+      const before = chats().length;
+      await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption(id, userId, name, reward) }));
+      return chats().slice(before);
+    };
+
+    await redeem('pt-1', 'p1', 'Pia', rewardId);
+    assert.deepEqual(ha, [{ url: 'http://ha.test:8123/api/webhook/twitch-party-j6t2q8z3', body: { seconds: 12 } }], 'Party-Webhook mit der Länge des Sounds');
+    assert.equal(statusOf('pt-1'), 'FULFILLED');
+    assert.ok(pausedOf(rewardId) === true && pausedOf(fireId) === true, 'Party und Effekte sind gemeinsam pausiert');
+
+    // Effekt und zweite Party in der Sperre: Punkte zurück
+    const busy = await redeem('pt-2', 'p2', 'Paul', fireId);
+    assert.equal(statusOf('pt-2'), 'CANCELED');
+    assert.match(busy[0], /Paul, es läuft gerade schon ein Licht-Effekt/);
+    await redeem('pt-3', 'p3', 'Paula', rewardId);
+    assert.equal(statusOf('pt-3'), 'CANCELED');
+    assert.equal(ha.length, 1, 'nur ein Aufruf');
+
+    assert.equal(await lr.lichtTick(Date.now() + 6 * 60_000), true);
+    assert.ok(pausedOf(rewardId) === false && pausedOf(fireId) === false, 'nach der Sperre alles wieder frei');
+
+    // Lichtshows aus: der Eintrag spielt einfach nur den Sound
+    await db.set(lr.LOCK_KEY, { until: 0, fx: 'party', paused: false });
+    await admin(adminReq('PUT', 'settings', { lichtEnabled: false }, cookie));
+    await redeem('pt-4', 'p4', 'Pit', rewardId);
+    assert.equal(statusOf('pt-4'), 'FULFILLED');
+    assert.equal(ha.length, 1, 'ohne Lichtshows kein Aufruf');
+  } finally {
+    globalThis.fetch = realFetch;
+    if (partyId) await admin(adminReq('DELETE', `soundboard/${partyId}`, {}, cookie));
+    await admin(adminReq('PUT', 'settings', { lichtEnabled: false, lichtRewardsEnabled: false }, cookie));
+    await admin(adminReq('POST', 'setup', {}, cookie));
+    await db.delete(lr.LOCK_KEY);
+  }
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

@@ -1,5 +1,6 @@
 // Kanalpunkte-Soundboard: jeder Eintrag ist ein eigener Reward (Name, Preis, Abklingzeit) mit einer Sounddatei.
-// Eintrag: { id, title, cost, cooldown, volume, enabled, soundName, soundVersion, rewardId }
+// Eintrag: { id, title, cost, cooldown, volume, enabled, soundName, soundVersion, soundSeconds, party, rewardId }
+// party = Einlösung startet zusätzlich die Party-Szene in Home Assistant (so lange, wie der Sound dauert, soundSeconds)
 import crypto from 'node:crypto';
 import { db } from '../kern/store.mjs';
 import { fill, pushOverlay } from '../zuschauer/checkin.mjs';
@@ -28,6 +29,7 @@ export function sanitizeEntry(input) {
   num('cooldown', 0, 86_400); // Sekunden, Twitch erzwingt sie je Reward
   num('volume', 0.1, 1, false);
   if (typeof input.enabled === 'boolean') out.enabled = input.enabled;
+  if (typeof input.party === 'boolean') out.party = input.party;
   return out;
 }
 

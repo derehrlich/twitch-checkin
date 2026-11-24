@@ -208,6 +208,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { gewinnTick } = await import('./netlify/lib/belohnungen/gewinn.mjs');
   const gw = async () => { const s = await getSettings(); if (!s.gwEnabled) return; const r = await gewinnTick(s); if (r.redrawn || r.deleted) console.log(`Gewinnspiel: ${r.redrawn} nachgezogen, ${r.deleted} Adressen gelöscht`); };
   setInterval(() => gw().catch((e) => console.error('Gewinnspiel:', e.message)), 60_000).unref();
+  // Licht-Effekte: nach der Sperrzeit die pausierten Kanalpunkte-Rewards wieder freigeben (alle 30 Sekunden prüfen)
+  const { lichtTick } = await import('./netlify/lib/ereignisse/lichtreward.mjs');
+  setInterval(() => lichtTick().catch((e) => console.error('Licht-Effekte:', e.message)), 30_000).unref();
   // Twitch-Statistik: jede Minute Zuschauer messen, solange der Kanal live ist (nur aktiv, wenn im Admin eingeschaltet)
   const { statTick } = await import('./netlify/lib/statistik/stats.mjs');
   setInterval(() => getSettings().then((st) => (st.statsEnabled ? statTick(st) : null)).catch((e) => console.error('Statistik:', e.message)), 60_000).unref();
