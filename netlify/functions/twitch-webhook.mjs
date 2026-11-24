@@ -6,7 +6,7 @@ import { handleCheckout, handleRedemption, handleRescue } from '../lib/zuschauer
 import { handleRaid } from '../lib/ereignisse/raid.mjs';
 import { handleAlert } from '../lib/ereignisse/alerts.mjs';
 import { handleLicht } from '../lib/ereignisse/licht.mjs';
-import { effektFor, handleLichtReward } from '../lib/ereignisse/lichtreward.mjs';
+import { effektFor, handleLichtReward, handleParty } from '../lib/ereignisse/lichtreward.mjs';
 import { getBoard, handleSoundboard } from '../lib/belohnungen/soundboard.mjs';
 import { handleEntryBuy, handleEntryExtend } from '../lib/belohnungen/entrysound.mjs';
 import { eventByReward, handleTicket } from '../lib/belohnungen/tickets.mjs';
@@ -101,7 +101,7 @@ export default async (req) => {
     try {
       const redemption = { id: e.id, user_id: e.user_id, user_name: e.user_name, user_input: e.user_input, reward: e.reward };
       const settings = await getSettings();
-      if (board) await handleSoundboard(redemption, board, settings);
+      if (board) await (board.party ? handleParty : handleSoundboard)(redemption, board, settings);
       else if (isGewinn) await handleGewinnTicket(redemption, settings);
       else if (isGewinnBonus) await handleGewinnBonus(redemption, settings);
       else if (ticketEvent) await handleTicket(redemption, ticketEvent, settings);

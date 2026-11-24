@@ -9,7 +9,11 @@ export const EFFEKTE = [
   { key: 'stars', n: 3, name: 'Sternenhimmel', path: '/api/webhook/twitch-fx-stars-r5h2w9n4', color: '#3B4BC8' },
 ];
 
+// Party-Szene (Soundboard-Eintrag mit Haken „Party“): Sound, Tiles, Desktoplampen blinken so lange, wie der Sound dauert (Body { seconds }).
+export const PARTY = { key: 'party', path: '/api/webhook/twitch-party-j6t2q8z3', minSeconds: 5, maxSeconds: 120 };
+
 export const SHOWS = {
+  party: PARTY.path,
   raid: '/api/webhook/twitch-raid-p4x8m2k7',
   follow: '/api/webhook/twitch-follow-q9w3n6t5',
   sub: '/api/webhook/twitch-sub-h7c2v8r4',
@@ -28,13 +32,13 @@ export function showFor(type, e = {}) {
 export const baseUrl = (settings) => String(settings.lichtUrl || process.env.HA_URL || '').trim().replace(/\/+$/, '');
 
 // Löst eine Show aus. Wirft nie: Fehler werden nur protokolliert, der Bot läuft immer weiter.
-export async function triggerShow(show, settings) {
+export async function triggerShow(show, settings, body = null) {
   const path = SHOWS[show];
   const base = baseUrl(settings);
   if (!path) return { ok: false, error: 'Unbekannte Show' };
   if (!base) return { ok: false, error: 'Keine Home-Assistant-Adresse eingetragen' };
   try {
-    const res = await fetch(base + path, { method: 'POST', signal: AbortSignal.timeout(5000) });
+    const res = await fetch(base + path, { method: 'POST', signal: AbortSignal.timeout(5000), ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return { ok: true };
   } catch (err) {

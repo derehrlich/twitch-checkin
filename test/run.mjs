@@ -4077,5 +4077,67 @@ await test('Licht-Effekte per Kanalpunkte: Rewards, immer nur ein Effekt, Sperrz
   }
 });
 
+await test('Party-Szene: Soundboard-Eintrag spielt Sound, startet Party mit Länge, teilt die Sperre mit den Effekten', async () => {
+  const lr = await import('../netlify/lib/ereignisse/lichtreward.mjs');
+  assert.equal(lr.partySeconds({ soundSeconds: 500 }), 120, 'höchstens 120 s');
+  assert.equal(lr.partySeconds({ soundSeconds: 1 }), 5, 'mindestens 5 s');
+  assert.equal(lr.partySeconds({}), 20, 'ohne Länge 20 s');
+  const realFetch = globalThis.fetch;
+  const ha = [];
+  globalThis.fetch = async (url, init) => { if (!String(url).startsWith('http://ha.test')) return realFetch(url, init); ha.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null }); return new Response('', { status: 200 }); };
+  let partyId = null;
+  try {
+    assert.equal((await admin(adminReq('PUT', 'settings', { lichtEnabled: true, lichtUrl: 'http://ha.test:8123', lichtRewardsEnabled: true, lichtSperreMinuten: 5 }, cookie))).status, 200);
+    const entry = await (await admin(adminReq('POST', 'soundboard', { title: 'Party!', cost: 200 }, cookie))).json();
+    partyId = entry.id;
+    const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVE'), Buffer.alloc(40)]);
+    const up = await (await admin(adminReq('POST', `soundboard/${entry.id}/sound`, { name: 'party.wav', data: wav.toString('base64'), seconds: 12.4 }, cookie))).json();
+    assert.equal(up.soundSeconds, 12, 'Länge vom Browser gemerkt');
+    assert.equal((await (await admin(adminReq('PUT', `soundboard/${entry.id}`, { party: true }, cookie))).json()).party, true);
+    const setupRes = await admin(adminReq('POST', 'setup', {}, cookie));
+    assert.equal(setupRes.status, 200, JSON.stringify(await setupRes.json()));
+    const rewardId = (await (await admin(adminReq('GET', 'soundboard', null, cookie))).json()).find((e) => e.id === entry.id).rewardId;
+    assert.ok(rewardId, 'Reward angelegt');
+    const fireId = (await db.get('config/state')).lichtRewardId1;
+
+    const statusOf = (rid) => calls.filter((c) => c.path.endsWith('/redemptions') && c.query.id === rid).at(-1)?.body.status;
+    const pausedOf = (id) => calls.filter((c) => c.method === 'PATCH' && c.path.endsWith('/custom_rewards') && c.query.id === id && c.body && 'is_paused' in c.body).at(-1)?.body.is_paused;
+    const redeem = async (id, userId, name, reward) => {
+      const before = chats().length;
+      await webhook(signed('notification', { subscription: { type: 'channel.channel_points_custom_reward_redemption.add' }, ...redemption(id, userId, name, reward) }));
+      return chats().slice(before);
+    };
+
+    await redeem('pt-1', 'p1', 'Pia', rewardId);
+    assert.deepEqual(ha, [{ url: 'http://ha.test:8123/api/webhook/twitch-party-j6t2q8z3', body: { seconds: 12 } }], 'Party-Webhook mit der Länge des Sounds');
+    assert.equal(statusOf('pt-1'), 'FULFILLED');
+    assert.ok(pausedOf(rewardId) === true && pausedOf(fireId) === true, 'Party und Effekte sind gemeinsam pausiert');
+
+    // Effekt und zweite Party in der Sperre: Punkte zurück
+    const busy = await redeem('pt-2', 'p2', 'Paul', fireId);
+    assert.equal(statusOf('pt-2'), 'CANCELED');
+    assert.match(busy[0], /Paul, es läuft gerade schon ein Licht-Effekt/);
+    await redeem('pt-3', 'p3', 'Paula', rewardId);
+    assert.equal(statusOf('pt-3'), 'CANCELED');
+    assert.equal(ha.length, 1, 'nur ein Aufruf');
+
+    assert.equal(await lr.lichtTick(Date.now() + 6 * 60_000), true);
+    assert.ok(pausedOf(rewardId) === false && pausedOf(fireId) === false, 'nach der Sperre alles wieder frei');
+
+    // Lichtshows aus: der Eintrag spielt einfach nur den Sound
+    await db.set(lr.LOCK_KEY, { until: 0, fx: 'party', paused: false });
+    await admin(adminReq('PUT', 'settings', { lichtEnabled: false }, cookie));
+    await redeem('pt-4', 'p4', 'Pit', rewardId);
+    assert.equal(statusOf('pt-4'), 'FULFILLED');
+    assert.equal(ha.length, 1, 'ohne Lichtshows kein Aufruf');
+  } finally {
+    globalThis.fetch = realFetch;
+    if (partyId) await admin(adminReq('DELETE', `soundboard/${partyId}`, {}, cookie));
+    await admin(adminReq('PUT', 'settings', { lichtEnabled: false, lichtRewardsEnabled: false }, cookie));
+    await admin(adminReq('POST', 'setup', {}, cookie));
+    await db.delete(lr.LOCK_KEY);
+  }
+});
+
 fs.rmSync(process.env.LOCAL_STORE_DIR, { recursive: true, force: true });
 console.log(`\n${n} Tests bestanden`);

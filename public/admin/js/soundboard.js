@@ -14,7 +14,8 @@ function renderBoard() {
         <div><label>Lautstärke (0,1 bis 1)</label><input data-f="volume" type="number" min="0.1" max="1" step="0.1" value="${e.volume}"></div>
       </div>
       <label class="check big"><input data-f="enabled" type="checkbox" ${e.enabled ? 'checked' : ''}> Aktiv (als Reward in Twitch verfügbar)</label>
-      <p class="muted" style="margin:4px 0">Ton: <b>${e.soundVersion ? esc(e.soundName) : 'noch keiner'}</b> · Reward: ${e.rewardId ? 'angelegt' : 'noch nicht angelegt'}</p>
+      <label class="check big"><input data-f="party" type="checkbox" ${e.party ? 'checked' : ''}> Party-Szene: Tiles feiern, Desktoplampen blinken, so lange der Ton dauert (braucht die Lichtshows, Seite „Alerts“)</label>
+      <p class="muted" style="margin:4px 0">Ton: <b>${e.soundVersion ? esc(e.soundName) : 'noch keiner'}</b>${e.soundSeconds ? ` (${e.soundSeconds} s)` : ''} · Reward: ${e.rewardId ? 'angelegt' : 'noch nicht angelegt'}</p>
       <div class="row">
         <div><input data-f="file" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg"></div>
         <button data-act="upload">Ton hochladen</button>
@@ -28,7 +29,18 @@ function renderBoard() {
 
 const fieldsOf = (row) => ({
   title: row.querySelector('[data-f=title]').value, cost: row.querySelector('[data-f=cost]').value, cooldown: row.querySelector('[data-f=cooldown]').value,
-  volume: row.querySelector('[data-f=volume]').value, enabled: row.querySelector('[data-f=enabled]').checked,
+  volume: row.querySelector('[data-f=volume]').value, enabled: row.querySelector('[data-f=enabled]').checked, party: row.querySelector('[data-f=party]').checked,
+});
+
+// Länge der Sounddatei in Sekunden (der Browser liest sie aus), 0 wenn nicht lesbar
+const soundLength = (file) => new Promise((resolve) => {
+  const url = URL.createObjectURL(file);
+  const audio = new Audio();
+  const done = (v) => { URL.revokeObjectURL(url); resolve(v); };
+  audio.addEventListener('loadedmetadata', () => done(Number.isFinite(audio.duration) ? Math.round(audio.duration) : 0));
+  audio.addEventListener('error', () => done(0));
+  setTimeout(() => done(0), 5000);
+  audio.src = url;
 });
 
 let preview = null;
@@ -49,7 +61,8 @@ export function initSoundboard() {
       const file = row.querySelector('[data-f=file]').files[0];
       const data = await readUpload(file, 1_500_000);
       btn.disabled = true;
-      try { await api('POST', `soundboard/${id}/sound`, { name: file.name, data }); await loadBoard(); toast('Ton hochgeladen ✓ – jetzt die Rewards abgleichen'); } finally { btn.disabled = false; }
+      const seconds = await soundLength(file);
+      try { await api('POST', `soundboard/${id}/sound`, { name: file.name, data, seconds }); await loadBoard(); toast('Ton hochgeladen ✓ – jetzt die Rewards abgleichen'); } finally { btn.disabled = false; }
     } else if (act === 'play') {
       preview?.pause();
       preview = new Audio(`/api/soundboard?id=${id}&v=${entry.soundVersion}`);

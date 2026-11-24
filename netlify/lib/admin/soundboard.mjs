@@ -15,7 +15,7 @@ export async function soundboard({ route, method, body }) {
     const fields = sanitizeEntry(body);
     if (!fields.title) return json({ error: 'Bitte einen Namen angeben' }, 400);
     if (duplicate(board, fields.title)) return json({ error: 'Es gibt schon einen Eintrag mit diesem Namen' }, 400);
-    const entry = { id: newId(), cost: 100, cooldown: 0, volume: 1, enabled: true, soundName: null, soundVersion: null, rewardId: null, ...fields };
+    const entry = { id: newId(), cost: 100, cooldown: 0, volume: 1, enabled: true, soundName: null, soundVersion: null, soundSeconds: null, party: false, rewardId: null, ...fields };
     await saveBoard([...board, entry]);
     return json(entry);
   }
@@ -35,6 +35,8 @@ export async function soundboard({ route, method, body }) {
     await storeFile(soundKey(entry.id), up);
     entry.soundName = cleanName(body.name, 'Ton');
     entry.soundVersion = Date.now();
+    const seconds = Math.round(Number(body.seconds)); // Länge misst der Browser beim Hochladen
+    entry.soundSeconds = Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 600) : null;
     await saveBoard(board);
     return json(entry);
   }
