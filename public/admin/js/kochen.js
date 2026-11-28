@@ -27,12 +27,12 @@ export function initKochen() {
   const act = (path, body, msg) => run(async () => { k = await api('POST', path, body()); render(); if (msg) toast(msg); });
   $('kochenStart').addEventListener('click', act('kochen/start', () => ({ title: $('kochenTitle').value }), 'Schild läuft ✓'));
   $('kochenStop').addEventListener('click', act('kochen/stop', () => ({}), 'Ausgeblendet ✓'));
-  $('kochenCdMin').addEventListener('click', act('kochen/countdown', () => ({ minutes: Number($('kochenMin').value), label: $('kochenLabel').value }), 'Countdown läuft ✓'));
+  $('kochenCdMin').addEventListener('click', act('kochen/countdown', () => ({ minutes: Number($('kochenMin').value), label: $('kochenLabel').value, doneText: $('kochenDone').value }), 'Countdown läuft ✓'));
   $('kochenCdAt').addEventListener('click', run(async () => {
     const t = new Date($('kochenAt').value).getTime(); // Ortszeit des Browsers
     if (!Number.isFinite(t)) return toast('Bitte Tag und Uhrzeit wählen');
     if (t < Date.now() + 5000) return toast('Der Zeitpunkt liegt schon in der Vergangenheit');
-    k = await api('POST', 'kochen/countdown', { at: t, label: $('kochenLabel').value }); render(); toast('Countdown läuft ✓');
+    k = await api('POST', 'kochen/countdown', { at: t, label: $('kochenLabel').value, doneText: $('kochenDone').value }); render(); toast('Countdown läuft ✓');
   }));
   $('kochenCdStop').addEventListener('click', act('kochen/countdown/stop', () => ({}), 'Countdown weggenommen ✓'));
 }

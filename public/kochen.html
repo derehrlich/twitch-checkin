@@ -49,7 +49,7 @@ const size = Number(params.get('size'));
 if (size >= 0.3 && size <= 3) document.querySelectorAll('.card').forEach((c) => c.style.setProperty('--s', size));
 
 let cfg = null, offset = 0;
-const DEMO = () => ({ show: true, title: 'Gulaschsuppe', command: '!rezept', countdown: { label: 'Essen ist fertig in', until: Date.now() + 47 * 60_000 + 12_000 }, now: Date.now() });
+const DEMO = () => ({ show: true, title: 'Gulaschsuppe', command: '!rezept', countdown: { doneText: 'Guten Appetit!', label: 'Essen ist fertig in', until: Date.now() + 47 * 60_000 + 12_000 }, now: Date.now() });
 
 async function poll() {
   try {
@@ -75,7 +75,7 @@ function frame() {
   $('cd').classList.toggle('done', left === 0);
   $('label').textContent = left > 0 ? c.label : '';
   const clock = $('clock');
-  clock.textContent = left === 0 ? 'Guten Appetit!' : days > 0 ? `${days} T ${two(h)}:${two(m)}:${two(s % 60)}` : h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
+  clock.textContent = left === 0 ? (c.doneText || 'Guten Appetit!') : days > 0 ? `${days} T ${two(h)}:${two(m)}:${two(s % 60)}` : h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
   clock.classList.toggle('long', days > 0);
 }
 

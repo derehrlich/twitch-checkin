@@ -9,7 +9,7 @@ Zeigt beim Kochstream links oben das Schild **„Heute in der Küche:“** mit d
 ## Beim Kochen
 Admin → Overlays → **Kochen**:
 1. Gericht eintragen, **Schild einschalten**. Das Gericht kannst du jederzeit ändern.
-2. **Countdown:** entweder Minuten ab jetzt (z. B. 45) oder einen Tag und eine Uhrzeit wählen, dazu einen Text wie „Essen ist fertig in“. Ist die Zeit um, blinkt „Guten Appetit!“. Mit „Countdown wegnehmen“ verschwindet er.
+2. **Countdown:** entweder Minuten ab jetzt (z. B. 45) oder einen Tag und eine Uhrzeit wählen, dazu einen Text wie „Essen ist fertig in“. Ist die Zeit um, blinkt ein Text, den du selbst einträgst (Standard „Guten Appetit!“, z. B. auch „Essen ist fertig!“). Mit „Countdown wegnehmen“ verschwindet er.
 3. **Alles ausblenden** nimmt Schild und Countdown weg.
 
 Mit `?size=0.8` hinter der Adresse wird alles kleiner, mit `?demo` siehst du ein Beispiel.

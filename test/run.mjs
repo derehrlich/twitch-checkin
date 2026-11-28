@@ -3795,6 +3795,11 @@ await test('Koch-Overlay: Schild, !rezept-Hinweis, Countdown (Minuten oder Zeitp
   assert.equal((await pub()).countdown, null, 'zu kurz wird ignoriert');
   await api('POST', 'kochen/countdown', { minutes: 30, label: 'Essen ist fertig in' });
   v = await pub();
+  assert.equal(v.countdown.doneText, 'Guten Appetit!', 'Standardtext');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'x', doneText: 'Essen ist fertig!' });
+  assert.equal((await pub()).countdown.doneText, 'Essen ist fertig!', 'eigener Text');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'Essen ist fertig in' });
+  v = await pub();
   assert.equal(v.countdown.label, 'Essen ist fertig in'); assert.ok(Math.abs(v.countdown.until - v.now - 30 * 60_000) < 5000);
   const at = Date.now() + 3 * 86_400_000;
   await api('POST', 'kochen/countdown', { at, label: '' });

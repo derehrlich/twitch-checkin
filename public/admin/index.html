@@ -681,9 +681,10 @@
       </section>
       <section class="card">
         <h2>Countdown</h2>
-        <p class="muted">Zählt rechts unten herunter, entweder eine Zeitspanne ab jetzt oder bis zu einem Tag und einer Uhrzeit. Ist er abgelaufen, blinkt er mit dem Text „Guten Appetit!“.</p>
+        <p class="muted">Zählt rechts unten herunter, entweder eine Zeitspanne ab jetzt oder bis zu einem Tag und einer Uhrzeit. Ist er abgelaufen, blinkt er mit einem Text, den du selbst bestimmst (Standard „Guten Appetit!“).</p>
         <div class="grid">
           <div><label for="kochenLabel">Text darüber (z. B. Essen ist fertig in)</label><input id="kochenLabel" maxlength="40" placeholder="Essen ist fertig in"></div>
+          <div><label for="kochenDone">Text, wenn die Zeit um ist</label><input id="kochenDone" maxlength="30" placeholder="Guten Appetit!"></div>
           <div><label for="kochenMin">Zeitspanne in Minuten</label><input id="kochenMin" type="number" min="0.1" max="1440" step="any" value="30"></div>
           <div><label for="kochenAt">… oder bis zu diesem Zeitpunkt</label><input id="kochenAt" type="datetime-local"></div>
         </div>
