@@ -202,6 +202,11 @@ export const SCHEMA = {
       a('planNoneTemplate', '📅 Gerade steht kein Stream im Plan. Schau in {url} vorbei.', 'Antwort, wenn nichts im Plan steht', { url: 'unserem Discord' }),
       a('planUnknownTemplate', '📅 Den aktuellen Streamplan findest du in {url}.', 'Antwort, wenn der Plan nicht vorliegt (Bot nicht erreichbar)', { url: 'unserem Discord' }),
     ] },
+    { title: 'Rezept', hint: `<b>!rezept</b> schreibt den Link zur Rezeptseite in den Chat (die Seite <b>/rezept</b> ist öffentlich, das Rezept steht fest in <b>public/rezept.html</b>). Platzhalter: ${code('url')} Link zur Rezeptseite.`, items: [
+      c('rezeptEnabled', false, '!rezept einschalten'),
+      t('rezeptCommand', '!rezept', 'Befehl für den Rezept-Link', { maxlength: 26, kind: 'command', placeholder: '!rezept' }),
+      a('rezeptTemplate', '🍲 Das Rezept zum Nachkochen: {url}', 'Antwort auf !rezept', { url: 'https://wache.example.de/rezept' }),
+    ] },
   ],
 
   moderation: [

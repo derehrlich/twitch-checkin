@@ -6,7 +6,7 @@
 //   rolle   optional: 'mod' = nur Mods und der Kanalinhaber (alle anderen werden still ignoriert)
 //   run     liefert den Antworttext (oder null für keine Antwort)
 import { db } from '../kern/store.mjs';
-import { sendChat } from '../kern/twitch.mjs';
+import { sendChat, siteUrl } from '../kern/twitch.mjs';
 import { fill, fmtDuration, streamDay } from '../zuschauer/checkin.mjs';
 import { computeStreak, getStreamDays } from '../zuschauer/streak.mjs';
 import { linkReply, rankReply } from '../belohnungen/community.mjs';
@@ -113,6 +113,7 @@ export const BEFEHLE = [
   { id: 'meine', wort: (s) => s.meineCommand, aktiv: (s) => s.meineEnabled, run: ({ e, settings }) => meText(e, settings) },
   { id: 'level', wort: (s) => s.levelCommand, aktiv: (s) => s.levelEnabled, run: ({ e, settings }) => levelReply(e, settings) },
   { id: 'discord', wort: (s) => s.discordCommand, aktiv: (s) => s.discordCmdEnabled && s.discordInvite, run: ({ settings }) => fill(settings.discordTemplate, { url: settings.discordInvite }) },
+  { id: 'rezept', wort: (s) => s.rezeptCommand, aktiv: (s) => s.rezeptEnabled, run: ({ settings }) => fill(settings.rezeptTemplate, { url: `${siteUrl()}/rezept` }) },
   { id: 'plan', wort: (s) => s.planCommand, aktiv: (s) => s.planCmdEnabled, run: async ({ settings }) => planText(await getPlan(), settings) },
   { id: 'adventure', wort: (s) => s.advCommand, aktiv: (s) => s.advEnabled, run: async ({ e, args, settings }) => (await submitFromTwitch(settings, e, args)).reply },
   { id: 'tickets', wort: (s) => s.ticketsCommand, aktiv: (s) => s.ticketsEnabled, run: ({ settings }) => ticketsInfo(settings) },
