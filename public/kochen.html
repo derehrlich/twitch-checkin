@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Kochen</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Koch-Overlay als OBS-Browserquelle (1920×1080, Hintergrund durchsichtig), ganz oben über der Küchenkamera.
+     Rezept, Zutaten und Schritte stellst du im Admin ein (Reiter „Overlays“ → Kochen).
+     Platz der Karten (so gewählt, dass Menschen, Herd und Arbeitsfläche frei bleiben):
+       Rezept   links oben auf der schwarzen Dunstabzugshaube
+       Zutaten  rechts unten auf den leeren Schranktüren
+       Wecker   unten in der Mitte auf der weißen Tischplatte
+     ?size=0.6 … 2   alles größer oder kleiner (Standard 1)    ?demo   Beispiel, immer sichtbar */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  .card { position: fixed; box-sizing: border-box; opacity: 0; --s: 1; --in: translate(0, 0); transform: var(--out) scale(var(--s)); transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; }
+  .card.on { opacity: 1; transform: var(--in) scale(var(--s)); }
+
+  #recipe { left: 20px; top: 46px; width: 420px; max-height: 340px; padding: 14px 20px 16px; --out: translate(-120%, 0); transform-origin: 0 0; overflow: hidden; }
+  #recipe .kicker { font-size: 18px; font-weight: 600; letter-spacing: 1px; color: #e9d3ae; text-transform: uppercase; }
+  #recipe .title { margin-top: 2px; font: 700 34px/1.08 var(--wordmark); color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .8); overflow-wrap: anywhere; }
+  #recipe .stepno { margin-top: 12px; display: inline-block; padding: 2px 12px; border-radius: 9px; background: rgba(20, 10, 4, .55); font-size: 18px; font-weight: 600; color: #e9d3ae; }
+  #recipe .step { margin-top: 8px; font-size: 27px; font-weight: 600; line-height: 1.2; color: #fff3da; text-shadow: 0 2px 0 rgba(43, 24, 12, .75); overflow-wrap: anywhere; }
+  #recipe .step.pop { animation: pop .5s ease-out; }
+  .none { display: none !important; }
+
+  #ing { left: 1384px; top: 630px; width: 470px; max-height: 250px; padding: 12px 18px 14px; --out: translate(120%, 0); transform-origin: 100% 0; overflow: hidden; }
+  #ing h2 { margin: 0 0 6px; font: 700 24px/1 var(--font); letter-spacing: 1px; text-transform: uppercase; color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .8); }
+  #ing ul { margin: 0; padding: 0; list-style: none; columns: 1; column-gap: 20px; font-size: 22px; font-weight: 500; line-height: 1.28; color: #fff3da; }
+  #ing ul.two { columns: 2; }
+  #ing li { break-inside: avoid; padding-left: 20px; position: relative; text-shadow: 0 2px 0 rgba(43, 24, 12, .7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ing li::before { content: '•'; position: absolute; left: 4px; color: var(--gold); }
+
+  #timer { left: 50%; bottom: 26px; padding: 8px 30px 10px; text-align: center; min-width: 300px; --out: translate(-50%, 160%); --in: translate(-50%, 0); transform-origin: 50% 100%; }
+  #timer .label { font-size: 20px; font-weight: 600; letter-spacing: 1px; color: #e9d3ae; text-transform: uppercase; }
+  #timer .label:empty { display: none; }
+  #timer .clock { font: 700 68px/1 var(--wordmark); color: #ffd45e; text-shadow: 3px 3px 0 rgba(43, 24, 12, .8); font-variant-numeric: tabular-nums; }
+  #timer.done .clock { color: #ff7a5c; animation: blink .8s steps(2) infinite; }
+
+  @keyframes pop { 0% { transform: scale(.92); opacity: .2; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes blink { 50% { opacity: .25; } }
+</style>
+</head>
+<body>
+<div id="recipe" class="card panel">
+  <div class="kicker">Heute in der Küche</div>
+  <div class="title" id="title"></div>
+  <div class="stepno" id="stepno"></div>
+  <div class="step" id="step"></div>
+</div>
+<div id="ing" class="card panel">
+  <h2>Zutaten</h2>
+  <ul id="ingList"></ul>
+</div>
+<div id="timer" class="card panel">
+  <div class="label" id="tLabel"></div>
+  <div class="clock" id="clock">0:00</div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const size = Number(params.get('size'));
+if (size >= 0.3 && size <= 3) document.querySelectorAll('.card').forEach((c) => c.style.setProperty('--s', size));
+
+let cfg = null, offset = 0, lastStep = -1, lastKey = '';
+const DEMO = { show: true, title: 'Hausgemachte Pfannkuchen', ingredients: ['250 g Mehl', '2 Eier', '500 ml Milch', '1 Prise Salz', '2 EL Zucker', 'Butter zum Braten'], steps: ['Mehl, Zucker und Salz in eine Schüssel geben', 'Eier und Milch dazugeben und glatt rühren', 'Den Teig zehn Minuten ruhen lassen', 'In der heißen Pfanne goldbraun ausbacken'], step: 1, timer: { label: 'Teig ruht', until: Date.now() + 8 * 60_000 + 25_000 }, now: Date.now() };
+
+async function poll() {
+  try {
+    const v = params.has('demo') ? { ...DEMO, now: Date.now() } : await (await fetch('/api/kochen', { cache: 'no-store' })).json();
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+function fillStatic() {
+  const key = JSON.stringify([cfg.title, cfg.ingredients, cfg.steps]);
+  if (key !== lastKey) {
+    lastKey = key;
+    $('title').textContent = cfg.title;
+    const ul = $('ingList'); ul.textContent = '';
+    for (const t of cfg.ingredients) { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); }
+    ul.classList.toggle('two', cfg.ingredients.length > 7);
+    lastStep = -1;
+  }
+  if (cfg.step !== lastStep) {
+    lastStep = cfg.step;
+    const has = cfg.steps.length > 0;
+    $('stepno').classList.toggle('none', !has); $('step').classList.toggle('none', !has);
+    $('stepno').textContent = has ? `Schritt ${cfg.step + 1} von ${cfg.steps.length}` : '';
+    const st = $('step'); st.textContent = cfg.steps[cfg.step] ?? '';
+    st.classList.remove('pop'); void st.offsetWidth; st.classList.add('pop');
+  }
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  const on = !!(cfg && cfg.show);
+  $('recipe').classList.toggle('on', on);
+  $('ing').classList.toggle('on', on && cfg.ingredients.length > 0);
+  const t = on ? cfg.timer : null;
+  $('timer').classList.toggle('on', !!t);
+  if (!on) return;
+  fillStatic();
+  if (t) {
+    const left = Math.max(0, t.until - (Date.now() + offset)), s = Math.ceil(left / 1000);
+    $('tLabel').textContent = left > 0 ? t.label : (t.label ? `${t.label}: fertig!` : 'Fertig!');
+    $('clock').textContent = left > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '0:00';
+    $('timer').classList.toggle('done', left === 0);
+  }
+}
+
+poll(); setInterval(poll, 3000); frame();
+</script>
+</body>
+</html>

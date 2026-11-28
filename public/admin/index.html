@@ -665,6 +665,40 @@
       <div data-schema="pause" class="folds"></div>
     </div>
 
+    <div class="tab-panel hidden" data-panel="kochen">
+      <section class="card">
+        <h2>Koch-Overlay</h2>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="kochenUrl"></code> anlegen, ganz oben über die Kamera. Sie bleibt unsichtbar, bis du ein Rezept startest. Die Karten sind so gelegt, dass das Kamerabild frei bleibt: Rezept links oben, Zutaten rechts unten, Wecker unten in der Mitte. Mit <code>?size=0.8</code> hinter der Adresse machst du alles kleiner.</p>
+        <div class="grid">
+          <div><label for="kochenTitle">Was wird gekocht?</label><input id="kochenTitle" maxlength="60" placeholder="Heute kochen wir …"></div>
+        </div>
+        <div class="grid">
+          <div><label for="kochenIng">Zutaten (eine pro Zeile, höchstens 14)</label><textarea id="kochenIng" rows="7" placeholder="500 g Mehl&#10;250 ml Milch&#10;3 Eier"></textarea></div>
+          <div><label for="kochenSteps">Schritte (einer pro Zeile, höchstens 20)</label><textarea id="kochenSteps" rows="7" placeholder="Zutaten abwiegen&#10;Teig verrühren&#10;30 Minuten ruhen lassen"></textarea></div>
+        </div>
+        <p class="muted" id="kochenInfo"></p>
+        <div class="row">
+          <button id="kochenStart">Rezept starten</button>
+          <button id="kochenPrev" class="ghost">◀ Schritt zurück</button>
+          <button id="kochenNext" class="ghost">Nächster Schritt ▶</button>
+          <button id="kochenStop" class="ghost">Beenden</button>
+          <a class="btn ghost" href="/kochen?demo" target="_blank" rel="noopener">Vorschau</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Küchenwecker</h2>
+        <p class="muted">Der Wecker erscheint unten in der Mitte und blinkt, wenn er abgelaufen ist. Er läuft mit dem Rezept, du kannst ihn aber auch allein stoppen.</p>
+        <div class="grid">
+          <div><label for="kochenTimerMin">Minuten</label><input id="kochenTimerMin" type="number" min="0.1" max="360" step="any" value="10"></div>
+          <div><label for="kochenTimerLabel">Wofür? (z. B. Nudeln)</label><input id="kochenTimerLabel" maxlength="40"></div>
+        </div>
+        <div class="row">
+          <button id="kochenTimerStart">Wecker starten</button>
+          <button id="kochenTimerStop" class="ghost">Wecker stoppen</button>
+        </div>
+      </section>
+    </div>
+
     <div class="tab-panel hidden" data-panel="abspann">
       <section class="card">
         <h2>Abspann und Rangliste ansehen</h2>

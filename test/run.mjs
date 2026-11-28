@@ -3777,6 +3777,38 @@ await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Sei
   assert.equal((await pub()).show, false, 'ausgeschaltet: Befehl tut nichts');
 });
 
+await test('Koch-Overlay: Rezept, Schritte, Wecker, öffentliche Seite, Admin-Knöpfe', async () => {
+  const kochenFn = (await import('../netlify/functions/kochen.mjs')).default;
+  const pub = async () => (await kochenFn(new Request(BASE + '/api/kochen'))).json();
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'kochen'))).status, 401, 'Admin nur mit Login');
+  assert.equal((await pub()).show, false, 'Standard unsichtbar');
+  let v = await (await api('POST', 'kochen/start', { title: 'Pfannkuchen', ingredients: '- 250 g Mehl\n\n2 Eier\n', steps: '1. Rühren\n2) Ruhen lassen\nBacken' })).json();
+  assert.deepEqual(v.state.ingredients, ['250 g Mehl', '2 Eier'], 'Aufzählungszeichen und leere Zeilen fliegen raus');
+  assert.deepEqual(v.state.steps, ['Rühren', 'Ruhen lassen', 'Backen'], 'führende Nummern fliegen raus');
+  v = await pub();
+  assert.equal(v.show, true); assert.equal(v.title, 'Pfannkuchen'); assert.equal(v.step, 0); assert.ok(v.now);
+  await api('POST', 'kochen/prev', {});
+  assert.equal((await pub()).step, 0, 'nicht vor den ersten Schritt');
+  for (let i = 0; i < 5; i++) await api('POST', 'kochen/next', {});
+  assert.equal((await pub()).step, 2, 'nicht hinter den letzten Schritt');
+  // Wecker: zu kurze Zeit wird ignoriert, sonst läuft er bis zur Endzeit
+  await api('POST', 'kochen/timer', { minutes: 0.01, label: 'zu kurz' });
+  assert.equal((await pub()).timer, null);
+  await api('POST', 'kochen/timer', { minutes: 10, label: 'Teig ruht' });
+  v = await pub();
+  assert.equal(v.timer.label, 'Teig ruht'); assert.ok(Math.abs(v.timer.until - v.now - 600_000) < 5000);
+  // Rezept ändern behält Schritt und Wecker
+  await api('POST', 'kochen/start', { title: 'x'.repeat(200), ingredients: Array.from({ length: 30 }, (_, i) => 'Zutat ' + i).join('\n'), steps: 'a\nb\nc' });
+  v = await pub();
+  assert.equal(v.title.length, 60); assert.equal(v.ingredients.length, 14); assert.equal(v.step, 2); assert.ok(v.timer);
+  await api('POST', 'kochen/timer/stop', {});
+  assert.equal((await pub()).timer, null);
+  await api('POST', 'kochen/stop', {});
+  v = await pub();
+  assert.equal(v.show, false); assert.deepEqual(v.steps, []);
+});
+
 await test('Startbildschirm: Vorlauf, Verlängern, Anekdoten, Hintergrundbild, öffentliche Seite', async () => {
   const pubFn = (await import('../netlify/functions/startscreen.mjs')).default;
   const bgFn = (await import('../netlify/functions/startscreen-bg.mjs')).default;

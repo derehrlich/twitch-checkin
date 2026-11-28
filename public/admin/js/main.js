@@ -20,6 +20,7 @@ import { initTickets, loadTickets } from './tickets.js';
 import { initGewinn, loadGewinn } from './gewinn.js';
 import { initFeier, loadFeier } from './feier.js';
 import { initPause, loadPause } from './pause.js';
+import { initKochen, loadKochen } from './kochen.js';
 import { initLicht } from './licht.js';
 import { initStartscreen, loadStartscreen } from './startscreen.js';
 import { initNav } from './nav.js';
@@ -37,7 +38,7 @@ function showLogin(disabled) {
 async function init() {
   await loadStatus();
   $('login').classList.add('hidden'); $('app').classList.remove('hidden'); $('logout').classList.remove('hidden');
-  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadStartscreen(), loadUpdate(), loadAutoBackup(), loadStart(), loadStats(), loadMediakit(), loadPoll(), loadLevel()]);
+  await Promise.all([loadSettings(), loadUsers(), loadBoard(), loadCommands(), loadRaids(), loadEntrySounds(), loadCommunity(), loadCatalog(), loadSport(), loadModeration(), loadHealth(), loadTickets(), loadGewinn(), loadFeier(), loadPause(), loadKochen(), loadStartscreen(), loadUpdate(), loadAutoBackup(), loadStart(), loadStats(), loadMediakit(), loadPoll(), loadLevel()]);
   if (new URLSearchParams(location.search).has('verbunden')) {
     $('syncHint').classList.remove('hidden');
     history.replaceState(null, '', '/admin/' + location.hash);
@@ -48,7 +49,7 @@ renderForms();
 $('alpacaUrl').textContent = location.origin + '/alpakas';
 $('chatUrl').textContent = location.origin + '/chat';
 $('chatHochUrl').textContent = location.origin + '/chat-hoch';
-initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initFeier(); initPause(); initLicht(); initStartscreen();
+initSettings(); initStatus(); initMedia(); initSoundboard(); initCommands(); initEntrySound(); initCatalog(); initCommunity(); initVisitors(); initTests(); initRaids(); initBackup(); initSport(); initModeration(); initHealth(); initUpdate(); initTickets(); initGewinn(); initFeier(); initPause(); initKochen(); initLicht(); initStartscreen();
 document.addEventListener('admin:settings', renderMedia);
 document.addEventListener('admin:loggedout', (e) => showLogin(e.detail.adminDisabled));
 
