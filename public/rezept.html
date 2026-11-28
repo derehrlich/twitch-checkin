@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rezept: Gulaschsuppe bei EhrlichVerwirrt</title>
+<meta name="description" content="Gulaschsuppe, der deftige Klassiker – das Rezept zum Nachkochen.">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="/stadtwache.css">
+<style>
+  /* Öffentliche Rezeptseite, der Link kommt mit !rezept in den Chat. Das Rezept steht fest in dieser Datei (Mengen für 4 Portionen, die Seite rechnet um). */
+  main { max-width: 820px; margin: 0 auto; padding: 28px 18px 56px; display: grid; gap: 20px; }
+  .card { padding: 22px 22px 24px; }
+  h2 { margin-top: 0; }
+  .facts { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .facts li { padding: 8px 14px; border-radius: 12px; background: var(--feld); border: 1px solid var(--rand); }
+  .facts b { display: block; font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--leise); }
+  .portionen { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .portionen button { min-width: 40px; }
+  .portionen output { font: 700 1.4rem/1 var(--pixel); color: var(--gelb); min-width: 2ch; text-align: center; }
+  .cols { display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; align-items: start; }
+  @media (max-width: 680px) { .cols { grid-template-columns: 1fr; } }
+  ul.zutaten { list-style: none; margin: 0; padding: 0; }
+  ul.zutaten li { padding: 7px 0; border-bottom: 1px solid var(--rand); }
+  ul.zutaten li:last-child { border-bottom: 0; }
+  ul.zutaten label { display: flex; gap: 10px; align-items: baseline; cursor: pointer; }
+  ul.zutaten input:checked + span { text-decoration: line-through; color: var(--leise); }
+  .hint { color: var(--leise); font-size: .85em; }
+  ol { margin: 0; padding-left: 1.3em; display: grid; gap: 12px; }
+  .tipp { padding: 10px 14px; border-left: 4px solid var(--gelb); background: var(--feld); border-radius: 0 10px 10px 0; margin: 0; }
+  .quelle { text-align: center; color: var(--leise); font-size: .9rem; }
+  .quelle a { color: inherit; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/img/lama.png" alt="" onerror="this.remove()"><div><small>EhrlichVerwirrt</small><h1>Rezept</h1></div></div>
+  <button type="button" id="thema" class="leise thema" aria-label="Hell oder dunkel umschalten" title="Hell / Dunkel">🌓</button>
+</header>
+<main>
+  <section class="card">
+    <h2>Gulaschsuppe, der deftige Klassiker</h2>
+    <ul class="facts">
+      <li><b>Zubereitung</b>15 Min.</li>
+      <li><b>Gesamtzeit</b>2 Std. 5 Min.</li>
+    </ul>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Zutaten</h2>
+      <div class="portionen">
+        <span>Portionen:</span>
+        <button type="button" class="leise" id="minus" aria-label="Eine Portion weniger">−</button>
+        <output id="n" aria-live="polite">15</output>
+        <button type="button" class="leise" id="plus" aria-label="Eine Portion mehr">+</button>
+      </div>
+      <ul class="zutaten" id="zutaten"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Zubereitung</h2>
+      <ol>
+        <li>Zwiebel und Knoblauch klein hacken.</li>
+        <li>Butterschmalz in einem Topf erhitzen und das Rindergulasch portionsweise von allen Seiten scharf anbraten, dann herausnehmen.
+          <p class="tipp"><b>Tipp:</b> Fleisch lieber in mehreren Portionen anbraten, damit schöne Röstaromen entstehen.</p></li>
+        <li>Zwiebeln, Knoblauch, Zucker und Tomatenmark ins Bratfett geben und anschwitzen. Jetzt alles mit einem Schuss Rotwein oder Aceto Balsamico ablöschen.</li>
+        <li>Rinderfond, Gulasch, Salz, Pfeffer, Paprikapulver, Majoran und die Lorbeerblätter in den Topf geben. Alles zugedeckt bei kleiner Hitze für 1,5 Stunden schmoren lassen.</li>
+        <li>Währenddessen Kartoffeln schälen und in Würfel schneiden. Die Möhre in Scheiben schneiden und die Paprika würfeln. Alles zum Gulasch geben und 20 Min. köcheln lassen. Petersilie unterheben.</li>
+      </ol>
+    </section>
+  </div>
+  <p class="quelle">Ein Rezept von <a href="https://gaumenfreundin.de" target="_blank" rel="noopener">Gaumenfreundin.de</a></p>
+</main>
+<script src="/thema.js" defer></script>
+<script>
+// Mengen für 4 Portionen. unit '' = Stück, 'x' = ohne Menge (Text steht in name).
+const BASIS = 4;
+const ZUTATEN = [
+  { q: 2, u: '', name: 'große Zwiebeln' },
+  { q: 2, u: '', name: 'Knoblauchzehen' },
+  { q: 2, u: 'EL', name: 'Butterschmalz' },
+  { q: 500, u: 'g', name: 'Rindergulasch', note: 'durchwachsen, Stücke ca. 3-4 cm' },
+  { q: 2, u: 'EL', name: 'Tomatenmark' },
+  { q: 1.2, u: 'l', name: 'Rinderfond' },
+  { q: 1, u: '', name: 'Schuss Rotwein', note: 'Alternative: Balsamico Essig', fix: true },
+  { u: 'x', name: 'Salz und Pfeffer' },
+  { q: 3, u: 'EL', name: 'Paprikapulver edelsüß', note: 'Tipp: Wenn keine Kinder mitessen, mische ich edelsüß & rosenscharf' },
+  { q: 1, u: 'TL', name: 'Zucker' },
+  { q: 1, u: 'TL', name: 'Majoran' },
+  { q: 2, u: '', name: 'Lorbeerblätter' },
+  { q: 300, u: 'g', name: 'Kartoffeln', note: 'festkochend' },
+  { q: 1, u: '', name: 'Möhre' },
+  { q: 2, u: '', name: 'rote Paprikaschoten' },
+  { q: 1, u: 'EL', name: 'gehackte Petersilie', note: 'Tipp: TK-Kräuter sparen Schnippelzeit' },
+];
+const BRUCH = { 0.25: '¼', 0.5: '½', 0.75: '¾' };
+const $ = (id) => document.getElementById(id);
+let portionen = 15;
+try { const s = Number(new URLSearchParams(location.search).get('p')); if (s >= 1 && s <= 60) portionen = Math.round(s); } catch {}
+
+function menge(z) {
+  if (z.u === 'x') return '';
+  if (z.fix) return `${z.q} `;
+  let v = z.q * portionen / BASIS;
+  if (z.u === 'g' && v >= 1000) return `${(v / 1000).toLocaleString('de-DE', { maximumFractionDigits: 3 })} kg `;
+  if (z.u === 'g') v = Math.round(v / 5) * 5;
+  else if (z.u === 'l') return `${v.toLocaleString('de-DE', { maximumFractionDigits: 2 })} l `;
+  else v = Math.round(v * 4) / 4;
+  const ganz = Math.floor(v), rest = v - ganz;
+  const text = rest ? `${ganz || ''}${BRUCH[rest] ?? rest}` : String(ganz);
+  return `${text}${z.u && z.u !== '' ? ' ' + z.u : ''} `;
+}
+
+function render() {
+  $('n').textContent = portionen;
+  $('zutaten').replaceChildren(...ZUTATEN.map((z) => {
+    const li = document.createElement('li'), label = document.createElement('label'), box = document.createElement('input'), span = document.createElement('span');
+    box.type = 'checkbox';
+    span.textContent = menge(z) + z.name;
+    if (z.note) { const h = document.createElement('span'); h.className = 'hint'; h.textContent = ` – ${z.note}`; span.append(h); }
+    label.append(box, span); li.append(label);
+    return li;
+  }));
+}
+$('minus').onclick = () => { portionen = Math.max(1, portionen - 1); render(); };
+$('plus').onclick = () => { portionen = Math.min(60, portionen + 1); render(); };
+render();
+</script>
+</body>
+</html>

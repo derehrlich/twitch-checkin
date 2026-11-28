@@ -91,6 +91,9 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 - Dorf-Level `netlify/lib/belohnungen/level.mjs` (Tabelle `levelTable` als Text `Punkte | Titel`, `parseTable`/`levelFor`, `lifetimePoints` = alle Monate wie die Rangliste, `ratchet` merkt die höchste Stufe in `level/<twitchId>`: ein Level geht nie verloren). `!level` (`levelReply`), Aufstieg beim Check-in (`levelUpText` in `handleRedemption`), Karte in `meine.mjs`/`meine.html`, Admin `netlify/lib/admin/level.mjs` + `public/admin/js/level.js` (Seite „Dorf-Level“), Schema-Schlüssel `level`. Der **VerwirrBot** holt `GET /api/community/levels` (nur Discord-ID, Stufe, Punkte, keine Namen, fünf Minuten zwischengespeichert) und vergibt die Discord-Rollen. Doku `docs/dorf-level.md`.
 - `!discord` (nutzt die Einstellung `discordInvite`, die es schon für den Clip-Hinweis gibt) und `!plan` (`netlify/lib/chat/plan.mjs`, Plan vom Bot per `POST /api/community/plan` in `bot/plan`, nicht in der Sicherung, älter als 3 Tage = „Plan nicht verfügbar“), Einstellungen in der Gruppe „Discord-Link und Streamplan“ im Schema-Schlüssel `chat`.
 
+## Rezeptseite
+- `public/rezept.html` (`/rezept`, öffentlich, ohne Cloudflare Access): Rezept steht fest in der Datei (Mengen für 4 Portionen, `ZUTATEN`, die Seite rechnet um, Start 15 Portionen, `?p=` setzt die Zahl). Befehl `!rezept` (in `BEFEHLE`, Schalter `rezeptEnabled`, standardmäßig aus, Schema-Schlüssel `chat`, Gruppe „Rezept“) schreibt den Link. Neues Rezept = Datei anpassen.
+
 ## Tests
 - `npm ci && npm test` (aktuell 145 Tests). Vor jedem Pull Request ausführen; neue Funktionen bekommen einen Test in `test/run.mjs`.
 - Der Browser-Test läuft mit `npm run test:e2e`.

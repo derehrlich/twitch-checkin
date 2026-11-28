@@ -2239,7 +2239,7 @@ await test('Chat-Befehle: eine Liste, ausgeschaltete reagieren nicht, Zuschauer 
   const { BEFEHLE, findeBefehl } = await import('../netlify/lib/chat/befehle.mjs');
   await admin(adminReq('PUT', 'settings', { chatEnabled: true, chatCommands: true, soEnabled: true, quoteEnabled: false, communityEnabled: false, commandCooldown: 60 }, cookie));
   const s = await getSettings();
-  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'meine', 'level', 'discord', 'plan', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
+  assert.deepEqual(BEFEHLE.map((b) => b.id), ['streak', 'top', 'verknuepfen', 'rangliste', 'so', 'quote', 'addquote', 'delquote', 'permit', 'geburtstag', 'pause', 'pauseende', 'umfrage', 'umfrageende', 'meine', 'level', 'discord', 'rezept', 'plan', 'adventure', 'tickets', 'platz', 'absagen', 'dabei', 'steam', 'ticketadd', 'ticketremove']);
   assert.equal(findeBefehl('!quote', s), undefined, 'Zitate aus');
   assert.equal(findeBefehl('!verknuepfen', s), undefined, 'Community aus');
   assert.equal(findeBefehl('!so', s).id, 'so');
@@ -3672,6 +3672,12 @@ await test('!discord und !plan: Link aus den Einstellungen, Plan vom Bot (nur mi
   assert.match(plan.planText({ at: now, items: [{ date: '2030-01-01', time: '', text: 'alt' }] }, settings, now), /^📅 Gerade steht kein Stream im Plan\. Schau in https:\/\/discord\.gg\/testlink vorbei\.$/);
   assert.match(plan.planText({ at: now - 4 * 86_400_000, items: stored.items }, settings, now), /Den aktuellen Streamplan findest du/, 'älter als 3 Tage: der Bot meldet sich nicht mehr');
   await db.delete('bot/plan');
+  // !rezept: Link zur öffentlichen Rezeptseite
+  await api('PUT', 'settings', { rezeptEnabled: false });
+  const n1 = chats().length; await say('!rezept'); assert.equal(chats().length, n1, 'ausgeschaltet: keine Antwort');
+  await api('PUT', 'settings', { rezeptEnabled: true });
+  await say('!rezept'); assert.match(chats().at(-1), /^🍲 Das Rezept zum Nachkochen: https?:\/\/\S+\/rezept$/);
+  await api('PUT', 'settings', { rezeptEnabled: false });
   await api('PUT', 'settings', { discordCmdEnabled: false, planCmdEnabled: false });
 });
 
