@@ -3777,36 +3777,38 @@ await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Sei
   assert.equal((await pub()).show, false, 'ausgeschaltet: Befehl tut nichts');
 });
 
-await test('Koch-Overlay: Rezept, Schritte, Wecker, öffentliche Seite, Admin-Knöpfe', async () => {
+await test('Koch-Overlay: Schild, !rezept-Hinweis, Countdown (Minuten oder Zeitpunkt), Admin-Knöpfe', async () => {
   const kochenFn = (await import('../netlify/functions/kochen.mjs')).default;
   const pub = async () => (await kochenFn(new Request(BASE + '/api/kochen'))).json();
   const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
   assert.equal((await admin(adminReq('GET', 'kochen'))).status, 401, 'Admin nur mit Login');
   assert.equal((await pub()).show, false, 'Standard unsichtbar');
-  let v = await (await api('POST', 'kochen/start', { title: 'Pfannkuchen', ingredients: '- 250 g Mehl\n\n2 Eier\n', steps: '1. Rühren\n2) Ruhen lassen\nBacken' })).json();
-  assert.deepEqual(v.state.ingredients, ['250 g Mehl', '2 Eier'], 'Aufzählungszeichen und leere Zeilen fliegen raus');
-  assert.deepEqual(v.state.steps, ['Rühren', 'Ruhen lassen', 'Backen'], 'führende Nummern fliegen raus');
+  await api('POST', 'kochen/countdown', { minutes: 5 });
+  assert.equal((await pub()).countdown, null, 'ohne Schild kein Countdown');
+  let v = await (await api('POST', 'kochen/start', { title: 'Gulaschsuppe' })).json();
+  assert.equal(v.state.active, true);
   v = await pub();
-  assert.equal(v.show, true); assert.equal(v.title, 'Pfannkuchen'); assert.equal(v.step, 0); assert.ok(v.now);
-  await api('POST', 'kochen/prev', {});
-  assert.equal((await pub()).step, 0, 'nicht vor den ersten Schritt');
-  for (let i = 0; i < 5; i++) await api('POST', 'kochen/next', {});
-  assert.equal((await pub()).step, 2, 'nicht hinter den letzten Schritt');
-  // Wecker: zu kurze Zeit wird ignoriert, sonst läuft er bis zur Endzeit
-  await api('POST', 'kochen/timer', { minutes: 0.01, label: 'zu kurz' });
-  assert.equal((await pub()).timer, null);
-  await api('POST', 'kochen/timer', { minutes: 10, label: 'Teig ruht' });
+  assert.equal(v.show, true); assert.equal(v.title, 'Gulaschsuppe'); assert.equal(v.command, '', 'Befehl nur sichtbar, wenn !rezept an ist'); assert.ok(v.now);
+  await api('PUT', 'settings', { rezeptEnabled: true });
+  assert.equal((await pub()).command, (await getSettings()).rezeptCommand);
+  await api('POST', 'kochen/countdown', { minutes: 0.01 });
+  assert.equal((await pub()).countdown, null, 'zu kurz wird ignoriert');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'Essen ist fertig in' });
   v = await pub();
-  assert.equal(v.timer.label, 'Teig ruht'); assert.ok(Math.abs(v.timer.until - v.now - 600_000) < 5000);
-  // Rezept ändern behält Schritt und Wecker
-  await api('POST', 'kochen/start', { title: 'x'.repeat(200), ingredients: Array.from({ length: 30 }, (_, i) => 'Zutat ' + i).join('\n'), steps: 'a\nb\nc' });
+  assert.equal(v.countdown.label, 'Essen ist fertig in'); assert.ok(Math.abs(v.countdown.until - v.now - 30 * 60_000) < 5000);
+  const at = Date.now() + 3 * 86_400_000;
+  await api('POST', 'kochen/countdown', { at, label: '' });
+  assert.equal((await pub()).countdown.until, at, 'bis zu einem Zeitpunkt');
+  await api('POST', 'kochen/countdown', { at: Date.now() - 1000 });
+  assert.equal((await pub()).countdown.until, at, 'Zeitpunkt in der Vergangenheit ändert nichts');
+  await api('POST', 'kochen/start', { title: 'x'.repeat(200) });
   v = await pub();
-  assert.equal(v.title.length, 60); assert.equal(v.ingredients.length, 14); assert.equal(v.step, 2); assert.ok(v.timer);
-  await api('POST', 'kochen/timer/stop', {});
-  assert.equal((await pub()).timer, null);
+  assert.equal(v.title.length, 60); assert.ok(v.countdown, 'Gericht ändern lässt den Countdown stehen');
+  await api('POST', 'kochen/countdown/stop', {});
+  assert.equal((await pub()).countdown, null);
   await api('POST', 'kochen/stop', {});
-  v = await pub();
-  assert.equal(v.show, false); assert.deepEqual(v.steps, []);
+  assert.equal((await pub()).show, false);
+  await api('PUT', 'settings', { rezeptEnabled: false });
 });
 
 await test('Startbildschirm: Vorlauf, Verlängern, Anekdoten, Hintergrundbild, öffentliche Seite', async () => {

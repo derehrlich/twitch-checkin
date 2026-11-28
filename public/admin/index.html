@@ -668,33 +668,29 @@
     <div class="tab-panel hidden" data-panel="kochen">
       <section class="card">
         <h2>Koch-Overlay</h2>
-        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="kochenUrl"></code> anlegen, ganz oben über die Kamera. Sie bleibt unsichtbar, bis du ein Rezept startest. Die Karten sind so gelegt, dass das Kamerabild frei bleibt: Rezept links oben, Zutaten rechts unten, Wecker unten in der Mitte. Mit <code>?size=0.8</code> hinter der Adresse machst du alles kleiner.</p>
+        <p class="muted">In OBS eine Browserquelle (1920×1080) auf <code id="kochenUrl"></code> anlegen, ganz oben über die Kamera. Sie bleibt unsichtbar, bis du das Schild einschaltest. Links oben steht „Heute in der Küche“ mit dem Gericht und dem Befehl <code id="kochenCmd"></code>, rechts unten läuft auf Wunsch ein Countdown. Mit <code>?size=0.8</code> hinter der Adresse wird alles kleiner.</p>
         <div class="grid">
-          <div><label for="kochenTitle">Was wird gekocht?</label><input id="kochenTitle" maxlength="60" placeholder="Heute kochen wir …"></div>
-        </div>
-        <div class="grid">
-          <div><label for="kochenIng">Zutaten (eine pro Zeile, höchstens 14)</label><textarea id="kochenIng" rows="7" placeholder="500 g Mehl&#10;250 ml Milch&#10;3 Eier"></textarea></div>
-          <div><label for="kochenSteps">Schritte (einer pro Zeile, höchstens 20)</label><textarea id="kochenSteps" rows="7" placeholder="Zutaten abwiegen&#10;Teig verrühren&#10;30 Minuten ruhen lassen"></textarea></div>
+          <div><label for="kochenTitle">Gericht</label><input id="kochenTitle" maxlength="60" placeholder="z. B. Gulaschsuppe"></div>
         </div>
         <p class="muted" id="kochenInfo"></p>
         <div class="row">
-          <button id="kochenStart">Rezept starten</button>
-          <button id="kochenPrev" class="ghost">◀ Schritt zurück</button>
-          <button id="kochenNext" class="ghost">Nächster Schritt ▶</button>
-          <button id="kochenStop" class="ghost">Beenden</button>
+          <button id="kochenStart">Schild einschalten</button>
+          <button id="kochenStop" class="ghost">Alles ausblenden</button>
           <a class="btn ghost" href="/kochen?demo" target="_blank" rel="noopener">Vorschau</a>
         </div>
       </section>
       <section class="card">
-        <h2>Küchenwecker</h2>
-        <p class="muted">Der Wecker erscheint unten in der Mitte und blinkt, wenn er abgelaufen ist. Er läuft mit dem Rezept, du kannst ihn aber auch allein stoppen.</p>
+        <h2>Countdown</h2>
+        <p class="muted">Zählt rechts unten herunter, entweder eine Zeitspanne ab jetzt oder bis zu einem Tag und einer Uhrzeit. Ist er abgelaufen, blinkt er mit dem Text „Guten Appetit!“.</p>
         <div class="grid">
-          <div><label for="kochenTimerMin">Minuten</label><input id="kochenTimerMin" type="number" min="0.1" max="360" step="any" value="10"></div>
-          <div><label for="kochenTimerLabel">Wofür? (z. B. Nudeln)</label><input id="kochenTimerLabel" maxlength="40"></div>
+          <div><label for="kochenLabel">Text darüber (z. B. Essen ist fertig in)</label><input id="kochenLabel" maxlength="40" placeholder="Essen ist fertig in"></div>
+          <div><label for="kochenMin">Zeitspanne in Minuten</label><input id="kochenMin" type="number" min="0.1" max="1440" step="any" value="30"></div>
+          <div><label for="kochenAt">… oder bis zu diesem Zeitpunkt</label><input id="kochenAt" type="datetime-local"></div>
         </div>
         <div class="row">
-          <button id="kochenTimerStart">Wecker starten</button>
-          <button id="kochenTimerStop" class="ghost">Wecker stoppen</button>
+          <button id="kochenCdMin">Countdown mit Minuten starten</button>
+          <button id="kochenCdAt" class="ghost">Countdown bis Zeitpunkt starten</button>
+          <button id="kochenCdStop" class="ghost">Countdown wegnehmen</button>
         </div>
       </section>
     </div>

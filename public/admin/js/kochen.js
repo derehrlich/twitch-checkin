@@ -1,41 +1,38 @@
-// Koch-Overlay im Reiter „Overlays“: Rezept starten, Schritte weiterschalten, Küchenwecker.
+// Koch-Overlay im Reiter „Overlays“: Schild einschalten, Countdown stellen.
 import { $, api, run, toast } from './core.js';
 
 let k = null;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const when = (ms) => new Date(ms).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 
 function render() {
   $('kochenUrl').textContent = location.origin + '/kochen';
+  $('kochenCmd').textContent = k.commandOn ? k.command : `${k.command} (noch ausgeschaltet, siehe Chat → Rezept)`;
   const s = k.state;
   $('kochenInfo').innerHTML = s.active
-    ? `<b>Läuft:</b> „${esc(s.title)}“, Schritt ${s.steps.length ? s.step + 1 : 0} von ${s.steps.length}${s.timer ? ', Wecker gestellt' : ''}.`
-    : 'Gerade läuft kein Rezept.';
-  $('kochenStart').textContent = s.active ? 'Rezept ändern' : 'Rezept starten';
-  for (const id of ['kochenStop', 'kochenTimerStart', 'kochenTimerStop']) $(id).disabled = !s.active;
-  $('kochenPrev').disabled = !s.active || s.step <= 0;
-  $('kochenNext').disabled = !s.active || s.step >= s.steps.length - 1;
+    ? `<b>Schild an:</b> „${esc(s.title || '–')}“${s.countdown ? `, Countdown bis ${when(s.countdown.until)} Uhr` : ''}.`
+    : 'Das Schild ist gerade aus.';
+  $('kochenStart').textContent = s.active ? 'Gericht ändern' : 'Schild einschalten';
+  for (const id of ['kochenStop', 'kochenCdMin', 'kochenCdAt']) $(id).disabled = !s.active;
+  $('kochenCdStop').disabled = !s.active || !s.countdown;
 }
 
 export async function loadKochen() {
   k = await api('GET', 'kochen');
-  const s = k.state;
-  // Felder nur füllen, wenn ein Rezept läuft und sie noch leer sind, damit nichts Getipptes überschrieben wird
-  if (s.active && !$('kochenTitle').value && !$('kochenIng').value && !$('kochenSteps').value) {
-    $('kochenTitle').value = s.title; $('kochenIng').value = s.ingredients.join('\n'); $('kochenSteps').value = s.steps.join('\n');
-  }
+  if (k.state.active && !$('kochenTitle').value) $('kochenTitle').value = k.state.title;
   render();
 }
 
 export function initKochen() {
-  const post = (path, body, msg) => run(async () => { k = await api('POST', path, body ?? {}); render(); if (msg) toast(msg); });
-  $('kochenStart').addEventListener('click', run(async () => {
-    k = await api('POST', 'kochen/start', { title: $('kochenTitle').value, ingredients: $('kochenIng').value, steps: $('kochenSteps').value }); render(); toast('Rezept läuft ✓');
+  const act = (path, body, msg) => run(async () => { k = await api('POST', path, body()); render(); if (msg) toast(msg); });
+  $('kochenStart').addEventListener('click', act('kochen/start', () => ({ title: $('kochenTitle').value }), 'Schild läuft ✓'));
+  $('kochenStop').addEventListener('click', act('kochen/stop', () => ({}), 'Ausgeblendet ✓'));
+  $('kochenCdMin').addEventListener('click', act('kochen/countdown', () => ({ minutes: Number($('kochenMin').value), label: $('kochenLabel').value }), 'Countdown läuft ✓'));
+  $('kochenCdAt').addEventListener('click', run(async () => {
+    const t = new Date($('kochenAt').value).getTime(); // Ortszeit des Browsers
+    if (!Number.isFinite(t)) return toast('Bitte Tag und Uhrzeit wählen');
+    if (t < Date.now() + 5000) return toast('Der Zeitpunkt liegt schon in der Vergangenheit');
+    k = await api('POST', 'kochen/countdown', { at: t, label: $('kochenLabel').value }); render(); toast('Countdown läuft ✓');
   }));
-  $('kochenNext').addEventListener('click', post('kochen/next'));
-  $('kochenPrev').addEventListener('click', post('kochen/prev'));
-  $('kochenStop').addEventListener('click', post('kochen/stop', {}, 'Beendet ✓'));
-  $('kochenTimerStart').addEventListener('click', run(async () => {
-    k = await api('POST', 'kochen/timer', { minutes: Number($('kochenTimerMin').value), label: $('kochenTimerLabel').value }); render(); toast('Wecker läuft ✓');
-  }));
-  $('kochenTimerStop').addEventListener('click', post('kochen/timer/stop', {}, 'Wecker gestoppt ✓'));
+  $('kochenCdStop').addEventListener('click', act('kochen/countdown/stop', () => ({}), 'Countdown weggenommen ✓'));
 }

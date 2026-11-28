@@ -1,57 +1,42 @@
-// Koch-Overlay (/kochen): Rezeptkarte, Zutaten und Küchenwecker, so gelegt, dass sie das Kamerabild frei lassen.
-//   cook/state  { active, title, ingredients[], steps[], step (0-basiert), timer: { label, until (ms), seconds } | null, startedAt }
+// Koch-Overlay (/kochen): Schild „Heute in der Küche“ mit Gericht und !rezept-Befehl, dazu ein Countdown.
+//   cook/state  { active, title, countdown: { until (ms), label } | null }
 // Gesteuert per Knopf im Admin (Reiter Overlays → Kochen). Die Seite holt den Stand alle paar Sekunden.
 import { db } from '../kern/store.mjs';
 
 export const STATE_KEY = 'cook/state';
-const IDLE = { active: false, title: '', ingredients: [], steps: [], step: 0, timer: null, startedAt: 0 };
-const MAX = { title: 60, line: 140, ingredients: 14, steps: 20 };
+const IDLE = { active: false, title: '', countdown: null };
 
 export const getState = async () => ({ ...IDLE, ...((await db.get(STATE_KEY)) ?? {}) });
 
-/** Text mit einer Zeile je Eintrag → saubere Liste (leere Zeilen, Aufzählungszeichen und führende Nummern fliegen raus). */
-export const parseLines = (text, max) => String(text ?? '').split(/\r?\n/)
-  .map((l) => l.replace(/^\s*(?:[-*•]|\d{1,2}[.)])\s*/, '').trim().slice(0, MAX.line)).filter(Boolean).slice(0, max);
-
-export async function start({ title, ingredients, steps } = {}, now = Date.now()) {
+/** Schild einschalten oder das Gericht ändern (der Countdown bleibt, wie er ist). */
+export async function start({ title } = {}) {
   const old = await getState();
-  const list = Array.isArray(steps) ? steps : parseLines(steps, MAX.steps);
-  const state = {
-    active: true,
-    title: String(title ?? '').trim().slice(0, MAX.title) || 'Heute kochen wir',
-    ingredients: Array.isArray(ingredients) ? ingredients.slice(0, MAX.ingredients) : parseLines(ingredients, MAX.ingredients),
-    steps: list,
-    // Beim Ändern eines laufenden Rezepts bleibt der Schritt und der Wecker, wo sie waren
-    step: old.active ? Math.min(old.step, Math.max(0, list.length - 1)) : 0,
-    timer: old.active ? old.timer : null,
-    startedAt: old.active ? old.startedAt : now,
-  };
+  const state = { active: true, title: String(title ?? '').trim().slice(0, 60), countdown: old.active ? old.countdown : null };
   await db.set(STATE_KEY, state);
   return state;
 }
 
-/** Einen Schritt weiter (+1) oder zurück (-1), bleibt immer innerhalb der Liste. */
-export async function move(delta) {
+/**
+ * Countdown stellen: entweder `minutes` ab jetzt oder `at` (Datum und Uhrzeit als Text, z. B. „2026-11-29T18:30“,
+ * gilt in der Zeitzone des Servers) bzw. Millisekunden. Zu kleine oder vergangene Zeiten werden ignoriert.
+ */
+export async function setCountdown({ minutes, at, label } = {}, now = Date.now()) {
   const s = await getState();
   if (!s.active) return s;
-  s.step = Math.min(Math.max(0, s.steps.length - 1), Math.max(0, s.step + (Number(delta) < 0 ? -1 : 1)));
+  let until = null;
+  if (at !== undefined && at !== null && at !== '') {
+    const t = typeof at === 'number' ? at : new Date(at).getTime();
+    if (Number.isFinite(t)) until = t;
+  } else if (Number(minutes) > 0) until = now + Math.round(Number(minutes) * 60_000);
+  if (until === null || until < now + 5000 || until > now + 366 * 86_400_000) return s;
+  s.countdown = { until, label: String(label ?? '').trim().slice(0, 40) };
   await db.set(STATE_KEY, s);
   return s;
 }
 
-export async function setTimer({ minutes, label } = {}, now = Date.now()) {
+export async function stopCountdown() {
   const s = await getState();
-  if (!s.active) return s;
-  const seconds = Math.round(Number(minutes) * 60);
-  if (!(seconds >= 5)) return s;
-  s.timer = { label: String(label ?? '').trim().slice(0, 40), seconds: Math.min(seconds, 6 * 3600), until: now + Math.min(seconds, 6 * 3600) * 1000 };
-  await db.set(STATE_KEY, s);
-  return s;
-}
-
-export async function stopTimer() {
-  const s = await getState();
-  if (s.timer) { s.timer = null; await db.set(STATE_KEY, s); }
+  if (s.countdown) { s.countdown = null; await db.set(STATE_KEY, s); }
   return s;
 }
 
@@ -62,7 +47,7 @@ export async function stop() {
 }
 
 /** Was die OBS-Seite braucht. `now` ist die Serverzeit in Millisekunden. */
-export async function publicView(now = Date.now()) {
+export async function publicView(settings, now = Date.now()) {
   const s = await getState();
-  return { show: s.active, title: s.title, ingredients: s.ingredients, steps: s.steps, step: s.step, timer: s.timer, now };
+  return { show: s.active, title: s.title, command: settings.rezeptEnabled ? settings.rezeptCommand : '', countdown: s.countdown, now };
 }
