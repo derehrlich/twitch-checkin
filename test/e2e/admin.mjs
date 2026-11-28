@@ -71,7 +71,7 @@ await page.fill('#pw', 'geheim'); await page.click('#loginForm button');
 await page.waitForSelector('#app:visible'); ok('Anmeldung klappt');
 
 // 2. Reiter
-assert.equal(await page.locator('.tabs button[data-tab]').count(), 30);
+assert.equal(await page.locator('.tabs button[data-tab]').count(), 31);
 // Einstellungen stehen in zugeklappten Karten: für den Test alle aufklappen
 const openFolds = () => page.evaluate(() => document.querySelectorAll('details.fold').forEach((d) => { d.open = true; }));
 const go = async (tab) => { await page.click(`.tabs button[data-tab="${tab}"]`); await openFolds(); };

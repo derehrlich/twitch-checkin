@@ -31,24 +31,6 @@ export function initKochen() {
   $('kochenStart').addEventListener('click', run(async () => {
     k = await api('POST', 'kochen/start', { title: $('kochenTitle').value, ingredients: $('kochenIng').value, steps: $('kochenSteps').value }); render(); toast('Rezept läuft ✓');
   }));
-  $('kochenNext').disabled = !s.active || s.step >= s.steps.length - 1;
-}
-
-export async function loadKochen() {
-  k = await api('GET', 'kochen');
-  const s = k.state;
-  // Felder nur füllen, wenn ein Rezept läuft und sie noch leer sind, damit nichts Getipptes überschrieben wird
-  if (s.active && !$('kochenTitle').value && !$('kochenIng').value && !$('kochenSteps').value) {
-    $('kochenTitle').value = s.title; $('kochenIng').value = s.ingredients.join('\n'); $('kochenSteps').value = s.steps.join('\n');
-  }
-  render();
-}
-
-export function initKochen() {
-  const post = (path, body, msg) => run(async () => { k = await api('POST', path, body ?? {}); render(); if (msg) toast(msg); });
-  $('kochenStart').addEventListener('click', post('kochen/start', undefined, 'Rezept läuft ✓').constructor === Function ? run(async () => {
-    k = await api('POST', 'kochen/start', { title: $('kochenTitle').value, ingredients: $('kochenIng').value, steps: $('kochenSteps').value }); render(); toast('Rezept läuft ✓');
-  }) : null);
   $('kochenNext').addEventListener('click', post('kochen/next'));
   $('kochenPrev').addEventListener('click', post('kochen/prev'));
   $('kochenStop').addEventListener('click', post('kochen/stop', {}, 'Beendet ✓'));

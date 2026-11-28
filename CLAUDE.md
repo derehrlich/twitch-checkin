@@ -72,6 +72,9 @@ test/run.mjs         Unit-Tests (npm test), test/e2e/admin.mjs Browser-Test (npm
 ## Pause-Overlay
 - `netlify/lib/overlays/pause.mjs` (Schlüssel `pause/state`), öffentlich `GET /api/pause`, Seite `public/pause.html` (`/pause`), Admin-Route `netlify/lib/admin/pause.mjs`, Knöpfe in `public/admin/js/pause.js` (Reiter Overlays). Chat: `!pause [Minuten] Text` und `!weiter`, nur Mods/Broadcaster, Schalter `pauseEnabled` (standardmäßig aus), Einstellungen im Schema-Schlüssel `pause`.
 
+## Koch-Overlay
+- `netlify/lib/overlays/kochen.mjs` (Schlüssel `cook/state`: Titel, Zutaten, Schritte, aktueller Schritt, Wecker), öffentlich `GET /api/kochen`, Seite `public/kochen.html` (`/kochen`, `?size=`, `?demo`), Admin-Route `netlify/lib/admin/kochen.mjs` + `public/admin/js/kochen.js` (Seite „Kochen“ im Reiter Overlays). Kein Schema-Eintrag, keine Chat-Befehle. Die drei Karten (Rezept links oben auf der Dunstabzugshaube, Zutaten rechts unten auf den Schranktüren, Wecker unten auf dem Tisch) sind auf Marcels Küchenkamera abgestimmt; steht die Kamera anders, die Plätze oben in der Datei ändern. Doku `docs/kochen.md`.
+
 ## Startbildschirm-Overlay
 - `netlify/lib/overlays/startscreen.mjs` (Schlüssel `startscreen/config`, `startscreen/state`, Hintergrundbild `startbg/image`), öffentlich `GET /api/startscreen` und `/api/startscreen-bg`, Seite `public/startscreen.html` (`/startscreen`, vollflächig; `?rahmen` für Marcels Rahmen-Overlay mit Holzleiste und Kamera, `?bg=0` durchsichtig, `?demo`), Admin-Route `netlify/lib/admin/startscreen.mjs`, Karte in `public/admin/js/startscreen.js` (Reiter Overlays). Vorlauf-Countdown, Baufortschritt-Balken und wechselnde Bauanekdoten (Zeile `Überschrift | Text`). Doku: `docs/startscreen.md`. Kein Schema-Eintrag, alles liegt in der eigenen Config.
 
