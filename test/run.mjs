@@ -3777,6 +3777,45 @@ await test('Pause-Overlay: !pause Text / !weiter nur für Mods, öffentliche Sei
   assert.equal((await pub()).show, false, 'ausgeschaltet: Befehl tut nichts');
 });
 
+await test('Koch-Overlay: Schild, !rezept-Hinweis, Countdown (Minuten oder Zeitpunkt), Admin-Knöpfe', async () => {
+  const kochenFn = (await import('../netlify/functions/kochen.mjs')).default;
+  const pub = async () => (await kochenFn(new Request(BASE + '/api/kochen'))).json();
+  const api = (m, p, b) => admin(adminReq(m, p, b, cookie));
+  assert.equal((await admin(adminReq('GET', 'kochen'))).status, 401, 'Admin nur mit Login');
+  assert.equal((await pub()).show, false, 'Standard unsichtbar');
+  await api('POST', 'kochen/countdown', { minutes: 5 });
+  assert.equal((await pub()).countdown, null, 'ohne Schild kein Countdown');
+  let v = await (await api('POST', 'kochen/start', { title: 'Gulaschsuppe' })).json();
+  assert.equal(v.state.active, true);
+  v = await pub();
+  assert.equal(v.show, true); assert.equal(v.title, 'Gulaschsuppe'); assert.equal(v.command, '', 'Befehl nur sichtbar, wenn !rezept an ist'); assert.ok(v.now);
+  await api('PUT', 'settings', { rezeptEnabled: true });
+  assert.equal((await pub()).command, (await getSettings()).rezeptCommand);
+  await api('POST', 'kochen/countdown', { minutes: 0.01 });
+  assert.equal((await pub()).countdown, null, 'zu kurz wird ignoriert');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'Essen ist fertig in' });
+  v = await pub();
+  assert.equal(v.countdown.doneText, 'Guten Appetit!', 'Standardtext');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'x', doneText: 'Essen ist fertig!' });
+  assert.equal((await pub()).countdown.doneText, 'Essen ist fertig!', 'eigener Text');
+  await api('POST', 'kochen/countdown', { minutes: 30, label: 'Essen ist fertig in' });
+  v = await pub();
+  assert.equal(v.countdown.label, 'Essen ist fertig in'); assert.ok(Math.abs(v.countdown.until - v.now - 30 * 60_000) < 5000);
+  const at = Date.now() + 3 * 86_400_000;
+  await api('POST', 'kochen/countdown', { at, label: '' });
+  assert.equal((await pub()).countdown.until, at, 'bis zu einem Zeitpunkt');
+  await api('POST', 'kochen/countdown', { at: Date.now() - 1000 });
+  assert.equal((await pub()).countdown.until, at, 'Zeitpunkt in der Vergangenheit ändert nichts');
+  await api('POST', 'kochen/start', { title: 'x'.repeat(200) });
+  v = await pub();
+  assert.equal(v.title.length, 60); assert.ok(v.countdown, 'Gericht ändern lässt den Countdown stehen');
+  await api('POST', 'kochen/countdown/stop', {});
+  assert.equal((await pub()).countdown, null);
+  await api('POST', 'kochen/stop', {});
+  assert.equal((await pub()).show, false);
+  await api('PUT', 'settings', { rezeptEnabled: false });
+});
+
 await test('Startbildschirm: Vorlauf, Verlängern, Anekdoten, Hintergrundbild, öffentliche Seite', async () => {
   const pubFn = (await import('../netlify/functions/startscreen.mjs')).default;
   const bgFn = (await import('../netlify/functions/startscreen-bg.mjs')).default;

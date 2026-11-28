@@ -9,7 +9,7 @@ export const NAV = [
   ['Belohnungen', [['soundboard', '🔊', 'Soundboard'], ['einlaufsound', '🎺', 'Einlaufsound'], ['alpakas', '🦙', 'Alpakas'], ['community', '🏆', 'Rangliste'], ['level', '🏗️', 'Dorf-Level'], ['meine', '🙋', 'Meine Stadtwache']]],
   ['Zahlen', [['statistik', '📈', 'Twitch-Statistik'], ['mediakit', '📰', 'Mediakit']]],
   ['Aktionen', [['tickets', '🎟️', 'Events und Tickets'], ['gewinn', '🎁', 'Gewinnspiel'], ['umfrage', '📊', 'Umfragen'], ['feier', '🎂', 'Geburtstagswoche'], ['rad', '🎡', 'Glücksrad'], ['adventure', '🗺️', 'Adventures']]],
-  ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
+  ['Overlays', [['obs', '🎬', 'OBS-Adressen'], ['startscreen', '⏳', 'Startbildschirm'], ['pause', '☕', 'Pause'], ['kochen', '🍳', 'Kochen'], ['abspann', '📜', 'Abspann und Panel'], ['sport', '🏃', 'Sport']]],
   ['Verwaltung', [['medien', '🎵', 'Töne und Bilder'], ['tests', '🧪', 'Tests'], ['system', '⚙️', 'System']]],
 ];
 export const PAGES = NAV.flatMap(([group, items]) => items.map(([id, icon, name]) => ({ id, icon, name, group })));
@@ -20,7 +20,7 @@ const OLD = { checkin: 'zuschauer', besucher: 'zuschauer', alerts: 'ereignisse',
 const OVERLAYS = [
   ['Chat-Leiste (waagerecht)', '/chat', '1920 × 120', 'chatleiste'], ['Klassischer Chat', '/chat-hoch', '560 × 420', 'chatleiste'],
   ['Alpaka-Leiste', '/alpakas', '1920 × 120', 'alpakas'], ['Startbildschirm', '/startscreen', '1920 × 1080', 'startscreen'],
-  ['Pause', '/pause', '1920 × 1080', 'pause'], ['Abspann', '/abspann', '1920 × 1080', 'abspann'], ['Rangliste', '/rangliste?overlay', 'frei', 'abspann'],
+  ['Pause', '/pause', '1920 × 1080', 'pause'], ['Kochen', '/kochen', '1920 × 1080', 'kochen'], ['Abspann', '/abspann', '1920 × 1080', 'abspann'], ['Rangliste', '/rangliste?overlay', 'frei', 'abspann'],
   ['Sport-Scoreboard', '/sport', '1920 × 1080', 'sport'], ['Countdown', '/countdown', '1920 × 1080', 'feier'],
   ['Glücksrad', '/rad', '1920 × 1080', 'rad'], ['Gewinnspiel-Ziehung', '/gewinn/overlay', '1920 × 1080', 'gewinn'], ['Umfrage', '/umfrage', '1920 × 1080', 'umfrage'], ['Meine Stadtwache (Zuschauer-Seite)', '/meine', 'Browser', 'meine'],
   ['Mediakit (öffentliche Seite)', '/mediakit', 'Browser', 'mediakit'],

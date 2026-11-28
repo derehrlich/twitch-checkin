@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stadtwache Kochen</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* Koch-Overlay als OBS-Browserquelle (1920×1080, Hintergrund durchsichtig), ganz oben über der Küchenkamera.
+     Gericht und Countdown stellst du im Admin ein (Reiter „Overlays“ → Kochen).
+     Platz (auf Marcels Küchenkamera so gewählt, dass nichts Wichtiges verdeckt wird):
+       Schild    links oben auf der schwarzen Dunstabzugshaube
+       Countdown rechts unten auf den leeren Schranktüren
+     ?size=0.6 … 2   alles größer oder kleiner (Standard 1)    ?demo   Beispiel, immer sichtbar */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: var(--font); }
+  .card { position: fixed; box-sizing: border-box; opacity: 0; --s: 1; --in: translate(0, 0); transform: var(--out) scale(var(--s)); transition: transform .7s cubic-bezier(.2, .9, .3, 1), opacity .5s; }
+  .card.on { opacity: 1; transform: var(--in) scale(var(--s)); }
+  .none { display: none !important; }
+
+  #sign { left: 20px; top: 46px; width: 420px; padding: 14px 20px 16px; --out: translate(-120%, 0); transform-origin: 0 0; }
+  #sign .kicker { font: 700 30px/1.1 var(--wordmark); color: #ffd45e; text-shadow: 2px 2px 0 rgba(43, 24, 12, .8); }
+  #sign .dish { margin-top: 8px; font-size: 32px; font-weight: 700; line-height: 1.15; color: #fff3da; text-shadow: 0 2px 0 rgba(43, 24, 12, .75); overflow-wrap: anywhere; }
+  #sign .cmd { margin-top: 12px; display: inline-block; padding: 3px 14px; border-radius: 9px; background: rgba(20, 10, 4, .55); font-size: 22px; font-weight: 600; color: #e9d3ae; }
+
+  #cd { left: 1450px; top: 700px; width: 400px; padding: 10px 20px 12px; text-align: center; --out: translate(120%, 0); transform-origin: 100% 0; }
+  #cd .label { font-size: 20px; font-weight: 600; letter-spacing: 1px; color: #e9d3ae; text-transform: uppercase; }
+  #cd .label:empty { display: none; }
+  #cd .clock { font: 700 60px/1.05 var(--wordmark); color: #ffd45e; text-shadow: 3px 3px 0 rgba(43, 24, 12, .8); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #cd .clock.long { font-size: 44px; }
+  #cd.done .clock { color: #ff7a5c; font-size: 40px; animation: blink .8s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+</style>
+</head>
+<body>
+<div id="sign" class="card panel">
+  <div class="kicker">Heute in der Küche:</div>
+  <div class="dish" id="dish"></div>
+  <div class="cmd none" id="cmd"></div>
+</div>
+<div id="cd" class="card panel">
+  <div class="label" id="label"></div>
+  <div class="clock" id="clock"></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const size = Number(params.get('size'));
+if (size >= 0.3 && size <= 3) document.querySelectorAll('.card').forEach((c) => c.style.setProperty('--s', size));
+
+let cfg = null, offset = 0;
+const DEMO = () => ({ show: true, title: 'Gulaschsuppe', command: '!rezept', countdown: { doneText: 'Guten Appetit!', label: 'Essen ist fertig in', until: Date.now() + 47 * 60_000 + 12_000 }, now: Date.now() });
+
+async function poll() {
+  try {
+    const v = params.has('demo') ? DEMO() : await (await fetch('/api/kochen', { cache: 'no-store' })).json();
+    offset = v.now - Date.now(); // Serverzeit minus Zeit dieses Rechners
+    cfg = v;
+  } catch { /* beim nächsten Mal wieder */ }
+}
+
+const two = (n) => String(n).padStart(2, '0');
+function frame() {
+  requestAnimationFrame(frame);
+  const on = !!(cfg && cfg.show);
+  $('sign').classList.toggle('on', on);
+  const c = on ? cfg.countdown : null;
+  $('cd').classList.toggle('on', !!c);
+  if (!on) return;
+  $('dish').textContent = cfg.title; $('dish').classList.toggle('none', !cfg.title);
+  $('cmd').textContent = cfg.command ? `${cfg.command} für das Rezept` : ''; $('cmd').classList.toggle('none', !cfg.command || !cfg.title);
+  if (!c) return;
+  const left = Math.max(0, c.until - (Date.now() + offset)), s = Math.ceil(left / 1000);
+  const days = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  $('cd').classList.toggle('done', left === 0);
+  $('label').textContent = left > 0 ? c.label : '';
+  const clock = $('clock');
+  clock.textContent = left === 0 ? (c.doneText || 'Guten Appetit!') : days > 0 ? `${days} T ${two(h)}:${two(m)}:${two(s % 60)}` : h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
+  clock.classList.toggle('long', days > 0);
+}
+
+poll(); setInterval(poll, 3000); frame();
+</script>
+</body>
+</html>

@@ -61,6 +61,11 @@
   status = 200
 
 [[redirects]]
+  from = "/kochen"
+  to = "/kochen.html"
+  status = 200
+
+[[redirects]]
   from = "/startscreen"
   to = "/startscreen.html"
   status = 200
